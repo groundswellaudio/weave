@@ -3,8 +3,22 @@
 #include <glad/glad.h>
 #include <concepts>
 #include <cassert>
+#include <iostream>
 
 #include "spiral.hpp"
+
+#include <iostream>
+
+template <class T>
+auto& operator<<(std::ostream& os, const vec<T, 2>& v) {
+  os << "{" << v.x << " " << v.y << "}";
+  return os;
+}
+
+auto& operator<<(std::ostream& os, widget_id id) {
+  os << id.base.value << "." << id.offset;
+  return os;
+}
 
 class sdl_backend
 {
@@ -229,8 +243,19 @@ struct mouse_event_dispatcher
     return (p.x >= pos.x && p.x <= pos.x + sz.x && p.y >= pos.y && p.y <= pos.y + sz.y);
   }
   
+  void set_focused(widget_id id, vec2f offset) {
+    if (id == focused)
+      return;
+    std::cout << "set focused " << id << " " << offset << std::endl;
+    focused = id;
+    current_offset = offset;
+  }
+  
+  // offset + widget.pos = absolute position
   bool try_push_down(mouse_event e, widget_tree& t, widget_id id, vec2f offset = {0, 0}) 
-  {
+  { 
+    assert( offset.x >= 0 && offset.y >= 0 && "negative offset?" );
+    std::cout << "try push down " << e.position << " " << id << " " << offset << std::endl;
     auto w = t.find(id);
     assert( w );
     auto pos = w->pos();
@@ -241,19 +266,20 @@ struct mouse_event_dispatcher
       for (auto& cid : w->children())
         if (try_push_down(e, t, cid, offset + pos))
           return true;
-      focused = id;
-      current_offset = offset;
+      set_focused(id, offset + pos);
       return true;
     }
     return false;
   }
   
   void try_push_up(mouse_event e, widget_tree& t, widget_id id, vec2f offset = {0, 0})
-  {
+  { 
+    assert( offset.x >= 0 && offset.y >= 0 && "negative offset?" );
+    std::cout << "try push up " << e.position << " " << id << " " << offset << std::endl;
+    
     auto w = t.find(id);
     if (contains(*w, e.position - offset)) {
-      focused = id;
-      current_offset = offset;
+      set_focused(id, offset);
     }
     else {
       auto next = w->parent_id();
