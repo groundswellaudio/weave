@@ -27,11 +27,7 @@ struct mouse_up {
 
 struct mouse_move {
 	vec2f delta;
-	mouse_button button : 2;
-};
-
-struct mouse_drag {
-	vec2f delta;
+	bool is_dragging; 
 	mouse_button button : 2;
 };
 
@@ -41,14 +37,16 @@ struct mouse_scroll {
 
 struct mouse_event {
   vec2f position;
-  std::variant<mouse_enter, mouse_exit, mouse_down, mouse_up, mouse_move, 
-               mouse_drag, mouse_scroll> event; 
+  std::variant<mouse_enter, mouse_exit, mouse_down, mouse_up, mouse_move, mouse_scroll> event; 
+  
+  bool is_mouse_move() { return is<mouse_move>(); }
+  bool is_mouse_drag() { return is<mouse_move>() && get_as<mouse_move>().is_dragging; }
   
   template <class T>
   bool is() const { return holds_alternative<T>(event); } 
   
   template <class T>
-  T& get_as() const { return std::get<T>(event); }
+  T& get_as() { return std::get<T>(event); }
 };
 
 using input_event = mouse_event;
@@ -65,4 +63,4 @@ template <class T, class... Ts>
 static constexpr auto is_one_of = ((^T == ^Ts) or ...);
 
 template <class T>
-concept is_mouse_event = is_one_of<T, mouse_enter, mouse_exit, mouse_down, mouse_up, mouse_move, mouse_drag, mouse_scroll>; 
+concept is_mouse_event = is_one_of<T, mouse_enter, mouse_exit, mouse_down, mouse_up, mouse_move, mouse_scroll>; 

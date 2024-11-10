@@ -2,33 +2,11 @@
 
 #include <unordered_map>
 #include <vector>
-#include "events/mouse_events.hpp"
 #include <functional>
+#include <iostream>
 
-struct painter;
-
-struct layout_tag {};
-
-struct view_id {
-  bool operator==(const view_id&) const = default;
-  unsigned value = 0;
-};
-
-struct widget_id {
-  
-  constexpr widget_id() = default;
-  constexpr widget_id(view_id id) : base{id} {}
-  
-  bool operator==(const widget_id& o) const = default; 
-  view_id base;
-  unsigned offset = 0;
-};
-
-template <>
-class std::hash<widget_id> {
-  public : 
-  constexpr std::size_t operator()(const widget_id& x) const { return (std::size_t(x.base.value << 32) | x.offset); }
-};
+#include "events/mouse_events.hpp"
+#include "view.hpp"
 
 template <class T>
 struct event_context {
@@ -54,6 +32,25 @@ struct event_context {
   std::function<T(void*)> read_fn;
 };
 
+consteval std::meta::expr to_str(std::meta::type t) {
+  std::meta::ostream os;
+  os << t;
+  return make_literal_expr(os);
+}
+
+template <class T>
+auto& operator<<(std::ostream& os, const vec<T, 2>& v) {
+  os << "{" << v.x << " " << v.y << "}";
+  return os;
+}
+
+auto& operator<<(std::ostream& os, widget_id id) {
+  os << id.base.value << "." << id.offset;
+  return os;
+}
+
+struct painter; 
+
 struct widget_tree 
 {
   struct children_view;
@@ -64,8 +61,9 @@ struct widget_tree
   
     struct model 
     {
+      virtual void debug_dump() = 0;
       virtual void paint(painter& p, vec2f size, void* state) = 0;
-      virtual vec2f layout(children_view v) = 0;
+      virtual vec2f layout(children_view v, vec2f size) = 0;
       virtual void on(input_event e, vec2f this_size, void* ctx_ptr) = 0;
       virtual ~model() {};
     };
@@ -77,7 +75,11 @@ struct widget_tree
   
     template <class T, class Lens>
     struct model_impl final : model_impl_base<T> {
-    
+      
+      void debug_dump() { 
+        std::cerr << %to_str(^T);
+      }
+      
       void on(input_event e, vec2f this_size, void* ctx_ptr) override 
       {
         if constexpr (^Lens != ^void)
@@ -100,10 +102,10 @@ struct widget_tree
           this->obj.paint(p, size);
       }
     
-      vec2f layout(children_view v) override {
+      vec2f layout(children_view v, vec2f size) override {
         if constexpr (is_base_of(^layout_tag, ^T))
           return this->obj.layout(v);
-        return {0, 0};
+        return size;
       }
       
       ~model_impl() override {}
@@ -123,7 +125,7 @@ struct widget_tree
     }
   
     auto layout(children_view v) {
-      size_v = model_ptr->layout(v);
+      size_v = model_ptr->layout(v, size());
       return size_v;
     }
   
@@ -160,6 +162,20 @@ struct widget_tree
     
     auto& children() const { return children_v; }
     
+    vec2f layout(widget_tree& tree) {
+      return this->layout( children_view{children_v, tree} );
+    }
+    
+    void debug_dump(widget_tree& tree, int indentation) {
+      std::cerr << std::endl;
+      for (int k = 0; k < indentation; ++k)
+        std::cerr << "\t";
+      std::cerr << "pos " << pos_v  << " size " << size_v << " ";
+      model_ptr->debug_dump();
+      for (auto& c : tree.children(*this))
+        c.debug_dump(tree, indentation + 1);
+    }
+    
     private : 
     
     vec2f pos_v, size_v;
@@ -168,41 +184,37 @@ struct widget_tree
     std::unique_ptr<model> model_ptr;
   };
   
-  /* 
-  struct node_and_children {
-    widget node;
-    std::vector<widget_id> children;
-  };  */ 
-  
   struct children_view {
     
     struct iterator 
     {
-      auto& operator++() { ++it; return *this; }
+      iterator& operator++() { ++it; return *this; }
       bool operator==(iterator o) const { return it == o.it; }
-      auto& operator*() const { return self.get(*it); }
+      widget& operator*() const { return self.get(*it); }
       
       std::vector<widget_id>::const_iterator it; 
       widget_tree& self;
     };
     
-    auto begin() const {
+    iterator begin() const {
       return iterator{child_vec.begin(), self};
     }
     
-    auto end() const {
+    iterator end() const {
       return iterator{child_vec.end(), self};
     }
+    
+    widget_tree& tree() const { return self; }
   
     const std::vector<widget_id>& child_vec;
     widget_tree& self;
   };
   
-  auto children(widget_id id) {
+  children_view children(widget_id id) {
     return children_view{get(id).children(), *this};
   }
   
-  auto children(widget& w) {
+  children_view children(widget& w) {
     return children(w.id());
   }
   
@@ -224,27 +236,25 @@ struct widget_tree
     it->second.emplace<T, Lens>();
     it->second.set_size(size);
     it->second.set_pos(0, 0);
-    //get(parent).add_child(id);
     return &it->second;
   }
+  
+  widget& parent(widget& w) { return get(w.parent_id()); }
   
   widget* root() { return &widget_map.find(widget_id{view_id{0}})->second; }
   
   void layout() {
-    root()->layout( children(widget_id{view_id{0}}) );
+    root()->layout(*this);
+  }
+  
+  void debug_dump() {
+    root()->debug_dump(*this, 0);
   }
   
   std::unordered_map<widget_id, widget> widget_map;
 };
 
 using widget = widget_tree::widget;
-
-struct view {
-  auto& operator=(const view&) { return *this; }
-  widget_id view_id = {};
-};
-
-struct composed_view : view {};
 
 struct widget_tree_builder 
 {
@@ -267,7 +277,7 @@ struct widget_tree_builder
   }
   
   template <class T, class Lens = void>
-  widget_tree::widget* create_widget(widget_id id, vec2f size) {
+  widget* create_widget(widget_id id, vec2f size) {
     return tree.create_widget<T, Lens>(id, current_id, size);
   }
 };

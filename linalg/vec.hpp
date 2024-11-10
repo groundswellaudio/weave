@@ -70,6 +70,8 @@ struct vec<T, 2>
     return Res;
   }
   
+  constexpr bool operator==(const vec<T, 2>& o) const = default;
+  
   constexpr auto operator-() const {
     vec<T, 2> res {*this};
     res.x = -res.x;
