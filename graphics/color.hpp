@@ -22,7 +22,7 @@ struct rgb {
   template <class V>
   constexpr operator rgb<V> () const 
   {
-    static constexpr double norm_factor = (double) rgb<V>::norm() / norm();
+    static constexpr double norm_factor = ((double) rgb<V>::norm()) / norm();
     return { (V)(data[0] * norm_factor), (V)(data[1] * norm_factor), (V)(data[2] * norm_factor)}; 
   }
   

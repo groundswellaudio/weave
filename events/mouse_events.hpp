@@ -41,6 +41,7 @@ struct mouse_event {
   
   bool is_mouse_move() { return is<mouse_move>(); }
   bool is_mouse_drag() { return is<mouse_move>() && get_as<mouse_move>().is_dragging; }
+  bool is_mouse_down() { return is<mouse_down>(); }
   
   template <class T>
   bool is() const { return holds_alternative<T>(event); } 

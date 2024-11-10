@@ -122,7 +122,6 @@ struct application
     widget_tree_builder builder {tree};
     builder.construct_view(app_view);
     tree.layout();
-    tree.debug_dump();
   }
   
   void run(State& state)
@@ -141,6 +140,7 @@ struct application
   void paint(State& state)
   {
     painter p {gctx.ctx};
+    p.set_font("default");
     p.begin_frame(win.size(), 1);
     
     auto impl = [this, &p, &state] (auto&& self, widget& w) -> void

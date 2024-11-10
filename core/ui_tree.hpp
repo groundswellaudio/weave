@@ -70,13 +70,16 @@ struct widget_tree
   
     template <class T>
     struct model_impl_base : model {
+      model_impl_base(auto&&... args) : obj{args...} {}
       T obj;
     };
   
     template <class T, class Lens>
     struct model_impl final : model_impl_base<T> {
       
-      void debug_dump() { 
+      model_impl(auto&&... args) : model_impl_base<T>{args...} {}
+      
+      void debug_dump() override { 
         std::cerr << %to_str(^T);
       }
       
@@ -230,10 +233,10 @@ struct widget_tree
     return &it->second;
   }
   
-  template <class T, class Lens = void>
-  widget* create_widget(widget_id id, widget_id parent, vec2f size) {
+  template <class T, class Lens = void, class... Args>
+  widget* create_widget(widget_id id, widget_id parent, vec2f size, Args&&... args) {
     auto [it, success] = widget_map.try_emplace(id, widget{id, parent});
-    it->second.emplace<T, Lens>();
+    it->second.emplace<T, Lens>(args...);
     it->second.set_size(size);
     it->second.set_pos(0, 0);
     return &it->second;
@@ -277,8 +280,8 @@ struct widget_tree_builder
   }
   
   template <class T, class Lens = void>
-  widget* create_widget(widget_id id, vec2f size) {
-    return tree.create_widget<T, Lens>(id, current_id, size);
+  widget* create_widget(widget_id id, vec2f size, auto&&... args) {
+    return tree.create_widget<T, Lens>(id, current_id, size, args...);
   }
 };
 
