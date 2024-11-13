@@ -30,24 +30,25 @@ struct slider_x_node
 };
 
 template <class Lens>
-struct slider : view {
+struct slider {
   
   slider(Lens L) : lens{L} {}
   
   template <class S>
   auto construct(widget_tree_builder& b, S& state) {
     auto next = b.template create_widget<slider_x_node>(lens, size);
-    this_id = next.parent_widget()->id();
   }
   
   template <class S>
-  void rebuild(slider<Lens> New, widget_tree_builder& b, S& state) {
+  void rebuild(slider<Lens> New, widget_tree_updater& b, S& state) {
+    b.consume_leaf();
     *this = New;
   }
   
+  /* 
   void destroy(widget_tree& t) {
-    t.destroy(view::this_id);
-  }
+    //t.destroy(view::this_id);
+  } */ 
   
   Lens lens;
   vec2f size = {80, 15};

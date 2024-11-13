@@ -29,11 +29,10 @@ struct text : view {
     return b.template create_widget<text_widget>(empty_lens{}, {100, 15}, str);
   }
   
-  void rebuild(text New, widget_tree_builder& b, ignore) {
+  void rebuild(text New, widget_tree_updater& b, ignore) {  
+    auto& w = b.consume_leaf().as<text_widget>();
     if (*this == New)
       return;
-    auto& w = b.tree.find(view::this_id)->as<text_widget>();
-    w.text = New.str;
     *this = New;
   }
   

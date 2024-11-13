@@ -15,6 +15,9 @@ struct widget_id {
   constexpr widget_id(view_id id) : base{id} {}
   
   bool operator==(const widget_id& o) const = default; 
+  
+  static constexpr widget_id root() { return {view_id{0}}; }
+  
   view_id base;
   unsigned offset = 0;
 };

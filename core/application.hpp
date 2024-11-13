@@ -31,7 +31,7 @@ namespace impl {
     void set_focused(widget_id id, vec2f absolute_pos) {
       if (id == focused)
         return;
-      if (id == widget_id{view_id{0}})
+      if (id == widget_id::root())
         assert( (absolute_pos == vec2f{0, 0}) && "root is focused but offset is not 0" );
       focused = id;
       focused_absolute_pos = absolute_pos;
@@ -65,7 +65,7 @@ namespace impl {
     {
       auto w = t.find(focused);
       if (not w) {
-        set_focused(widget_id{view_id{0}}, {0, 0});
+        set_focused(widget_id::root(), {0, 0});
         w = t.root();
       }
       if (e.is_mouse_move() && !e.is_mouse_drag()) 
@@ -81,6 +81,18 @@ namespace impl {
       }
       e.position -= focused_absolute_pos;
       w->on(e, state);
+    }
+    
+    void layout_changed(widget_tree& t) {
+      vec2f new_pos = {0, 0};
+      auto id = focused;
+      while(id != widget_id::root())
+      {
+        auto& w = t.get(id);
+        new_pos += w.pos();
+        id = w.parent_id();
+      }
+      focused_absolute_pos = new_pos;
     }
   
     widget_id focused;
@@ -140,9 +152,10 @@ struct application
       });
       
       auto new_view = view_ctor(state);
-      auto builder = tree.builder();
-      app_view.rebuild(new_view, builder, state);
-    
+      auto upd = tree.updater();
+      app_view.rebuild(new_view, upd, state);
+      med.layout_changed(tree);
+      
       paint(state);
     }
   }

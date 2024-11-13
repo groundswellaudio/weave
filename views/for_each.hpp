@@ -36,9 +36,8 @@ struct for_each {
   }
   
   template <class State>
-  void rebuild(Self& NewView, widget_tree_builder& b, State& state)
+  void rebuild(Self& NewView, widget_tree_updater& b, State& state)
   {
-    b.tree.children(id)
     int k = 0;
     auto&& range_data = range_fn(state);
     for (auto e : range_fn(state))
@@ -50,17 +49,18 @@ struct for_each {
     
     if (NewView.elements.size() > elements.size())
     { 
-      //b.set_construct_after(view::this_id);
       unsigned k = 0;
       for (; k < elements.size(); ++k)
         elements[k].rebuild(NewView.elements[k], b, state);
       for (; k < NewView.elements.size(); ++k) {
         elements.emplace_back(NewView.elements[k]);
-        elements.back().construct(b, state);
+        auto next_b = b.builder();
+        elements.back().construct(next_b, state);
       }
       
       b.parent_widget()->layout(b.tree);
     }
+    
     
     /* 
     if (NewView.elements.size() <= elements.size())
@@ -85,63 +85,4 @@ struct for_each {
         NewView.elements[k].construct( tree.builder() );
     } */ 
   }
-};
-
-template <class View>
-struct maybe {
-  
-  using Self = maybe<View>;
-  
-  template <class S>
-  void construct(widget_tree_builder& b, S& state)
-  {
-    if (!flag) 
-      return;
-    view.construct(b, state);
-  }
-  
-  template <class State>
-  void rebuild(Self& New, widget_tree_builder& b, State& s) 
-  {
-    if (flag == New.flag)
-    {
-      if (flag)
-        view.rebuild(New.view, b, s);
-    }
-    else if (!flag)
-    {
-      view.construct(b, s);
-      b.parent_widget()->layout(b.tree);
-    }
-    else
-      view.destroy(b.tree);
-    *this = New;
-  }
-  
-  bool flag; 
-  View view;
-};
-
-template <class V>
-maybe(bool, V) -> maybe<V>;
-
-/* 
-template <class... Ts>
-struct either {
-  
-  template <class L, class S>
-  void construct(widget_tree_builder<L>& b, S& state)
-  {
-    switch(flag)
-    {
-      
-    }
-    
-    if (!flag) 
-      return;
-    view.construct(b, state);
-  }
-  
-  unsigned flag;
-  tuple<Ts...> children;
-}; */ 
+}; 

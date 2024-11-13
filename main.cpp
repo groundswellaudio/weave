@@ -16,7 +16,10 @@ auto make_demo_app(AppState& state)
       slider{%lens(^(state.z))}, 
       text{"hello"}
     },  */
-    toggle_button{ %lens(^(state.flag)), "Flag"}, 
+    hstack{
+      toggle_button{ 
+    },
+    toggle_button{%lens(^(state.flag)), "Flag"},
     for_each{
       %lens(^(state.vals)),
       [] (auto lens, auto& state) {

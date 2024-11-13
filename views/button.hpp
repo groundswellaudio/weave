@@ -2,7 +2,7 @@
 
 #include "views_core.hpp"
 #include <string_view>
-#include "cursor.hpp"
+#include "../cursor.hpp"
 
 struct toggle_button_widget
 {
@@ -52,15 +52,11 @@ struct toggle_button : view {
     return w;
   }
   
-  void rebuild(toggle_button<Lens>& New, widget_tree_builder& b, ignore)
+  void rebuild(toggle_button<Lens>& New, widget_tree_updater& b, ignore)
   {
+    auto& w = b.consume_leaf().template as<toggle_button_widget>();
     if (New == *this)
       return;
-    auto& w = b.tree.find(view::this_id)->template as<toggle_button_widget>();
-    
-    w.str = New.str;
-    w.font_size = New.font_size;
-     
     *this = New;
   }
   
@@ -112,12 +108,10 @@ struct trigger_button : view {
   }
   
   template <class State>
-  void rebuild(trigger_button<Fn> New, widget_tree_builder& b, State& s) {
+  void rebuild(trigger_button<Fn> New, widget_tree_updater& b, State& s) {  
+    auto& w = b.consume_leaf().template as<trigger_button_widget<State, Fn>>();
     if (str == New.str)
       return;
-    auto& w = b.tree.find(view::this_id)->template as<trigger_button_widget<State, Fn>>();
-    w.str = New.str;
-    w.font_size = font_size;
     *this = New;
   }
   

@@ -37,10 +37,12 @@ struct stack_base : stack<Ts...> {
   }
   
   template <class S>
-  void rebuild(stack_base<T, Ts...>& New, widget_tree_builder& b, S& state) {
-    auto next_b = b.builder_for_parent(this->this_id);
-    tuple_for_each_with_index( this->children, [&next_b, &state, &New] (auto& elem, auto index) {
-      elem.rebuild( get<index.value>(New.children), next_b, state );
+  void rebuild(stack_base<T, Ts...>& New, widget_tree_updater& b, S& state) {
+    auto [w, next_updater] = b.consume_parent();
+    
+    tuple_for_each_with_index( this->children, [&next_updater, &state, &New] (auto& elem, auto index) 
+    {
+      elem.rebuild(get<index.value>(New.children), next_updater, state);
     });
   }
 };

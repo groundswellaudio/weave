@@ -9,6 +9,7 @@
 #include "events/mouse_events.hpp"
 #include "view.hpp"
 #include "lens.hpp"
+#include "../util/tuple.hpp"
 
 template <class T>
 struct event_context {
@@ -54,6 +55,7 @@ auto& operator<<(std::ostream& os, widget_id id) {
 struct painter; 
 
 struct widget_tree_builder;
+struct widget_tree_updater;
 
 struct widget_tree 
 {
@@ -170,6 +172,10 @@ struct widget_tree
       children_v.push_back(id);
     }
     
+    void insert_child(int pos, widget_id id) {
+      children_v.insert(children_v.begin() + pos, id);
+    }
+    
     auto& children() const { return children_v; }
     
     vec2f layout(widget_tree& tree) {
@@ -268,9 +274,12 @@ struct widget_tree
   
   widget_tree_builder builder();
   
+  widget_tree_updater updater(); 
+  
   private :
    
   friend widget_tree_builder;
+  friend widget_tree_updater;
   
   template <class T, class Lens, class... Args>
   widget* create_widget(Lens lens, widget_id id, widget_id parent, vec2f size, Args&&... args) {
@@ -294,6 +303,7 @@ struct widget_tree_builder
   unsigned& id_counter;
   widget_tree& tree;
   widget* parent_v;
+  int* child_index = nullptr;
   
   // Create a widget and returns a tree builder to build its children, if needed.
   template <class T, class Lens>
@@ -301,30 +311,54 @@ struct widget_tree_builder
   {
     auto res = tree.create_widget<T>(lens, widget_id{view_id{id_counter++}}, parent_v ? parent_v->id() : widget_id{view_id{0}}, size, args...);
     if (parent_v) {
-      parent_widget()->add_child(res->id());
+      if (child_index) {
+        parent_widget()->insert_child((*child_index)++, res->id());
+      }
+      else {
+        parent_widget()->add_child(res->id());
+      }
       assert( parent_widget()->id() != res->id() && "widget id invalids" );
     }
     return widget_tree_builder{id_counter, tree, res};
   }
   
   widget* parent_widget() const { return parent_v; }
-  
-  /* 
-  template <class Lens>
-  auto add_lens(Lens L) {
-    auto NewL = compose_lens(parent_lens, L);
-    return widget_tree_builder<decltype(NewL)>{id_counter, tree, parent, NewL};
-  } */ 
-  
-  widget_tree_builder builder_for_parent(widget_id id) {
-    auto w = tree.find(id);
-    assert( w && "parent widget not found" );
-    return {id_counter, tree, w};
-  }
 };
 
 inline widget_tree_builder widget_tree::builder() {
   return {id_counter, *this, nullptr};
+}
+
+struct widget_tree_updater 
+{
+  widget& consume_leaf() {
+    if (parent_v)
+      return tree.get(parent_v->children()[child_index++]);
+    return tree.get(widget_id::root());
+  }
+  
+  tuple<widget&, widget_tree_updater> consume_parent() {
+    auto& r = consume_leaf();
+    return {r, {id_counter, tree, &r, 0}};
+  }
+  
+  template <class T, class Lens>
+  widget_tree_builder create_widget(Lens lens, vec2f size, auto&&... args) {
+    return builder().create_widget(lens, size, args...);
+  }
+  
+  widget* parent_widget() const { return parent_v; }
+  
+  widget_tree_builder builder() { return {id_counter, tree, parent_v, &child_index}; }
+  
+  unsigned& id_counter;
+  widget_tree& tree;
+  widget* parent_v;
+  int child_index;
+};
+
+inline widget_tree_updater widget_tree::updater() {
+  return {id_counter, *this, nullptr, 0};
 }
 
 /* 
