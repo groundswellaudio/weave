@@ -2,6 +2,7 @@
 
 #include "views_core.hpp"
 #include <string_view>
+#include "cursor.hpp"
 
 struct toggle_button_widget
 {
@@ -13,7 +14,11 @@ struct toggle_button_widget
   using value_type = bool;
   
   void on(mouse_event e, vec2f sz, event_context<bool> ec) {
-    if (e.is_mouse_down())
+    if (e.is_mouse_enter())
+      set_mouse_cursor(mouse_cursor::hand);
+    else if (e.is_mouse_exit())
+      set_mouse_cursor(mouse_cursor::arrow);
+    else if (e.is_mouse_down())
       ec.write(!ec.read());
   }
   
@@ -72,6 +77,10 @@ struct trigger_button_widget {
   float font_size;
   
   void on(mouse_event e, vec2f this_size, void* state) {
+    if (e.is_mouse_enter())
+      set_mouse_cursor(mouse_cursor::hand);
+    else if (e.is_mouse_exit())
+      set_mouse_cursor(mouse_cursor::arrow);
     if (!e.is_mouse_down())
       return;
     callback( *static_cast<State*>(state) );

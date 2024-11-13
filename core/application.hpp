@@ -69,9 +69,15 @@ namespace impl {
         w = t.root();
       }
       if (e.is_mouse_move() && !e.is_mouse_drag()) 
-      { 
+      {
+        auto old_focus = focused;
+        auto old_pos = focused_absolute_pos;
         find_from(*t.find(focused), focused_absolute_pos, t, e);
         w = t.find(focused);
+        if (old_focus != focused) {
+          t.find(old_focus)->on(mouse_event{e.position - old_pos, mouse_exit{}}, state);
+          w->on(mouse_event{e.position - focused_absolute_pos, mouse_enter{}}, state);
+        }
       }
       e.position -= focused_absolute_pos;
       w->on(e, state);

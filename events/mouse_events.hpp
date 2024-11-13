@@ -39,6 +39,8 @@ struct mouse_event {
   vec2f position;
   std::variant<mouse_enter, mouse_exit, mouse_down, mouse_up, mouse_move, mouse_scroll> event; 
   
+  bool is_mouse_enter() { return is<mouse_enter>(); }
+  bool is_mouse_exit() { return is<mouse_exit>(); }
   bool is_mouse_move() { return is<mouse_move>(); }
   bool is_mouse_drag() { return is<mouse_move>() && get_as<mouse_move>().is_dragging; }
   bool is_mouse_down() { return is<mouse_down>(); }

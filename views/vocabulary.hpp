@@ -10,7 +10,7 @@ auto for_each_ctor_res(State& state, RangeFn range_fn, ViewCtor ctor)
                       state ) );
  
 template <class Range, class ViewCtor>
-struct for_each : view {
+struct for_each {
   Range range_fn;
   ViewCtor view_ctor;
   
@@ -38,6 +38,7 @@ struct for_each : view {
   template <class State>
   void rebuild(Self& NewView, widget_tree_builder& b, State& state)
   {
+    b.tree.children(id)
     int k = 0;
     auto&& range_data = range_fn(state);
     for (auto e : range_fn(state))
@@ -49,7 +50,7 @@ struct for_each : view {
     
     if (NewView.elements.size() > elements.size())
     { 
-      b.set_construct_after(view::this_id);
+      //b.set_construct_after(view::this_id);
       unsigned k = 0;
       for (; k < elements.size(); ++k)
         elements[k].rebuild(NewView.elements[k], b, state);
