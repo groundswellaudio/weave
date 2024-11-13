@@ -1,6 +1,7 @@
 #pragma once
 
 #include "views_core.hpp"
+#include <format>
 
 struct slider_x_node 
 {
@@ -21,11 +22,20 @@ struct slider_x_node
   
   void paint(painter& p, float pc, vec2f this_size) {
     auto sz = this_size;
-    p.fill_style(rgba_f{1.f, 0.f, 0.f, 1.f});
-    p.rectangle({0, 0}, sz);
-    p.fill_style(colors::lime);
+    p.fill_style(rgb_u8{30, 30, 30});
+    p.fill_rounded_rect({0, 0}, sz, 6);
+    p.fill_style(rgba_f{colors::cyan}.with_alpha(0.3));
     auto e = pc;
     p.rectangle({0, 0}, {e * sz.x, sz.y});
+    
+    p.stroke_style(rgba_f{colors::white}.with_alpha(0.5));
+    p.stroke_rounded_rect({0, 0}, this_size, 6, 1);
+    
+    p.fill_style(colors::white);
+    p.text_alignment(text_align::x::center, text_align::y::center);
+    auto str = std::format("{}", pc);
+    p.font_size(11);
+    p.text({this_size.x / 2, this_size.y / 2}, str);
   }
 };
 

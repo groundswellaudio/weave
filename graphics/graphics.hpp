@@ -31,86 +31,86 @@ namespace text_align
 
 struct painter_state
 {
-	painter_state(NVGcontext* backend_ptr) noexcept
-	: ctx{backend_ptr}
-	{
-	}
+  painter_state(NVGcontext* backend_ptr) noexcept
+  : ctx{backend_ptr}
+  {
+  }
+
+  void text_alignment(text_align::x alignx, text_align::y aligny = text_align::y::center)
+  {
+    current_aligment = (int)(alignx) | (int)(aligny);
+    nvgTextAlign(ctx, current_aligment);
+  }
+
+  // return the text bounding box if it were drawn at the given position
+  // using the current alignment
+  vec2f text_bounds(std::string_view str) const
+  {
+    float bounds[4];
+    nvgTextBounds(ctx, 0, 0, str.data(), str.end(), bounds);
+    return vec2f{ bounds[2] - bounds[0], bounds[3] - bounds[1] };
+  }
 	
-	void text_alignment(text_align::x alignx, text_align::y aligny = text_align::y::center)
-	{
-		current_aligment = (int)(alignx) | (int)(aligny);
-		nvgTextAlign(ctx, current_aligment);
-	}
+  /* 
+  auto make_image_from_file(const char* str)
+  {
+    auto res = nvgCreateImage(ctx, str, 0);
+    if (res == 0)
+      throw 1;
+    return image{ctx, res};
+  } */ 
 	
-	// return the text bounding box if it were drawn at the given position
-	// using the current alignment
-	vec2f text_bounds(std::string_view str) const
-	{
-		float bounds[4];
-		nvgTextBounds(ctx, 0, 0, str.data(), str.end(), bounds);
-		return vec2f{ bounds[2] - bounds[0], bounds[3] - bounds[1] };
-	}
+  auto font_size() const {
+    return current_font_size;
+  }
+
+  // Set the current font size
+  void font_size(float size){
+    current_font_size = size;
+    nvgFontSize(ctx, size);
+    update_font_offset();
+  }
+
+  void set_font(const char* ident){
+    nvgFontFace(ctx, "default");
+    update_font_offset();
+  }
 	
-	/* 
-	auto make_image_from_file(const char* str)
-	{
-		auto res = nvgCreateImage(ctx, str, 0);
-		if (res == 0)
-			throw 1;
-		return image{ctx, res};
-	} */ 
-	
-	auto font_size() const {
-		return current_font_size;
-	}
-	
-	// Set the current font size
-	void font_size(float size){
-		current_font_size = size;
-		nvgFontSize(ctx, size);
-		update_font_offset();
-	}
-	
-	void set_font(const char* ident){
-		nvgFontFace(ctx, "default");
-		update_font_offset();
-	}
-	
-	/* 
-	// Compute the glyph positions for @text at position @pos using the current aligment.
-	void get_glyph_positions(glyph_positions& p, std::string_view text, screen_pt pos) const
-	{
-		p.positions.resize(text.size());
-		nvgTextGlyphPositions( ctx, pos.x, pos.y, text.begin(), text.end(), p.positions.data(), (int)(p.positions.size()) );
-	}
-	
-	auto nvg_lin_grad(const linear_gradient& grad) const {
-		return nvgLinearGradient(ctx,
-			grad.from_point.x, grad.from_point.y, grad.to_point.x, grad.to_point.y,
-			impl::to_nvg_col(grad.from_col), impl::to_nvg_col(grad.to_col));
-	} */ 
-	
-	auto nvg_ctx_internal_handle__() const {
-		return ctx;
-	}
-	
-	protected :
-	
-	void update_font_offset()
-	{
-		// due to font format unconsistency,
-		// sometimes the ascender actually means "height max"
-		// so we have to apply an offset to correct that if it's the case
-		// ideally this should be handled by the renderer!
-		float a, d, h;
-		nvgTextMetrics(ctx, &a, &d, &h);
-		text_vert_offset = (a > h) ? a - h : 0;
-	}
-	
-	NVGcontext* ctx;
-	int current_aligment;
-	float current_font_size = 11;
-	float text_vert_offset = 0;
+  /* 
+  // Compute the glyph positions for @text at position @pos using the current aligment.
+  void get_glyph_positions(glyph_positions& p, std::string_view text, screen_pt pos) const
+  {
+    p.positions.resize(text.size());
+    nvgTextGlyphPositions( ctx, pos.x, pos.y, text.begin(), text.end(), p.positions.data(), (int)(p.positions.size()) );
+  }
+
+  auto nvg_lin_grad(const linear_gradient& grad) const {
+    return nvgLinearGradient(ctx,
+      grad.from_point.x, grad.from_point.y, grad.to_point.x, grad.to_point.y,
+      impl::to_nvg_col(grad.from_col), impl::to_nvg_col(grad.to_col));
+  } */ 
+
+  auto nvg_ctx_internal_handle__() const {
+    return ctx;
+  }
+
+  protected :
+
+  void update_font_offset()
+  {
+    // due to font format unconsistency,
+    // sometimes the ascender actually means "height max"
+    // so we have to apply an offset to correct that if it's the case
+    // ideally this should be handled by the renderer!
+    float a, d, h;
+    nvgTextMetrics(ctx, &a, &d, &h);
+    text_vert_offset = (a > h) ? a - h : 0;
+  }
+
+  NVGcontext* ctx;
+  int current_aligment;
+  float current_font_size = 11;
+  float text_vert_offset = 0;
 };
 
 struct painter : painter_state
@@ -123,12 +123,39 @@ struct painter : painter_state
     glEnable(GL_STENCIL_TEST);
     nvgBeginFrame(ctx, size.x, size.y, ratio);
   }
+  
+  void begin_path() {
+    nvgBeginPath(ctx);
+  }
 
+  void close_path() {
+    nvgClosePath(ctx);
+  }
+	
   void end_frame(){
     nvgEndFrame(ctx);
     glDisable(GL_STENCIL_TEST);
   }
   
+  void stroke_rounded_rect(vec2f pos, vec2f size, float rounding_radius, float thickness = 1) {
+    pos += origin;
+    nvgBeginPath(ctx);
+    nvgRoundedRect(ctx, pos.x, pos.y, size.x, size.y, rounding_radius);
+    nvgStrokeWidth(ctx, thickness);
+    nvgStroke(ctx);
+  }
+
+  void fill_rounded_rect(vec2f pos, vec2f size, float rounding_radius) {
+    pos += origin;
+    nvgBeginPath(ctx);
+    nvgRoundedRect(ctx, pos.x, pos.y, size.x, size.y, rounding_radius);
+    nvgFill(ctx);
+  }
+
+  void stroke_style(const color& c) {
+    nvgStrokeColor(ctx, impl::to_nvg_col(c));
+  }
+
   auto& fill_style(const color& c) {
     nvgFillColor(ctx, impl::to_nvg_col(c));
     return *this;
