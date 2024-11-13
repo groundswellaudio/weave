@@ -41,6 +41,12 @@ namespace impl
   }
 }
 
+template <auto N>
+struct constant {
+  static constexpr auto value = N;
+  constexpr operator decltype(N) () const { return N; } 
+};
+
 template <class... Ts>
 struct tuple
 {
@@ -74,6 +80,18 @@ namespace impl
         push_back(args, a); 
     return instantiate(^tuple, args);
   }
+  
+  consteval void gen_tuple_for_each(function_builder& b, expr fn, expr tpl)
+  {
+    for (auto e : expand_fields(expr_list{tpl}))
+      b << ^ [fn, e] ( (%fn)(%e) );
+  }
+  
+  consteval void gen_tuple_for_each_with_index(function_builder& b, expr fn, expr tpl) {
+    int k = 0;
+    for (auto e : expand_fields(expr_list{tpl}))
+      b << ^ [fn, e, p = k++] ( (%fn)(%e, constant<p>{}) );
+  }
 }
 
 template <class... Ts>
@@ -89,4 +107,16 @@ template <class Fn, class... Ts>
 constexpr decltype(auto) apply(Fn fn, Ts&&... ts)
 {
   return fn( %...impl::expand_fields(^(ts...))... );
+}
+
+template <class Fn, class Tpl>
+  requires (is_instance_of(remove_reference(^Tpl), ^tuple))
+constexpr void tuple_for_each(Tpl&& tpl, Fn fn) {
+  %impl::gen_tuple_for_each(^(fn), ^(tpl));
+}
+
+template <class Fn, class Tpl>
+  requires (is_instance_of(remove_reference(^Tpl), ^tuple))
+constexpr void tuple_for_each_with_index(Tpl&& tpl, Fn fn) {
+  %impl::gen_tuple_for_each_with_index(^(fn), ^(tpl));
 }

@@ -1,13 +1,16 @@
 #pragma once
 
 #include "view.hpp"
+#include "ui_tree.hpp"
 #include "../vec.hpp"
 #include "../util/tuple.hpp"
+#include "../util/ignore.hpp"
 
 struct painter;
 
 template <class... Ts>
-struct stack : composed_view {
+struct stack : view
+{
   template <class Fn>
   void traverse(Fn fn) {
     apply([fn] (auto&&... args) {
@@ -18,10 +21,34 @@ struct stack : composed_view {
   tuple<Ts...> children;
 };
 
+template <class T, class... Ts>
+struct stack_base : stack<Ts...> {
+  
+  template <class... Vs>
+  constexpr stack_base(Vs&&... ts) : stack<Ts...>{{}, {ts...}} {} 
+  
+  template <class S>
+  void construct(widget_tree_builder& b, S& state) 
+  {
+    auto next_b = b.template create_widget<T>(empty_lens{}, {0, 0});
+    tuple_for_each(this->children, [&next_b, &state] (auto& elem) {
+      elem.construct(next_b, state);
+    });
+  }
+  
+  template <class S>
+  void rebuild(stack_base<T, Ts...>& New, widget_tree_builder& b, S& state) {
+    auto next_b = b.builder_for_parent(this->this_id);
+    tuple_for_each_with_index( this->children, [&next_b, &state, &New] (auto& elem, auto index) {
+      elem.rebuild( get<index.value>(New.children), next_b, state );
+    });
+  }
+};
+
 struct vstack_widget : layout_tag 
 {
   void paint(painter& p, vec2f) {}
-  void on(input_event) {}
+  void on(input_event, ignore, ignore) {}
   
   auto layout( widget_tree::children_view c ) 
   {
@@ -38,20 +65,15 @@ struct vstack_widget : layout_tag
 };
 
 template <class... Ts>
-struct vstack : stack<Ts...>
+struct vstack : stack_base<vstack_widget, Ts...>
 { 
-  vstack(Ts... ts) : stack<Ts...>{{}, {ts...}} {}
-  
-  template <class Ctx>
-  auto construct(Ctx ctx) {
-    return ctx.template create_widget<vstack_widget>(this->view_id, vec2f{0, 0}); 
-  }
+  vstack(Ts... ts) : stack_base<vstack_widget, Ts...>{ts...} {}
 };
 
-struct hstack_widget : layout_tag 
+struct hstack_widget : layout_tag
 {
   void paint(painter& p, vec2f) {}
-  void on(input_event) {}
+  void on(input_event, ignore, ignore) {}
   
   auto layout( widget_tree::children_view c ) 
   {
@@ -69,12 +91,7 @@ struct hstack_widget : layout_tag
 };
 
 template <class... Ts>
-struct hstack : stack<Ts...>
+struct hstack : stack_base<hstack_widget, Ts...>
 {
-  hstack(Ts... ts) : stack<Ts...>{{}, {ts...}} {}
-  
-  template <class Ctx>
-  auto construct(Ctx ctx) {
-    return ctx.template create_widget<hstack_widget>(this->view_id, vec2f{0, 0}); 
-  }
+  hstack(Ts... ts) : stack_base<hstack_widget, Ts...>{ts...} {}
 };

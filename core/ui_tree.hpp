@@ -4,9 +4,11 @@
 #include <vector>
 #include <functional>
 #include <iostream>
+#include <cassert>
 
 #include "events/mouse_events.hpp"
 #include "view.hpp"
+#include "lens.hpp"
 
 template <class T>
 struct event_context {
@@ -15,8 +17,8 @@ struct event_context {
   template <class Lens>
   void emplace(void* s, Lens l) {
     state_ptr = s;
-    write_fn = [l] (void* s, const T& val) { l.write(val, s); };
-    read_fn = [l] (void* s) { return l.read(s); };
+    write_fn = [l] (void* s, const T& val) { l(*static_cast<typename Lens::input*>(s)) = val; };
+    read_fn = [l] (void* s) { return l(*static_cast<typename Lens::input*>(s)); };
   }
   
   void write(T v) {
@@ -51,6 +53,8 @@ auto& operator<<(std::ostream& os, widget_id id) {
 
 struct painter; 
 
+struct widget_tree_builder;
+
 struct widget_tree 
 {
   struct children_view;
@@ -77,7 +81,9 @@ struct widget_tree
     template <class T, class Lens>
     struct model_impl final : model_impl_base<T> {
       
-      model_impl(auto&&... args) : model_impl_base<T>{args...} {}
+      [[no_unique_address]] Lens lens;
+      
+      model_impl(Lens L, auto&&... args) : lens{L}, model_impl_base<T>{args...} {}
       
       void debug_dump() override { 
         std::cerr << %to_str(^T);
@@ -85,22 +91,23 @@ struct widget_tree
       
       void on(input_event e, vec2f this_size, void* ctx_ptr) override 
       {
-        if constexpr (^Lens != ^void)
+        if constexpr (^Lens != ^empty_lens)
         {
           event_context<typename T::value_type> evctx {};
-          evctx.template emplace<Lens>(ctx_ptr, Lens{});
+          evctx.emplace(ctx_ptr, lens);
           this->obj.on(e, this_size, evctx);
         }
         else 
         {
-          this->obj.on(e);
+          this->obj.on(e, this_size, ctx_ptr);
         }
       }
     
       void paint(painter& p, vec2f size, void* state) override {
-        //paint_context pc {Lens::read(ctx)};
-        if constexpr (^Lens != ^void)
-          this->obj.paint(p, Lens{}.read(state), size);
+        if constexpr (^Lens != ^empty_lens) {
+          auto sv = lens(*static_cast<typename Lens::input*>(state));
+          this->obj.paint(p, sv, size);
+        }
         else
           this->obj.paint(p, size);
       }
@@ -123,8 +130,8 @@ struct widget_tree
     {}
     
     template <class T, class Lens, class... Ts>
-    void emplace(Ts... ts) {
-      model_ptr.reset( new model_impl<T, Lens> {ts...} );
+    void emplace(Lens lens, Ts... ts) {
+      model_ptr.reset( new model_impl<T, Lens> {lens, ts...} );
     }
   
     auto layout(children_view v) {
@@ -133,7 +140,7 @@ struct widget_tree
     }
   
     template <class T>
-    T& get_as() {
+    T& as() {
       return static_cast<model_impl_base<T>*>(model_ptr.get())->obj;
     }
     
@@ -177,6 +184,12 @@ struct widget_tree
       model_ptr->debug_dump();
       for (auto& c : tree.children(*this))
         c.debug_dump(tree, indentation + 1);
+    }
+    
+    void remove_child(widget_id id) {
+      auto it = std::find(children_v.begin(), children_v.end(), id);
+      assert( it != children_v.end() && "id not contained in children" );
+      children_v.erase(it);
     }
     
     private : 
@@ -232,16 +245,7 @@ struct widget_tree
       return nullptr;
     return &it->second;
   }
-  
-  template <class T, class Lens = void, class... Args>
-  widget* create_widget(widget_id id, widget_id parent, vec2f size, Args&&... args) {
-    auto [it, success] = widget_map.try_emplace(id, widget{id, parent});
-    it->second.emplace<T, Lens>(args...);
-    it->second.set_size(size);
-    it->second.set_pos(0, 0);
-    return &it->second;
-  }
-  
+
   widget& parent(widget& w) { return get(w.parent_id()); }
   
   widget* root() { return &widget_map.find(widget_id{view_id{0}})->second; }
@@ -254,6 +258,30 @@ struct widget_tree
     root()->debug_dump(*this, 0);
   }
   
+  void destroy(widget_id id) {
+    auto it = widget_map.find(id);
+    assert( it != widget_map.end() && "widget not found for id" );
+    auto parent = it->second.parent_id();
+    find(parent)->remove_child(id);
+    widget_map.erase(it);
+  }
+  
+  widget_tree_builder builder();
+  
+  private :
+   
+  friend widget_tree_builder;
+  
+  template <class T, class Lens, class... Args>
+  widget* create_widget(Lens lens, widget_id id, widget_id parent, vec2f size, Args&&... args) {
+    auto [it, success] = widget_map.try_emplace(id, widget{id, parent});
+    it->second.emplace<T>(lens, args...);
+    it->second.set_size(size);
+    it->second.set_pos(0, 0);
+    return &it->second;
+  }
+  
+  unsigned id_counter = 0;
   std::unordered_map<widget_id, widget> widget_map;
 };
 
@@ -261,32 +289,47 @@ using widget = widget_tree::widget;
 
 struct widget_tree_builder 
 {
-  widget_tree& tree;
-  widget_id current_id = {};
+  friend widget_tree;
   
-  template <class V>
-  widget* construct_view(V view)
+  unsigned& id_counter;
+  widget_tree& tree;
+  widget* parent_v;
+  
+  // Create a widget and returns a tree builder to build its children, if needed.
+  template <class T, class Lens>
+  widget_tree_builder create_widget(Lens lens, vec2f size, auto&&... args) 
   {
-    auto next_current = view.construct(*this);
-    widget_tree_builder next {tree, next_current->id()};
-    
-    if constexpr ( std::meta::is_base_of(^composed_view, ^V) ) 
-      view.traverse( [&next, next_current] (auto& elem) {
-        auto child = next.construct_view(elem);
-        next_current->add_child(child->id());
-      });
-    
-    return next_current;
+    auto res = tree.create_widget<T>(lens, widget_id{view_id{id_counter++}}, parent_v ? parent_v->id() : widget_id{view_id{0}}, size, args...);
+    if (parent_v) {
+      parent_widget()->add_child(res->id());
+      assert( parent_widget()->id() != res->id() && "widget id invalids" );
+    }
+    return widget_tree_builder{id_counter, tree, res};
   }
   
-  template <class T, class Lens = void>
-  widget* create_widget(widget_id id, vec2f size, auto&&... args) {
-    return tree.create_widget<T, Lens>(id, current_id, size, args...);
+  widget* parent_widget() const { return parent_v; }
+  
+  /* 
+  template <class Lens>
+  auto add_lens(Lens L) {
+    auto NewL = compose_lens(parent_lens, L);
+    return widget_tree_builder<decltype(NewL)>{id_counter, tree, parent, NewL};
+  } */ 
+  
+  widget_tree_builder builder_for_parent(widget_id id) {
+    auto w = tree.find(id);
+    assert( w && "parent widget not found" );
+    return {id_counter, tree, w};
   }
 };
 
+inline widget_tree_builder widget_tree::builder() {
+  return {id_counter, *this, nullptr};
+}
+
+/* 
 struct view_archetype : view {
   
   widget_tree::widget* construct(widget_tree_builder& b);
     // { return b.tree.construct_widget(id); }
-};
+}; */ 

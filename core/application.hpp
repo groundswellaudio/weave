@@ -68,7 +68,7 @@ namespace impl {
         set_focused(widget_id{view_id{0}}, {0, 0});
         w = t.root();
       }
-      if (e.is<mouse_move>() && !e.get_as<mouse_move>().is_dragging) 
+      if (e.is_mouse_move() && !e.is_mouse_drag()) 
       { 
         find_from(*t.find(focused), focused_absolute_pos, t, e);
         w = t.find(focused);
@@ -81,6 +81,7 @@ namespace impl {
     vec2f focused_absolute_pos = {0, 0};
   };
   
+  /* 
   template <class View>
   void init_widget_id(View& v, unsigned& base) 
   {
@@ -93,7 +94,7 @@ namespace impl {
         init_widget_id(e, base);
       });
     }
-  }
+  } */ 
 
 } // impl
 
@@ -114,25 +115,28 @@ struct application
   
   application(State& s, ViewCtor ctor) : view_ctor{ctor}, app_view{view_ctor(s)}
   {
-    unsigned x = 0;
-    impl::init_widget_id(app_view, x);
+    //unsigned x = 0;
+    //impl::init_widget_id(app_view, x);
     win.init("spiral", 600, 400);
     gctx.init();
     
-    widget_tree_builder builder {tree};
-    builder.construct_view(app_view);
+    auto b = tree.builder();
+    app_view.construct(b, s);
     tree.layout();
   }
   
   void run(State& state)
   {
-    app_view = view_ctor(state);
-    
     while(!backend.want_quit)
     {
       backend.visit_event( [this, &state] (auto&& e) {
         med.on(e, tree, &state);
       });
+      
+      auto new_view = view_ctor(state);
+      auto builder = tree.builder();
+      app_view.rebuild(new_view, builder, state);
+    
       paint(state);
     }
   }

@@ -3,13 +3,14 @@
 #include "views_core.hpp"
 #include <string_view>
 
-struct text_node
+struct text_widget
 {
   std::string_view text;
   rgba_f color;
   
   using value_type = void;
-  void on(mouse_event e) 
+  
+  void on(mouse_event e, vec2f sz, ignore) 
   {
   }
   
@@ -24,8 +25,16 @@ struct text : view {
   
   text(std::string_view str) : str{str} {}
   
-  auto construct(widget_tree_builder& b) {
-    return b.create_widget<text_node>( view::view_id, {100, 15}, str);
+  auto construct(widget_tree_builder& b, ignore) {
+    return b.template create_widget<text_widget>(empty_lens{}, {100, 15}, str);
+  }
+  
+  void rebuild(text New, widget_tree_builder& b, ignore) {
+    if (*this == New)
+      return;
+    auto& w = b.tree.find(view::this_id)->as<text_widget>();
+    w.text = New.str;
+    *this = New;
   }
   
   std::string_view str;

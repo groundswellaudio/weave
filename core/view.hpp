@@ -28,10 +28,11 @@ class std::hash<widget_id> {
   }
 };
 
-// A view has a fixed id, determined at the beginning of the program.
 struct view {
   auto& operator=(const view&) { return *this; }
-  widget_id view_id = {};
+  bool operator==(const view& o) const { return true; }
+  bool operator!=(const view& o) const { return false; }
+  widget_id this_id = {}; 
 };
 
 // A base class for a view that has children

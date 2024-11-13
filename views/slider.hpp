@@ -8,7 +8,7 @@ struct slider_x_node
   
   void on(mouse_event e, vec2f this_size, event_context<float> ec) 
   {
-    if (!e.is_mouse_drag() && !e.is<mouse_down>())
+    if (!e.is_mouse_drag() && !e.is_mouse_down())
       return;
     
     auto sz = this_size;
@@ -32,12 +32,24 @@ struct slider_x_node
 template <class Lens>
 struct slider : view {
   
-  slider(Lens) {}
+  slider(Lens L) : lens{L} {}
   
-  auto construct(widget_tree_builder& b) {
-    return b.create_widget<slider_x_node, Lens>( view::view_id, size );
+  template <class S>
+  auto construct(widget_tree_builder& b, S& state) {
+    auto next = b.template create_widget<slider_x_node>(lens, size);
+    this_id = next.parent_widget()->id();
   }
   
+  template <class S>
+  void rebuild(slider<Lens> New, widget_tree_builder& b, S& state) {
+    *this = New;
+  }
+  
+  void destroy(widget_tree& t) {
+    t.destroy(view::this_id);
+  }
+  
+  Lens lens;
   vec2f size = {80, 15};
 };
 
