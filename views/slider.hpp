@@ -3,8 +3,20 @@
 #include "views_core.hpp"
 #include <format>
 
-struct slider_x_node 
+struct slider_properties {
+  bool operator==(const slider_properties&) const = default;
+  float min = 0, max = 1;
+  
+  rgba_u8 background_color = rgb_u8{30, 30, 30};
+  rgba_u8 active_color = rgba_f{colors::cyan}.with_alpha(0.3);
+  rgba_u8 text_color = colors::white;
+};
+
+struct slider_x_widget 
 {
+  slider_properties prop;
+  float ratio;
+  
   using value_type = float;
   
   void on(mouse_event e, vec2f this_size, event_context<float> ec) 
@@ -13,22 +25,25 @@ struct slider_x_node
       return;
     
     auto sz = this_size;
-    float ratio = std::min(e.position.x / sz.x, 1.f);
+    ratio = std::min(e.position.x / sz.x, 1.f);
     ratio = std::max(0.f, ratio);
     
-    ec.write(ratio);
+    auto new_val = prop.min + ratio * (prop.max - prop.min); 
+    ec.write(new_val);
     //ec.repaint_request();
   }
   
-  void paint(painter& p, float pc, vec2f this_size) {
+  void paint(painter& p, float pc, vec2f this_size) 
+  {
     auto sz = this_size;
-    p.fill_style(rgb_u8{30, 30, 30});
+    p.fill_style(prop.background_color);
     p.fill_rounded_rect({0, 0}, sz, 6);
-    p.fill_style(rgba_f{colors::cyan}.with_alpha(0.3));
-    auto e = pc;
+    p.fill_style(prop.active_color);
+    auto e = ratio;
     p.rectangle({0, 0}, {e * sz.x, sz.y});
     
-    p.stroke_style(rgba_f{colors::white}.with_alpha(0.5));
+    static constexpr auto outline_col = rgba_f{colors::white}.with_alpha(0.5);
+    p.stroke_style(outline_col);
     p.stroke_rounded_rect({0, 0}, this_size, 6, 1);
     
     p.fill_style(colors::white);
@@ -46,13 +61,21 @@ struct slider {
   
   template <class S>
   auto construct(widget_tree_builder& b, S& state) {
-    auto next = b.template create_widget<slider_x_node>(lens, size);
+    auto next = b.template create_widget<slider_x_widget>(lens, size, properties);
   }
   
   template <class S>
   void rebuild(slider<Lens> New, widget_tree_updater& b, S& state) {
-    b.consume_leaf();
+    auto& w = b.consume_leaf().as<slider_x_widget>();
+    if (w.prop != New.properties)
+      w.prop = New.properties; 
     *this = New;
+  }
+  
+  auto& with_range(float min, float max) {
+    properties.min = min;
+    properties.max = max;
+    return *this;
   }
   
   /* 
@@ -60,6 +83,7 @@ struct slider {
     //t.destroy(view::this_id);
   } */ 
   
+  slider_properties properties;
   Lens lens;
   vec2f size = {80, 15};
 };

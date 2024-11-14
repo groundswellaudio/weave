@@ -8,6 +8,11 @@
 
 struct painter;
 
+struct stack_data {
+  float interspace;
+  vec2f margin;
+};
+
 template <class... Ts>
 struct stack : view
 {
@@ -18,7 +23,18 @@ struct stack : view
     }, children);
   }
   
+  auto&& with_interspace(this auto&& self, float val) {
+    self.info.interspace = val;
+    return self;
+  }
+  
+  auto&& with_margin(this auto&& self, vec2f margin) {
+    self.info.margin = margin;
+    return self;
+  }
+  
   tuple<Ts...> children;
+  stack_data info;
 };
 
 template <class T, class... Ts>
@@ -30,7 +46,7 @@ struct stack_base : stack<Ts...> {
   template <class S>
   void construct(widget_tree_builder& b, S& state) 
   {
-    auto next_b = b.template create_widget<T>(empty_lens{}, {0, 0});
+    auto next_b = b.template create_widget<T>(empty_lens{}, {0, 0}, this->info);
     tuple_for_each(this->children, [&next_b, &state] (auto& elem) {
       elem.construct(next_b, state);
     });
@@ -49,20 +65,24 @@ struct stack_base : stack<Ts...> {
 
 struct vstack_widget : layout_tag 
 {
+  stack_data data;
+  
+  vstack_widget(stack_data d) : data{d} {}
+  
   void paint(painter& p, vec2f) {}
   void on(input_event, ignore, ignore) {}
   
   auto layout( widget_tree::children_view c ) 
   {
-    float pos = 0, width = 0;
+    float pos = data.margin.y, width = 0;
     for (auto& n : c) {
-      n.set_pos(0, pos);
+      n.set_pos(data.margin.x, pos);
       auto sz = n.layout(c.tree());
-      pos += sz.y;
+      pos += sz.y + data.interspace;
       width = std::max(width, sz.x);
     }
     
-    return vec2f{width, pos};
+    return vec2f{width, pos + data.margin.y};
   }
 };
 
@@ -74,21 +94,24 @@ struct vstack : stack_base<vstack_widget, Ts...>
 
 struct hstack_widget : layout_tag
 {
+  stack_data data;
+  hstack_widget(stack_data d) : data{d} {}
+  
   void paint(painter& p, vec2f) {}
   void on(input_event, ignore, ignore) {}
   
   auto layout( widget_tree::children_view c ) 
   {
-    float pos = 0, height = 0;
+    float pos = data.margin.x, height = 0;
     for (auto& n : c) 
     {
-      n.set_pos(pos, 0);
+      n.set_pos(pos, data.margin.y);
       auto sz = n.layout(c.tree());
-      pos += sz.x;
+      pos += sz.x + data.interspace;
       height = std::max(height, sz.y);
     }
     
-    return vec2f{pos, height};
+    return vec2f{pos + data.margin.x, height + 2 * data.margin.y};
   }
 };
 

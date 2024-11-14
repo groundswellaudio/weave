@@ -12,6 +12,7 @@
 #include "../graphics/graphics.hpp"
 #include "../events/mouse_events.hpp"
 #include "../vec.hpp"
+#include "../audio.hpp"
 
 namespace impl {
 
@@ -184,7 +185,7 @@ struct application
 
 // Construct an application with a given State and view constructor.
 template <class State, class Ctor>
-auto make_app(State state, Ctor view_ctor) {
+auto make_app(State& state, Ctor view_ctor) {
   using ViewT = decltype(view_ctor(state));
   return application<Ctor, ViewT, State>{state, view_ctor};
 }

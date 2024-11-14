@@ -26,6 +26,22 @@ struct vec
     return Res;
   }
   
+  template <operator_kind Op>
+    requires (std::meta::is_compound_assign(Op))
+  constexpr auto& apply_op(T v) {
+    for (int k = 0; k < N; ++k)
+      (%make_operator_expr(Op, ^(data[k]), ^(v)));
+    return *this;
+  }
+  
+  template <operator_kind Op>
+    requires (!std::meta::is_compound_assign(Op))
+  constexpr auto apply_op(T v) {
+    auto Res {*this};
+    (% make_operator_expr(std::meta::compound_equivalent(Op), ^(Res), ^(v)));
+    return Res;
+  }
+  
   constexpr auto operator-() const {
     vec<T, N> res {*this};
     for (auto& e : res.data)
@@ -47,6 +63,7 @@ struct vec
   T data[N];
   
   %declare_arithmetic( ^const vec& );
+  %declare_arithmetic( ^T );
 };
 
 template <class T>
@@ -70,6 +87,22 @@ struct vec<T, 2>
     return Res;
   }
   
+  template <operator_kind Op>
+    requires (std::meta::is_compound_assign(Op))
+  constexpr auto& apply_op(T v) {
+    (%make_operator_expr(Op, ^(x), ^(v)));
+    (%make_operator_expr(Op, ^(y), ^(v)));
+    return *this;
+  }
+  
+  template <operator_kind Op>
+    requires (!std::meta::is_compound_assign(Op))
+  constexpr auto apply_op(T v) const {
+    auto Res {*this};
+    (% make_operator_expr(std::meta::compound_equivalent(Op), ^(Res), ^(v)) );
+    return Res;
+  }
+  
   constexpr bool operator==(const vec<T, 2>& o) const = default;
   
   constexpr auto operator-() const {
@@ -80,6 +113,7 @@ struct vec<T, 2>
   }
   
   %declare_arithmetic( ^const vec& );
+  %declare_arithmetic( ^T );
   
   T x, y;
 };

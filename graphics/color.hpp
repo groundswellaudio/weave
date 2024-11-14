@@ -26,6 +26,8 @@ struct rgb {
     return { (V)(data[0] * norm_factor), (V)(data[1] * norm_factor), (V)(data[2] * norm_factor)}; 
   }
   
+  constexpr bool operator==(const rgb<T>& o) const = default;
+  
   template <class V>
   constexpr operator rgba<V> () const;
 
@@ -40,10 +42,21 @@ struct rgba {
 
   constexpr T& operator[](int x)              { return x == 4 ? alpha : col[x]; }
   constexpr const T& operator[](int x) const  { return x == 4 ? alpha : col[x]; }
-
+  
   constexpr auto with_alpha(T alpha_) const {
     return rgba{col, alpha_};
   }
+  
+  template <class V>
+  constexpr operator rgba<V> () const {
+    static constexpr double norm_factor = ((double) rgb<V>::norm()) / rgb<T>::norm();
+    return { 
+      {(V)(col[0] * norm_factor), (V)(col[1] * norm_factor), (V)(col[2] * norm_factor)},
+      (V)(alpha * norm_factor)
+    };
+  }
+  
+  constexpr bool operator==(const rgba<T>& o) const = default;
 
   rgb<T> col;
   T alpha;
@@ -52,11 +65,12 @@ struct rgba {
 template <class T>
 template <class V>
 constexpr rgb<T>::operator rgba<V>() const {
-  return {*this, 1.f};
+  return {*this, rgb<V>::norm()};
 }
 
 using rgba_f = rgba<float>;
 using rgb_u8 = rgb<unsigned char>;
+using rgba_u8 = rgba<unsigned char>;
 using color  = rgba<float>;
 
 namespace colors 

@@ -10,6 +10,7 @@ struct toggle_button_widget
   
   std::string_view str;
   float font_size;
+  rgba_u8 active_color;
   
   using value_type = bool;
   
@@ -26,18 +27,22 @@ struct toggle_button_widget
   {
     p.fill_style(rgba_f{1.f, 1.f, 0.f, 1.f});
     
-    p.circle({button_radius, button_radius}, button_radius);
+    p.stroke_style(rgba_f{colors::white}.with_alpha(0.5));
+    p.stroke_rounded_rect({0, 0}, sz, 6, 1);
+    
+    // p.circle({button_radius, button_radius}, button_radius);
     
     if (flag)
     {
-      p.fill_style(colors::red);
-      p.circle({button_radius, button_radius}, 6);
-    }
+      p.fill_style(active_color);
+      p.fill_rounded_rect({0, 0}, sz, 6);
+      //p.circle({button_radius, button_radius}, 6);
+    } 
     
     p.fill_style(colors::white);
-    p.text_alignment(text_align::x::left, text_align::y::center);
-    p.font_size(font_size);
-    p.text( {button_radius * 2 + 2, button_radius}, str );
+    p.text_alignment(text_align::x::center, text_align::y::center);
+    p.font_size(sz.y - 3);
+    p.text(sz / 2.f, str);
   }
 };
 
@@ -47,8 +52,7 @@ struct toggle_button : view {
   toggle_button(Lens l, std::string_view str) : lens{l}, str{str} {}
   
   auto construct(widget_tree_builder& b, ignore) {
-    auto w = b.template create_widget<toggle_button_widget>(lens, {60, 15}, str, font_size);
-    view::this_id = w.parent_widget()->id();
+    auto w = b.template create_widget<toggle_button_widget>(lens, {60, 15}, str, font_size, active_color);
     return w;
   }
   
@@ -63,6 +67,7 @@ struct toggle_button : view {
   Lens lens;
   std::string_view str;
   float font_size = 13;
+  rgba_u8 active_color = rgba_u8{colors::cyan}.with_alpha(255 * 0.5);
 };
 
 template <class State, class Callback>

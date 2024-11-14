@@ -1,6 +1,26 @@
 #include "spiral.hpp"
 
-struct AppState {
+#define MINIAUDIO_IMPLEMENTATION
+#include "deps/miniaudio/miniaudio.h"
+
+struct AppState : audio_renderer<AppState> {
+  
+  void render_audio(audio_output_stream os) 
+  {
+    /* 
+    for (auto s : os) {
+      auto x = std::sin(intern.delta * 2 * 3.14 * 440);
+      intern.delta += 1.f / 44100.f;
+      s[0] = x;
+      s[1] = x; 
+    } */ 
+  }
+  
+  struct internal {
+    float delta;
+  };
+  
+  internal intern;
   float x = 0.3, y = 0.5, z = 0.9;
   bool flag = false;
   std::vector<float> vals = {0.2, 0.3, 0.4};
@@ -20,7 +40,7 @@ auto make_demo_app(AppState& state)
     for_each{
       %lens(^(state.vals)),
       [] (auto lens, auto& state) {
-        return slider{lens};
+        return slider{lens}.with_range(30, 20000);
       }
     },
     maybe {
@@ -33,12 +53,15 @@ auto make_demo_app(AppState& state)
       }}
       
     //toggle_button{}
-  };
+  }
+  .with_interspace(8)
+  .with_margin({20, 5});
 }
 
 int main()
 {
   AppState state;
+  state.start_audio_render();
   auto app = make_app(state, &make_demo_app);
   app.run(state);
 }
