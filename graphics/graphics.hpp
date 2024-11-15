@@ -124,6 +124,14 @@ struct painter : painter_state
     nvgBeginFrame(ctx, size.x, size.y, ratio);
   }
   
+  void scissor(vec2f pos, vec2f size){
+    nvgScissor(ctx, pos.x + origin.x, pos.y + origin.y, size.x, size.y);
+  }
+
+  void reset_scissor() {
+    nvgResetScissor(ctx);
+  }
+	
   void begin_path() {
     nvgBeginPath(ctx);
   }
@@ -186,7 +194,7 @@ struct painter : painter_state
   {
     nvgText(ctx, origin.x + pos.x, origin.y + pos.y - this->text_vert_offset, v.data(), v.end());
   }
-	
+
   void translate(vec2f delta) {
     origin += delta;
   }

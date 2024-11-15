@@ -39,6 +39,8 @@ struct mouse_event {
   vec2f position;
   std::variant<mouse_enter, mouse_exit, mouse_down, mouse_up, mouse_move, mouse_scroll> event; 
   
+  vec2f mouse_scroll_delta() const { return get_as<mouse_scroll>().delta; }
+  bool is_mouse_scroll() const { return is<mouse_scroll>(); }
   bool is_mouse_enter() { return is<mouse_enter>(); }
   bool is_mouse_exit() { return is<mouse_exit>(); }
   bool is_mouse_move() { return is<mouse_move>(); }
@@ -49,7 +51,7 @@ struct mouse_event {
   bool is() const { return holds_alternative<T>(event); } 
   
   template <class T>
-  T& get_as() { return std::get<T>(event); }
+  T& get_as(this auto&& self) { return std::get<T>(self.event); }
 };
 
 using input_event = mouse_event;

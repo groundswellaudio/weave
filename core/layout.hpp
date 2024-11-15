@@ -76,7 +76,7 @@ struct vstack_widget : layout_tag
   {
     float pos = data.margin.y, width = 0;
     for (auto& n : c) {
-      n.set_pos(data.margin.x, pos);
+      n.set_position(data.margin.x, pos);
       auto sz = n.layout(c.tree());
       pos += sz.y + data.interspace;
       width = std::max(width, sz.x);
@@ -105,7 +105,7 @@ struct hstack_widget : layout_tag
     float pos = data.margin.x, height = 0;
     for (auto& n : c) 
     {
-      n.set_pos(pos, data.margin.y);
+      n.set_position(pos, data.margin.y);
       auto sz = n.layout(c.tree());
       pos += sz.x + data.interspace;
       height = std::max(height, sz.y);

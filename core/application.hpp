@@ -12,7 +12,6 @@
 #include "../graphics/graphics.hpp"
 #include "../events/mouse_events.hpp"
 #include "../vec.hpp"
-#include "../audio.hpp"
 
 namespace impl {
 
@@ -29,13 +28,21 @@ namespace impl {
       set_focused(w.id(), abs_pos);
     }
   
-    void set_focused(widget_id id, vec2f absolute_pos) {
+    void set_focused(widget_id id, vec2f absolute_pos, widget_tree& tree) {
       if (id == focused)
         return;
       if (id == widget_id::root())
         assert( (absolute_pos == vec2f{0, 0}) && "root is focused but offset is not 0" );
       focused = id;
       focused_absolute_pos = absolute_pos;
+      
+      parent_listeners.clear();
+      auto parent = tree.parent_id(id);
+      while (parent != id)
+      {
+        if (tree.get(parent).listen_to_child_events())
+          parent_listeners.push_back(parent);
+      }
     }
   
     bool find_in(widget& w, vec2f abs_pos, widget_tree& t, mouse_event e)
@@ -82,6 +89,7 @@ namespace impl {
       }
       e.position -= focused_absolute_pos;
       w->on(e, state);
+      for (auto p : parent_listeners)
     }
     
     void layout_changed(widget_tree& t) {
@@ -95,9 +103,10 @@ namespace impl {
       }
       focused_absolute_pos = new_pos;
     }
-  
+    
     widget_id focused;
     vec2f focused_absolute_pos = {0, 0};
+    std::vector<widget_id> parent_listeners;
   };
   
   /* 
@@ -170,6 +179,7 @@ struct application
     auto impl = [this, &p, &state] (auto&& self, widget& w) -> void
     {
       auto offset = w.pos();
+      p.scissor(w.pos(), w.size());
       p.translate(offset);
       w.paint(p, &state);
       for (auto& w : tree.children(w))

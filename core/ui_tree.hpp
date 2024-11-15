@@ -11,30 +11,6 @@
 #include "lens.hpp"
 #include "../util/tuple.hpp"
 
-template <class T>
-struct event_context {
-    
-  // Used by implementation only.
-  template <class Lens>
-  void emplace(void* s, Lens l) {
-    state_ptr = s;
-    write_fn = [l] (void* s, const T& val) { l(*static_cast<typename Lens::input*>(s)) = val; };
-    read_fn = [l] (void* s) { return l(*static_cast<typename Lens::input*>(s)); };
-  }
-  
-  void write(T v) {
-    write_fn(state_ptr, v);
-  }
-  
-  T read() const {
-    return read_fn(state_ptr);
-  }
-  
-  void* state_ptr;
-  std::function<void(void*, const T&)> write_fn;
-  std::function<T(void*)> read_fn;
-};
-
 consteval std::meta::expr to_str(std::meta::type t) {
   std::meta::ostream os;
   os << t;
@@ -61,22 +37,74 @@ struct widget_tree
 {
   struct children_view;
   
+  struct widget; 
+  
+  struct event_context_data {
+    widget_tree& tree;
+    void* state_ptr;
+    widget* elem = nullptr;
+  };
+  
+  template <class T>
+  struct event_context {
+    
+    template <class Lens>
+    void emplace(Lens l) {
+      write_fn = [l] (void* s, const T& val) { l(*static_cast<typename Lens::input*>(s)) = val; };
+      read_fn = [l] (void* s) { return l(*static_cast<typename Lens::input*>(s)); };
+    }
+  
+    void write(T v) {
+      write_fn(data.state_ptr, v);
+    }
+  
+    T read() const {
+      return read_fn(data.state_ptr);
+    }
+    
+    auto children() {
+      return data.tree.children(elem);
+    }
+    
+    event_context_data data;
+    std::function<void(void*, const T&)> write_fn;
+    std::function<T(void*)> read_fn;
+  };
+  
   struct widget
   {
     private : 
-  
+    
+    template <class T>
+    using ptr = T*;
+    
     struct model 
     {
       virtual void debug_dump() = 0;
       virtual void paint(painter& p, vec2f size, void* state) = 0;
       virtual vec2f layout(children_view v, vec2f size) = 0;
-      virtual void on(input_event e, vec2f this_size, void* ctx_ptr) = 0;
+      virtual void on(input_event e, event_context_data ec) = 0;
+      virtual void on_child_event(input_event e, event_context_data ec) = 0;
       virtual ~model() {};
     };
-  
+    
+    template <class T>
+    concept is_child_event_listener = requires (input_event e, widget_id i, 
+                                                event_context<typename T::value_type> ec) 
+    {
+      obj.on_child_event(e, i, ec); 
+    };
+    
     template <class T>
     struct model_impl_base : model {
       model_impl_base(auto&&... args) : obj{args...} {}
+      
+      bool is_child_event_listener() const { 
+        return requires (input_event e, widget_id i, event_context<typename T::value_type> ec) { 
+          obj.on_child_event(e, i, ec); 
+        };
+      }
+      
       T obj;
     };
   
@@ -91,17 +119,17 @@ struct widget_tree
         std::cerr << %to_str(^T);
       }
       
-      void on(input_event e, vec2f this_size, void* ctx_ptr) override 
+      void on(input_event e, event_context_data ec) override 
       {
         if constexpr (^Lens != ^empty_lens)
         {
-          event_context<typename T::value_type> evctx {};
-          evctx.emplace(ctx_ptr, lens);
+          event_context<typename T::value_type> evctx {ec};
+          evctx.emplace(lens);
           this->obj.on(e, this_size, evctx);
         }
         else 
         {
-          this->obj.on(e, this_size, ctx_ptr);
+          this->obj.on(e, ec.widget->size(), ec.state_ptr);
         }
       }
     
@@ -133,6 +161,8 @@ struct widget_tree
     
     template <class T, class Lens, class... Ts>
     void emplace(Lens lens, Ts... ts) {
+      auto ptr = new model_impl<T, Lens> {lens, ts...};
+      child_event_listener = ptr->is_child_event_listener();
       model_ptr.reset( new model_impl<T, Lens> {lens, ts...} );
     }
   
@@ -150,8 +180,9 @@ struct widget_tree
       model_ptr->paint(p, size(), state);
     }
   
-    void on(input_event e, void* state) {
-      model_ptr->on(e, size(), state);
+    void on(input_event e, event_context_data ec) {
+      ec.widget = this;
+      model_ptr->on(e, size(), ec);
     }
     
     void set_size(vec2f sz) {
@@ -159,9 +190,9 @@ struct widget_tree
     }
     
     vec2f size() const { return size_v; }
-    vec2f pos() const { return pos_v; }
+    vec2f position() const { return pos_v; }
     
-    void set_pos(float x, float y) {
+    void set_position(float x, float y) {
       pos_v = vec2f{x, y};
     }
     
@@ -232,6 +263,7 @@ struct widget_tree
     widget_tree& self;
   };
   
+  /// Tree functions
   children_view children(widget_id id) {
     return children_view{get(id).children(), *this};
   }
@@ -251,7 +283,9 @@ struct widget_tree
       return nullptr;
     return &it->second;
   }
-
+  
+  widget_id parent_id(widget_id id) const { return get(id).parent_id(); }
+  
   widget& parent(widget& w) { return get(w.parent_id()); }
   
   widget* root() { return &widget_map.find(widget_id{view_id{0}})->second; }
