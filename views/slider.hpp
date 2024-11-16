@@ -19,12 +19,12 @@ struct slider_x_widget
   
   using value_type = float;
   
-  void on(mouse_event e, vec2f this_size, event_context<float> ec) 
+  void on(mouse_event e, event_context<float> ec) 
   {
     if (!e.is_mouse_drag() && !e.is_mouse_down())
       return;
     
-    auto sz = this_size;
+    auto sz = ec.this_size();
     ratio = std::min(e.position.x / sz.x, 1.f);
     ratio = std::max(0.f, ratio);
     

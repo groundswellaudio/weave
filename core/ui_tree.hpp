@@ -28,25 +28,36 @@ auto& operator<<(std::ostream& os, widget_id id) {
   return os;
 }
 
+struct widget_tree;
 struct painter; 
-
 struct widget_tree_builder;
 struct widget_tree_updater;
 
+template <class T, class EvCtx>
+concept is_child_event_listener = requires (T obj, input_event e, widget_id i, 
+                                            EvCtx ec) 
+{
+  obj.on_child_event(e, ec, i);
+};
+  
 struct widget_tree 
 {
   struct children_view;
-  
   struct widget; 
   
   struct event_context_data {
+    
+    void* application_state() const { return state_ptr; }
+    auto children() { return tree.children(*elem); }
+    auto this_size() { return elem->size(); }
+    
     widget_tree& tree;
     void* state_ptr;
     widget* elem = nullptr;
   };
-  
+
   template <class T>
-  struct event_context {
+  struct event_context : event_context_data {
     
     template <class Lens>
     void emplace(Lens l) {
@@ -55,21 +66,19 @@ struct widget_tree
     }
   
     void write(T v) {
-      write_fn(data.state_ptr, v);
+      write_fn(state_ptr, v);
     }
   
     T read() const {
-      return read_fn(data.state_ptr);
+      return read_fn(state_ptr);
     }
     
-    auto children() {
-      return data.tree.children(elem);
-    }
-    
-    event_context_data data;
     std::function<void(void*, const T&)> write_fn;
     std::function<T(void*)> read_fn;
   };
+  
+  template <>
+  struct event_context<void> : event_context_data {};
   
   struct widget
   {
@@ -84,26 +93,13 @@ struct widget_tree
       virtual void paint(painter& p, vec2f size, void* state) = 0;
       virtual vec2f layout(children_view v, vec2f size) = 0;
       virtual void on(input_event e, event_context_data ec) = 0;
-      virtual void on_child_event(input_event e, event_context_data ec) = 0;
+      virtual void on_child_event(input_event e, event_context_data ec, widget_id child) = 0;
       virtual ~model() {};
-    };
-    
-    template <class T>
-    concept is_child_event_listener = requires (input_event e, widget_id i, 
-                                                event_context<typename T::value_type> ec) 
-    {
-      obj.on_child_event(e, i, ec); 
     };
     
     template <class T>
     struct model_impl_base : model {
       model_impl_base(auto&&... args) : obj{args...} {}
-      
-      bool is_child_event_listener() const { 
-        return requires (input_event e, widget_id i, event_context<typename T::value_type> ec) { 
-          obj.on_child_event(e, i, ec); 
-        };
-      }
       
       T obj;
     };
@@ -119,17 +115,24 @@ struct widget_tree
         std::cerr << %to_str(^T);
       }
       
+      using EvCtx = event_context<typename T::value_type>;
+      
       void on(input_event e, event_context_data ec) override 
       {
+        EvCtx evctx {ec};
         if constexpr (^Lens != ^empty_lens)
-        {
-          event_context<typename T::value_type> evctx {ec};
           evctx.emplace(lens);
-          this->obj.on(e, this_size, evctx);
-        }
-        else 
+        this->obj.on(e, evctx);
+      }
+      
+      void on_child_event(input_event e, event_context_data ec, widget_id child) override 
+      {
+        if constexpr (::is_child_event_listener<T, EvCtx>)
         {
-          this->obj.on(e, ec.widget->size(), ec.state_ptr);
+          EvCtx evctx {ec};
+          if constexpr (^Lens != ^empty_lens)
+            evctx.emplace(lens);
+          this->obj.on_child_event(e, evctx, child);
         }
       }
     
@@ -162,10 +165,10 @@ struct widget_tree
     template <class T, class Lens, class... Ts>
     void emplace(Lens lens, Ts... ts) {
       auto ptr = new model_impl<T, Lens> {lens, ts...};
-      child_event_listener = ptr->is_child_event_listener();
+      child_event_listener = ::is_child_event_listener<T, event_context<typename T::value_type>>;
       model_ptr.reset( new model_impl<T, Lens> {lens, ts...} );
     }
-  
+    
     auto layout(children_view v) {
       size_v = model_ptr->layout(v, size());
       return size_v;
@@ -181,8 +184,13 @@ struct widget_tree
     }
   
     void on(input_event e, event_context_data ec) {
-      ec.widget = this;
-      model_ptr->on(e, size(), ec);
+      ec.elem = this;
+      model_ptr->on(e, ec);
+    }
+    
+    void on_child_event(input_event e, event_context_data ec, widget_id child) {
+      ec.elem = this;
+      model_ptr->on_child_event(e, ec, child);
     }
     
     void set_size(vec2f sz) {
@@ -213,6 +221,8 @@ struct widget_tree
       return this->layout( children_view{children_v, tree} );
     }
     
+    bool is_child_event_listener() const { return child_event_listener; }
+    
     void debug_dump(widget_tree& tree, int indentation) {
       std::cerr << std::endl;
       for (int k = 0; k < indentation; ++k)
@@ -233,6 +243,7 @@ struct widget_tree
     
     vec2f pos_v, size_v;
     widget_id parent_id_v, this_id;
+    bool child_event_listener;
     std::vector<widget_id> children_v;
     std::unique_ptr<model> model_ptr;
   };
@@ -249,14 +260,9 @@ struct widget_tree
       widget_tree& self;
     };
     
-    iterator begin() const {
-      return iterator{child_vec.begin(), self};
-    }
-    
-    iterator end() const {
-      return iterator{child_vec.end(), self};
-    }
-    
+    auto& operator[](int idx) { return self.get(child_vec[idx]); }
+    iterator begin() const { return iterator{child_vec.begin(), self}; }
+    iterator end() const { return iterator{child_vec.end(), self}; }
     widget_tree& tree() const { return self; }
   
     const std::vector<widget_id>& child_vec;
@@ -273,6 +279,11 @@ struct widget_tree
   }
   
   widget& get(widget_id id) {
+    auto it = widget_map.find(id);
+    return it->second;
+  }
+  
+  const widget& get(widget_id id) const {
     auto it = widget_map.find(id);
     return it->second;
   }
@@ -320,7 +331,7 @@ struct widget_tree
     auto [it, success] = widget_map.try_emplace(id, widget{id, parent});
     it->second.emplace<T>(lens, args...);
     it->second.set_size(size);
-    it->second.set_pos(0, 0);
+    it->second.set_position(0, 0);
     return &it->second;
   }
   
@@ -328,7 +339,11 @@ struct widget_tree
   std::unordered_map<widget_id, widget> widget_map;
 };
 
+template <class T>
+using event_context = widget_tree::event_context<T>;
+
 using widget = widget_tree::widget;
+using event_context_data = widget_tree::event_context_data;
 
 struct widget_tree_builder 
 {

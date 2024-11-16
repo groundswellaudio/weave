@@ -40,3 +40,16 @@ struct view {
 
 // A base class for a view that has children
 struct composed_view : view {};
+
+template <class T>
+struct view_trait;
+
+template <class T>
+struct view_sequence_trait;
+
+template <class T>
+  requires (has_view_trait<T>)
+struct view_sequence_trait {
+  
+  void build_seq( 
+};

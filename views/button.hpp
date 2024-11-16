@@ -14,7 +14,7 @@ struct toggle_button_widget
   
   using value_type = bool;
   
-  void on(mouse_event e, vec2f sz, event_context<bool> ec) {
+  void on(mouse_event e, event_context<bool> ec) {
     if (e.is_mouse_enter())
       set_mouse_cursor(mouse_cursor::hand);
     else if (e.is_mouse_exit())
@@ -73,18 +73,20 @@ struct toggle_button : view {
 template <class State, class Callback>
 struct trigger_button_widget {
   
+  using value_type = void;
+  
   Callback callback;
   std::string_view str;
   float font_size;
   
-  void on(mouse_event e, vec2f this_size, void* state) {
+  void on(mouse_event e, event_context<void> ec) {
     if (e.is_mouse_enter())
       set_mouse_cursor(mouse_cursor::hand);
     else if (e.is_mouse_exit())
       set_mouse_cursor(mouse_cursor::arrow);
     if (!e.is_mouse_down())
       return;
-    callback( *static_cast<State*>(state) );
+    callback( *static_cast<State*>(ec.application_state()) );
   }
   
   void paint(painter& p, vec2f sz) 

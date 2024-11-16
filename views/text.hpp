@@ -10,7 +10,7 @@ struct text_widget
   
   using value_type = void;
   
-  void on(mouse_event e, vec2f sz, ignore) 
+  void on(ignore, ignore) 
   {
   }
   
@@ -26,6 +26,8 @@ struct text : view {
   text(std::string_view str) : str{str} {}
   
   auto construct(widget_tree_builder& b, ignore) {
+    return make_tuple( text_wigdet{text}, empty_lens{} );
+    
     return b.template create_widget<text_widget>(empty_lens{}, {100, 15}, str);
   }
   

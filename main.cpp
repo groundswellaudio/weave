@@ -43,6 +43,14 @@ auto make_demo_app(AppState& state)
         return slider{lens}.with_range(30, 20000);
       }
     },
+    scrollable {
+      vec2f{ 60, 15 },
+      vstack {
+        slider{ %lens(^(state.x)) }, 
+        slider{ %lens(^(state.y)) },
+        slider{ %lens(^(state.z)) }
+      }
+    },
     maybe {
       state.flag, 
       slider{%lens(^(state.x))}

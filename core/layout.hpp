@@ -48,6 +48,8 @@ struct stack_base : stack<Ts...> {
   {
     auto next_b = b.template create_widget<T>(empty_lens{}, {0, 0}, this->info);
     tuple_for_each(this->children, [&next_b, &state] (auto& elem) {
+      using trait = view_sequence_trait<std::remove_reference_t<decltype(elem)>>;
+      trait::seq_build(elem, build_consumer(*this));
       elem.construct(next_b, state);
     });
   }
@@ -58,6 +60,9 @@ struct stack_base : stack<Ts...> {
     
     tuple_for_each_with_index( this->children, [&next_updater, &state, &New] (auto& elem, auto index) 
     {
+      using trait = view_sequence_trait<std::remove_reference_t<decltype(elem)>>;
+      trait::seq_rebuild(elem, rebuild_consumer(*this));
+      
       elem.rebuild(get<index.value>(New.children), next_updater, state);
     });
   }
@@ -65,12 +70,14 @@ struct stack_base : stack<Ts...> {
 
 struct vstack_widget : layout_tag 
 {
+  using value_type = void;
+  
   stack_data data;
   
   vstack_widget(stack_data d) : data{d} {}
   
   void paint(painter& p, vec2f) {}
-  void on(input_event, ignore, ignore) {}
+  void on(ignore, ignore) {}
   
   auto layout( widget_tree::children_view c ) 
   {
@@ -94,11 +101,13 @@ struct vstack : stack_base<vstack_widget, Ts...>
 
 struct hstack_widget : layout_tag
 {
+  using value_type = void;
+  
   stack_data data;
   hstack_widget(stack_data d) : data{d} {}
   
   void paint(painter& p, vec2f) {}
-  void on(input_event, ignore, ignore) {}
+  void on(input_event, ignore) {}
   
   auto layout( widget_tree::children_view c ) 
   {

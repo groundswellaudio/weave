@@ -24,8 +24,8 @@ namespace impl {
       return (p.x >= 0 && (p.x <= sz.x) && p.y >= 0 && p.y <= sz.y);
     }
   
-    void set_focused(widget& w, vec2f abs_pos) {
-      set_focused(w.id(), abs_pos);
+    void set_focused(widget& w, vec2f abs_pos, widget_tree& tree) {
+      set_focused(w.id(), abs_pos, tree);
     }
   
     void set_focused(widget_id id, vec2f absolute_pos, widget_tree& tree) {
@@ -38,10 +38,12 @@ namespace impl {
       
       parent_listeners.clear();
       auto parent = tree.parent_id(id);
-      while (parent != id)
+      while (parent != widget_id::root())
       {
-        if (tree.get(parent).listen_to_child_events())
+        auto& w = tree.get(parent);
+        if (w.is_child_event_listener())
           parent_listeners.push_back(parent);
+        parent = tree.parent_id(parent);
       }
     }
   
@@ -50,9 +52,9 @@ namespace impl {
       if (contains(w, e.position - abs_pos))
       {
         for (auto& c : t.children(w))
-          if (find_in(c, abs_pos + c.pos(), t, e))
+          if (find_in(c, abs_pos + c.position(), t, e))
             return true;
-        set_focused(w, abs_pos);
+        set_focused(w, abs_pos, t);
         return true;
       }
       return false;
@@ -64,7 +66,7 @@ namespace impl {
         return true;
       if (w.id() == w.parent_id())
         return true;
-      return find_from(t.parent(w), abs_pos - w.pos(), t, e);
+      return find_from(t.parent(w), abs_pos - w.position(), t, e);
     }
   
     public : 
@@ -73,23 +75,29 @@ namespace impl {
     {
       auto w = t.find(focused);
       if (not w) {
-        set_focused(widget_id::root(), {0, 0});
+        set_focused(widget_id::root(), {0, 0}, t);
         w = t.root();
       }
+      
+      auto ecd = event_context_data{t, state};
+      
       if (e.is_mouse_move() && !e.is_mouse_drag()) 
       {
         auto old_focus = focused;
         auto old_pos = focused_absolute_pos;
         find_from(*t.find(focused), focused_absolute_pos, t, e);
         w = t.find(focused);
-        if (old_focus != focused) {
-          t.find(old_focus)->on(mouse_event{e.position - old_pos, mouse_exit{}}, state);
-          w->on(mouse_event{e.position - focused_absolute_pos, mouse_enter{}}, state);
+        if (old_focus != focused) 
+        {
+          t.find(old_focus)->on(mouse_event{e.position - old_pos, mouse_exit{}}, ecd);
+          w->on(mouse_event{e.position - focused_absolute_pos, mouse_enter{}}, ecd);
         }
       }
+      
       e.position -= focused_absolute_pos;
-      w->on(e, state);
+      w->on(e, ecd);
       for (auto p : parent_listeners)
+        w->on(e, ecd);
     }
     
     void layout_changed(widget_tree& t) {
@@ -98,7 +106,7 @@ namespace impl {
       while(id != widget_id::root())
       {
         auto& w = t.get(id);
-        new_pos += w.pos();
+        new_pos += w.position();
         id = w.parent_id();
       }
       focused_absolute_pos = new_pos;
@@ -178,8 +186,8 @@ struct application
     
     auto impl = [this, &p, &state] (auto&& self, widget& w) -> void
     {
-      auto offset = w.pos();
-      p.scissor(w.pos(), w.size());
+      auto offset = w.position();
+      p.scissor(offset, w.size());
       p.translate(offset);
       w.paint(p, &state);
       for (auto& w : tree.children(w))
@@ -187,7 +195,7 @@ struct application
       p.translate(-offset);
     };
     
-    impl(impl, tree.get(view_id{0}));
+    impl(impl, *tree.root());
     p.end_frame();
     win.swap_buffer();
   }
