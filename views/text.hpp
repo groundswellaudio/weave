@@ -3,6 +3,7 @@
 #include "views_core.hpp"
 #include <string_view>
 
+/* 
 struct text_widget
 {
   std::string_view text;
@@ -40,4 +41,4 @@ struct text : view {
   
   std::string_view str;
   float font_size = 13;
-};
+}; */ 

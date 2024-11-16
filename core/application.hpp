@@ -46,14 +46,24 @@ namespace impl {
         parent = tree.parent_id(parent);
       }
     }
-  
+    
+    bool find_in_children(widget& w, vec2f abs_pos, widget_tree& t, mouse_event e)
+    {
+      auto c = w.find_child_at(e.position - abs_pos);
+      if (!c)
+        return false;
+      if (find_in_children(*c, abs_pos + c->position(), t, e))
+        return true;
+      set_focused(*c, abs_pos + c->position(), t);
+      return true;
+    }
+    
     bool find_in(widget& w, vec2f abs_pos, widget_tree& t, mouse_event e)
     {
-      if (contains(w, e.position - abs_pos))
+      if (w.contains(e.position - abs_pos))
       {
-        for (auto& c : t.children(w))
-          if (find_in(c, abs_pos + c.position(), t, e))
-            return true;
+        if (find_in_children(w, abs_pos, t, e))
+          return true;
         set_focused(w, abs_pos, t);
         return true;
       }
@@ -76,7 +86,7 @@ namespace impl {
       auto w = t.find(focused);
       if (not w) {
         set_focused(widget_id::root(), {0, 0}, t);
-        w = t.root();
+        w = &t.root();
       }
       
       auto ecd = event_context_data{t, state};
@@ -112,7 +122,7 @@ namespace impl {
       focused_absolute_pos = new_pos;
     }
     
-    widget_id focused;
+    widget_id focused = widget_id::root();
     vec2f focused_absolute_pos = {0, 0};
     std::vector<widget_id> parent_listeners;
   };
@@ -157,8 +167,10 @@ struct application
     gctx.init();
     
     auto b = tree.builder();
-    app_view.construct(b, s);
-    tree.layout();
+    auto [w, lens, args] = app_view.build(b, s);
+    auto root = tree.create_widget(args.id, std::move(w), lens, args);
+    assert( root == &tree.root() );
+    tree.root().layout();
   }
   
   void run(State& state)
@@ -171,7 +183,7 @@ struct application
       
       auto new_view = view_ctor(state);
       auto upd = tree.updater();
-      app_view.rebuild(new_view, upd, state);
+      app_view.rebuild(new_view, tree.root(), upd, state);
       med.layout_changed(tree);
       
       paint(state);
@@ -195,7 +207,7 @@ struct application
       p.translate(-offset);
     };
     
-    impl(impl, *tree.root());
+    impl(impl, tree.root());
     p.end_frame();
     win.swap_buffer();
   }

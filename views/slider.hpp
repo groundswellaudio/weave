@@ -55,18 +55,18 @@ struct slider_x_widget
 };
 
 template <class Lens>
-struct slider {
+struct slider : view<slider<Lens>> {
   
   slider(Lens L) : lens{L} {}
   
   template <class S>
-  auto construct(widget_tree_builder& b, S& state) {
-    auto next = b.template create_widget<slider_x_widget>(lens, size, properties);
+  auto build(widget_builder b, S& state) {
+    return tuple{slider_x_widget{properties}, lens, widget_ctor_args{b.next_id(), size}};
   }
   
   template <class S>
-  void rebuild(slider<Lens> New, widget_tree_updater& b, S& state) {
-    auto& w = b.consume_leaf().as<slider_x_widget>();
+  void rebuild(slider<Lens> New, widget& wb, widget_updater up, S& state) {
+    auto& w = wb.as<slider_x_widget>();
     if (w.prop != New.properties)
       w.prop = New.properties; 
     *this = New;

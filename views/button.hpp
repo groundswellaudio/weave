@@ -4,13 +4,18 @@
 #include <string_view>
 #include "../cursor.hpp"
 
+struct button_properties {
+  bool operator==(const button_properties&) const = default; 
+  std::string_view str;
+  float font_size = 13;
+  rgba_u8 active_color = rgba_u8{colors::cyan}.with_alpha(255 * 0.5);
+};
+
 struct toggle_button_widget
 {
   static constexpr float button_radius = 8;
   
-  std::string_view str;
-  float font_size;
-  rgba_u8 active_color;
+  button_properties prop;
   
   using value_type = bool;
   
@@ -34,7 +39,7 @@ struct toggle_button_widget
     
     if (flag)
     {
-      p.fill_style(active_color);
+      p.fill_style(prop.active_color);
       p.fill_rounded_rect({0, 0}, sz, 6);
       //p.circle({button_radius, button_radius}, 6);
     } 
@@ -42,34 +47,36 @@ struct toggle_button_widget
     p.fill_style(colors::white);
     p.text_alignment(text_align::x::center, text_align::y::center);
     p.font_size(sz.y - 3);
-    p.text(sz / 2.f, str);
+    p.text(sz / 2.f, prop.str);
   }
 };
 
 template <class Lens>
-struct toggle_button : view {
+struct toggle_button : view<toggle_button<Lens>> {
   
-  toggle_button(Lens l, std::string_view str) : lens{l}, str{str} {}
-  
-  auto construct(widget_tree_builder& b, ignore) {
-    auto w = b.template create_widget<toggle_button_widget>(lens, {60, 15}, str, font_size, active_color);
-    return w;
+  toggle_button(Lens l, std::string_view str) : lens{l} {
+    properties.str = str;
   }
   
-  void rebuild(toggle_button<Lens>& New, widget_tree_updater& b, ignore)
-  {
-    auto& w = b.consume_leaf().template as<toggle_button_widget>();
-    if (New == *this)
+  auto build(widget_builder b, ignore) {
+    return make_tuple( 
+      toggle_button_widget{properties},
+      lens,
+      widget_ctor_args{b.next_id(), vec2f{60, 15}}
+    );
+  }
+  
+  void rebuild(toggle_button<Lens>& New, widget& w, ignore, ignore) {
+    if (New.properties == this->properties)
       return;
     *this = New;
   }
   
   Lens lens;
-  std::string_view str;
-  float font_size = 13;
-  rgba_u8 active_color = rgba_u8{colors::cyan}.with_alpha(255 * 0.5);
+  button_properties properties;
 };
 
+/* 
 template <class State, class Callback>
 struct trigger_button_widget {
   
@@ -101,22 +108,22 @@ struct trigger_button_widget {
 };
 
 template <class Fn>
-struct trigger_button : view {
+struct trigger_button : view<trigger_button<Fn>> {
   
   template <class T>
   trigger_button(T str, Fn fn) : str{str}, fn{fn} {} 
   
   template <class State>
-  void construct(widget_tree_builder& b, State& state) {
+  void build(widget_builder& b, State& state) {
     // ensure that the callback is well formed
     using z = decltype(fn(state));
-    auto next = b.create_widget<trigger_button_widget<State, Fn>>(empty_lens{}, {60, 15}, fn, str, font_size);
-    view::this_id = next.parent_widget()->id();
+    return make_tuple( trigger_button_widget<State, Fn>{fn, str, font_size}, 
+                       empty_lens{}, 
+                       widget_ctor_args{b.next_id(), {60.f, 15.f}} );
   }
   
   template <class State>
-  void rebuild(trigger_button<Fn> New, widget_tree_updater& b, State& s) {  
-    auto& w = b.consume_leaf().template as<trigger_button_widget<State, Fn>>();
+  void rebuild(trigger_button<Fn> New, widget& w, State& s) {  
     if (str == New.str)
       return;
     *this = New;
@@ -128,7 +135,7 @@ struct trigger_button : view {
 };
 
 template <class T, class Fn>
-trigger_button(T, Fn) -> trigger_button<Fn>;
+trigger_button(T, Fn) -> trigger_button<Fn>; */ 
 
 /*
 template <class L>

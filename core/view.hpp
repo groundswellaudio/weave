@@ -1,55 +1,58 @@
 #pragma once
 
-#include <functional>
+#include "ui_tree.hpp"
 
 struct layout_tag {};
 
-struct view_id {
-  bool operator==(const view_id&) const = default;
-  unsigned value = 0;
+struct widget_builder;
+struct widget_updater;
+
+template <class Producer, class Consumer, class Destroyer> 
+struct view_seq_rebuild_ctx {
+  Producer produce;
+  Consumer consume;
+  Destroyer destroy;
 };
 
-struct widget_id {
+template <class T>
+struct view {
   
-  constexpr widget_id() = default;
-  constexpr widget_id(view_id id) : base{id} {}
+  // must declare the following : 
+  // build(widget_builder& c, auto& state) -> tuple(widget, lens, widget_ctor_args)
+  // rebuild(self& new, widget& w, widget_updater up, auto& state)
   
-  bool operator==(const widget_id& o) const = default; 
+  void seq_build(this T& self, auto Consumer, const widget_builder& c, auto& state) {
+    auto [w, lens, args] = self.build(c, state);
+    Consumer(std::move(w), lens, args);
+  }
   
-  static constexpr widget_id root() { return {view_id{0}}; }
+  void seq_rebuild(this T& self, T& New, auto&& seq_updater, 
+                   const widget_updater& up, auto& state) 
+  {
+    self.rebuild(New, seq_updater.next(), up, state);
+  }
   
-  view_id base;
-  unsigned offset = 0;
-};
-
-template <>
-class std::hash<widget_id> {
-  public : 
-  constexpr std::size_t operator()(const widget_id& x) const { 
-    auto base = std::size_t(x.base.value) << 32;
-    return base | std::size_t(x.offset); 
+  void seq_destroy(this T& self, auto GetForDestroy, widget_tree& tree) {
+    self.destroy( GetForDestroy(), tree );
+  }
+  
+  void destroy(widget& w, widget_tree& t) {
+    t.destroy(w.id());
   }
 };
 
-struct view {
-  auto& operator=(const view&) { return *this; }
-  bool operator==(const view& o) const { return true; }
-  bool operator!=(const view& o) const { return false; }
-  widget_id this_id = {}; 
-};
-
-// A base class for a view that has children
-struct composed_view : view {};
-
 template <class T>
-struct view_trait;
-
-template <class T>
-struct view_sequence_trait;
-
-template <class T>
-  requires (has_view_trait<T>)
-struct view_sequence_trait {
+struct view_sequence_updater {
   
-  void build_seq( 
+  auto consume_fn(this T& self) {
+    return [&self] (auto&&... args) { self.consume(args...); };
+  }
+  
+  auto next_fn(this T& self) {
+    return [&self] () -> auto& { return self.next(); };
+  }
+  
+  auto destroy_fn(this T& self) {
+    return [&self] () -> auto& { return self.destroy(); };
+  }
 };

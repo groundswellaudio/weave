@@ -8,31 +8,33 @@ struct maybe {
   using Self = maybe<View>;
   
   template <class S>
-  void construct(widget_tree_builder& b, S& state)
+  void seq_build(auto consumer, widget_builder& b, S& state)
   {
     if (!flag) 
       return;
-    view.construct(b, state);
+    view.seq_build(consumer, b, state);
   }
   
+  unsigned size() { return flag; }
+  
   template <class State>
-  void rebuild(Self& New, widget_tree_updater& b, State& s) 
+  void seq_rebuild(Self& New, auto seq_updater, widget_updater& up, State& s) 
   {
     if (flag == New.flag)
     {
       if (flag)
-        view.rebuild(New.view, b, s);
+        view.seq_rebuild(New.view, seq_updater, up, s);
     }
     else if (!flag)
     {
-      auto nb = b.builder();
-      view.construct(nb, s);
-      b.parent_widget()->layout(b.tree);
+      auto nb = up.builder();
+      view.seq_build(seq_updater.consume_fn(), nb, s);
+      up.parent_widget()->layout();
     }
     else
     {
-      b.tree.destroy(b.consume_leaf().id());
-      b.parent_widget()->layout(b.tree);
+      view.seq_destroy(seq_updater.destroy_fn(), up.tree);
+      up.parent_widget()->layout();
     }
     *this = New;
   }

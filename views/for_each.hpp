@@ -20,9 +20,7 @@ struct for_each {
   
   std::vector<element> elements;
   
-  template <class S>
-  auto construct(widget_tree_builder& b, S& state)
-  {
+  void seq_build(auto Consumer, widget_builder& b, auto& state) {
     int k = 0;
     auto&& range_data = range_fn(state);
     for (auto&& data : range_data)
@@ -30,11 +28,43 @@ struct for_each {
       using input_t = %remove_reference(type_of(^range_data));
       auto lens = compose_lens(range_fn, range_element_lens<input_t>{k++});
       auto view = view_ctor(lens, state);
-      view.construct(b, state);
+      view.seq_build(Consumer, b, state);
       elements.push_back(view);
     }
   }
   
+  template <class State>
+  void seq_rebuild(auto& NewView, auto&& seq_updater, 
+                   widget_updater& up, State& state) 
+  {
+    int k = 0;
+    auto&& range_data = range_fn(state);
+    
+    for (auto e : range_data)
+    {
+      using input_t = %remove_reference(type_of(^range_data));
+      auto lens = compose_lens(range_fn, range_element_lens<input_t>{k++});
+      NewView.elements.push_back(view_ctor(lens, state));
+    }
+    
+    if (NewView.elements.size() > elements.size())
+    { 
+      unsigned k = 0;
+      for (; k < elements.size(); ++k)
+        elements[k].seq_rebuild(NewView.elements[k], seq_updater, up, state);
+      for (; k < NewView.elements.size(); ++k) {
+        elements.emplace_back(NewView.elements[k]);
+        elements.back().seq_build( seq_updater.consume_fn(), 
+                                   up.builder(), state );
+      }
+      
+      up.parent_widget()->layout();
+    }
+  }
+  
+  // void seq_destroy(auto Producer)
+  
+  /* 
   template <class State>
   void rebuild(Self& NewView, widget_tree_updater& b, State& state)
   {
@@ -62,7 +92,6 @@ struct for_each {
     }
     
     
-    /* 
     if (NewView.elements.size() <= elements.size())
     {
       for (unsigned k = 0; k < NewView.elements.size(); ++k)
@@ -83,6 +112,6 @@ struct for_each {
         e.rebuild(NewView.elements[k++], tree);
       for (k < NewView.elements.size(); ++k)
         NewView.elements[k].construct( tree.builder() );
-    } */ 
-  }
+    } 
+  } */ 
 }; 

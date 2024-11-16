@@ -43,6 +43,7 @@ auto make_demo_app(AppState& state)
         return slider{lens}.with_range(30, 20000);
       }
     },
+    /* 
     scrollable {
       vec2f{ 60, 15 },
       vstack {
@@ -50,15 +51,16 @@ auto make_demo_app(AppState& state)
         slider{ %lens(^(state.y)) },
         slider{ %lens(^(state.z)) }
       }
-    },
+    }, */ 
     maybe {
       state.flag, 
       slider{%lens(^(state.x))}
     }, 
+    /* 
     trigger_button{ "add slider!", 
       [] (AppState& state) {
         state.vals.push_back(0.8);
-      }}
+      }} */ 
       
     //toggle_button{}
   }

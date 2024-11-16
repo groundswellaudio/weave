@@ -1,5 +1,7 @@
 #pragma once
 
+#include <type_traits>
+
 using namespace std::meta;
 
 namespace impl 
@@ -55,6 +57,9 @@ struct tuple
   %impl::expand_as_fields(type_list{^Ts...});
 };
 
+template <class... Ts>
+tuple(Ts... ts) -> tuple<Ts...>;
+
 template <unsigned Index, class Tpl>
   requires ( std::meta::is_instance_of(std::meta::remove_reference(^Tpl), ^tuple) )
 constexpr auto&& get(Tpl&& tpl)
@@ -92,6 +97,11 @@ namespace impl
     for (auto e : expand_fields(expr_list{tpl}))
       b << ^ [fn, e, p = k++] ( (%fn)(%e, constant<p>{}) );
   }
+}
+
+template <class... Ts>
+constexpr auto make_tuple(Ts&&... ts) {
+  return tuple< std::remove_reference_t<Ts>... >{ (Ts&&) ts... };
 }
 
 template <class... Ts>
