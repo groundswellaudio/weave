@@ -2,6 +2,7 @@
 #pragma once
 
 #include "gen-operators.hpp"
+#include <algorithm>
 
 using namespace std::meta;
 
@@ -118,6 +119,17 @@ struct vec<T, 2>
   T x, y;
 };
 
+// Element-wise maximum
+template <class T>
+constexpr vec<T, 2> max(vec<T, 2> a, vec<T, 2> b) {
+  return { std::max(a.x, b.x), std::max(a.y, b.y) };
+}
+
+template <class T>
+constexpr vec<T, 2> min(vec<T, 2> a, vec<T, 2> b) {
+  return { std::min(a.x, b.x), std::min(a.y, b.y) };
+}
+
 namespace gl_types
 {
 
@@ -131,6 +143,11 @@ namespace gl_types
   {
     for (int dim = 2; dim < 5; ++dim)
     {
+      /* 
+      auto id = cat(cat(vecid, dim), tsuffix[k]);
+      b << ^ [id, dim, b = bases[k]] namespace {
+        using %name(id) = vec< %typename(b), dim >;
+      }; */ 
       auto type = instantiate(^vec, template_arguments{bases[k], dim});
       auto name = cat(cat(vecid, dim), tsuffix[k]);
       append_alias(b, name, type);

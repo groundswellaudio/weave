@@ -128,7 +128,7 @@ struct vstack_widget : layout_tag
     return {};
   }
   
-  auto layout() 
+  auto layout(vec2f sz)
   {
     float pos = data.margin.y, width = 0;
     for (auto& n : children()) {
@@ -138,7 +138,7 @@ struct vstack_widget : layout_tag
       width = std::max(width, sz.x);
     }
     
-    return vec2f{width, pos + data.margin.y};
+    return vec2f{width + 2 * data.margin.x, pos + data.margin.y};
   }
   
   std::span<widget*> children() {

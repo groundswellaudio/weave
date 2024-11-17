@@ -154,8 +154,8 @@ struct widget_tree
       }
       
       vec2f layout(vec2f size) final {
-        if constexpr ( requires {obj.layout();} )
-          return this->obj.layout();
+        if constexpr ( requires {this->obj.layout(size);} )
+          return this->obj.layout(size);
         return size;
       }
       
@@ -222,10 +222,10 @@ struct widget_tree
     }
     
     template <class T, class Lens, class... Ts>
-    void emplace(Lens lens, Ts... ts) {
+    void emplace(Lens lens, Ts&&... ts) {
       auto ptr = new model_impl<T, Lens> {lens, ts...};
       child_event_listener = ::is_child_event_listener<T, event_context<typename T::value_type>>;
-      model_ptr.reset( new model_impl<T, Lens> {lens, ts...} );
+      model_ptr.reset(ptr);
     }
     
     auto layout() {
@@ -281,6 +281,10 @@ struct widget_tree
     bool is_child_event_listener() const { return child_event_listener; }
     
     widget_children children() const { return model_ptr->children(); }
+    
+    void debug_dump() {
+      model_ptr->debug_dump();
+    }
     
     /* 
     void debug_dump(widget_tree& tree, int indentation) {
@@ -419,6 +423,11 @@ struct widget_builder
     auto w = tree.create_widget(parent_id, std::move(widget), lens, args);
     w->set_parent_id(parent_id);
     return w;
+  }
+  
+  template <class W, class Lens>
+  widget* make_widget(widget_id parent_id, tuple<W, Lens, widget_ctor_args> args) {
+    return make_widget(parent_id, args.m0, args.m1, args.m2);
   }
 };
 

@@ -125,7 +125,11 @@ struct painter : painter_state
   }
   
   void scissor(vec2f pos, vec2f size){
-    nvgScissor(ctx, pos.x + origin.x, pos.y + origin.y, size.x, size.y);
+    nvgScissor(ctx, pos.x, pos.y, size.x, size.y);
+  }
+  
+  void intersect_scissor(vec2f pos, vec2f size) {
+    nvgIntersectScissor(ctx, pos.x, pos.y, size.x, size.y);
   }
 
   void reset_scissor() {
@@ -145,8 +149,14 @@ struct painter : painter_state
     glDisable(GL_STENCIL_TEST);
   }
   
+  void stroke_rect(vec2f pos, vec2f size, float thick = 1) {
+    nvgBeginPath(ctx);
+    nvgRect(ctx, pos.x, pos.y, size.x, size.y);
+    nvgStrokeWidth(ctx, thick);
+    nvgStroke(ctx);
+  }
+  
   void stroke_rounded_rect(vec2f pos, vec2f size, float rounding_radius, float thickness = 1) {
-    pos += origin;
     nvgBeginPath(ctx);
     nvgRoundedRect(ctx, pos.x, pos.y, size.x, size.y, rounding_radius);
     nvgStrokeWidth(ctx, thickness);
@@ -154,7 +164,6 @@ struct painter : painter_state
   }
 
   void fill_rounded_rect(vec2f pos, vec2f size, float rounding_radius) {
-    pos += origin;
     nvgBeginPath(ctx);
     nvgRoundedRect(ctx, pos.x, pos.y, size.x, size.y, rounding_radius);
     nvgFill(ctx);
@@ -170,37 +179,41 @@ struct painter : painter_state
   }
 
   void rectangle(vec2f position, vec2f size) {
-    position += origin;
     nvgBeginPath(ctx);
     nvgRect(ctx, position.x, position.y, size.x, size.y);
     nvgFill(ctx);
   }
   
   void rounded_rectangle(vec2f position, vec2f size, float radius) {
-    position += origin;
     nvgBeginPath(ctx);
     nvgRoundedRect(ctx, position.x, position.y, size.x, size.y, radius);
     nvgFill(ctx);
   }
   
   void circle(vec2f position, float sz) {
-    position += origin;
     nvgBeginPath(ctx);
     nvgCircle(ctx, position.x, position.y, sz);
     nvgFill(ctx);
   }
   
-  void text(vec2f pos, std::string_view v)
-  {
+  void text(vec2f pos, std::string_view v) {
     nvgText(ctx, origin.x + pos.x, origin.y + pos.y - this->text_vert_offset, v.data(), v.end());
   }
-
+  
   void translate(vec2f delta) {
-    origin += delta;
+    nvgTranslate(ctx, delta.x, delta.y);
   }
   
   void set_origin(vec2f origin_) {
     origin = origin_;
+  }
+  
+  void push_transform() {
+    nvgSave(ctx);
+  }
+  
+  void pop_transform() {
+    nvgRestore(ctx);
   }
 
   vec2f origin {0, 0};

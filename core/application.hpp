@@ -107,7 +107,7 @@ namespace impl {
       e.position -= focused_absolute_pos;
       w->on(e, ecd);
       for (auto p : parent_listeners)
-        w->on(e, ecd);
+        t.get(p).on_child_event(e, ecd, focused);
     }
     
     void layout_changed(widget_tree& t) {
@@ -196,18 +196,32 @@ struct application
     p.set_font("default");
     p.begin_frame(win.size(), 1);
     
-    auto impl = [this, &p, &state] (auto&& self, widget& w) -> void
+    auto impl = [this, &p, &state] (auto&& self, widget& w, vec2f scissor_pos, vec2f scissor_sz) -> void
     {
-      auto offset = w.position();
-      p.scissor(offset, w.size());
-      p.translate(offset);
+      auto pos = w.position();
+      auto sz = w.size();
+      
+      auto new_scissor_pos = max(scissor_pos, pos);
+      new_scissor_pos = min(scissor_pos + scissor_sz, new_scissor_pos);
+      
+      auto new_scissor_end = min(scissor_pos + scissor_sz, pos + sz);
+      auto new_scissor_sz = new_scissor_end - new_scissor_pos;
+      new_scissor_sz = max(new_scissor_sz, {0, 0});
+      
+      //p.scissor( scissor_pos, scissor_sz );
+      
+      // p.stroke_style(colors::red);
+      // p.stroke_rect(new_scissor_pos, new_scissor_sz);
+      p.scissor(new_scissor_pos, new_scissor_sz);
+      p.translate(pos);
       w.paint(p, &state);
       for (auto& w : tree.children(w))
-        self(self, w);
-      p.translate(-offset);
+        self(self, w, new_scissor_pos - pos, new_scissor_sz);
+      //p.pop_transform();
+      p.translate(-pos);
     };
     
-    impl(impl, tree.root());
+    impl(impl, tree.root(), {0, 0}, win.size());
     p.end_frame();
     win.swap_buffer();
   }

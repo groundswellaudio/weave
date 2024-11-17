@@ -28,7 +28,17 @@ struct AppState : audio_renderer<AppState> {
 
 auto make_demo_app(AppState& state)
 {
-  return vstack{ 
+  auto s = scrollable {
+    vec2f{ 60, 50 },
+    vstack {
+      slider{ %lens(^(state.x)) }, 
+      slider{ %lens(^(state.y)) }, 
+      slider{ %lens(^(state.z)) }
+    }.with_margin({20, 20})
+     .with_interspace(30)
+  };
+  
+  return vstack{ s
     /* 
     slider{%lens(^(state.x))}, 
     hstack {
@@ -36,6 +46,7 @@ auto make_demo_app(AppState& state)
       slider{%lens(^(state.z))}, 
       text{"hello"}
     },  */
+    /* 
     toggle_button{%lens(^(state.flag)), "Flag"},
     for_each{
       %lens(^(state.vals)),
@@ -43,19 +54,10 @@ auto make_demo_app(AppState& state)
         return slider{lens}.with_range(30, 20000);
       }
     },
-    /* 
-    scrollable {
-      vec2f{ 60, 15 },
-      vstack {
-        slider{ %lens(^(state.x)) }, 
-        slider{ %lens(^(state.y)) },
-        slider{ %lens(^(state.z)) }
-      }
-    }, */ 
     maybe {
       state.flag, 
       slider{%lens(^(state.x))}
-    }, 
+    }, */ 
     /* 
     trigger_button{ "add slider!", 
       [] (AppState& state) {
@@ -65,7 +67,7 @@ auto make_demo_app(AppState& state)
     //toggle_button{}
   }
   .with_interspace(8)
-  .with_margin({20, 5});
+  .with_margin({10, 10});
 }
 
 int main()

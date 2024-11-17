@@ -4,49 +4,75 @@
 #include <string_view>
 #include "../cursor.hpp"
 
-/* 
 struct scrollable_widget {
   
   using value_type = void;
   
-  widget child;
+  static constexpr auto bar_width = 8;
   
-  float pos = 0;
+  widget* child;
+  float scrollbar_ratio = 0, scrollbar_start = 0;
+  
   bool scrollbar = false;
   
   void on(mouse_event e, event_context<void> ec) {
+    
   }
   
-  void on_child_event(input_event e, widget_id id, event_context<void> ec) 
+  vec2f layout(vec2f sz) {
+    auto res = child->layout();
+    scrollbar_ratio = std::max(sz.y / res.y, 1.f);
+    return {res.x + bar_width, sz.y};
+  }
+  
+  void on_child_event(input_event e, event_context<void> ec, widget_id id) 
   {
     if (e.is_mouse_scroll()) {
-      pos += e.mouse_scroll_delta().x;
       scrollbar = true;
-      ec.children()[0].set_position(0, -pos);
+      child->set_position(0, child->position().y + e.mouse_scroll_delta().y);
+      scrollbar_start = -child->position().y / child->size().y;
     }
     if (e.is_mouse_drag() && e.position.x > ec.this_size().x - 15)
       ;;
   }
   
-  void paint(painter& p, vec2f this_size) {
-    if (scrollbar)
-      p.fill_rounded_rect({this_size.x - 15, 0}, {15, this_size.y}, 6);
+  void paint(painter& p, vec2f sz) 
+  {
+    p.fill_style(colors::white);
+    p.fill_rounded_rect({sz.x - bar_width, 0}, {bar_width, sz.y}, 6);
+    p.fill_style(colors::gray);
+    auto p2 = {sz.x - bar_width, scrollbar_ratio * sz.y};
+    p.fill_rounded_rect({sz.x - bar_width, scrollbar_start * sz.y}, 
+                        {bar_width, sz.y * scrollbar_ratio}, 6);
+  }
+  
+  std::span<widget*> children() {
+    return {&child, 1};
+  }
+
+  widget* find_child_at(vec2f pos) {
+    return child;
   }
 };
 
+static_assert( is_child_event_listener<scrollable_widget, event_context<void>> );
+
 template <class View>
-struct scrollable {
+struct scrollable : view<scrollable<View>> {
+  
+  scrollable(vec2f sz, View child) : size{sz}, child{child} {}
   
   template <class State>
-  void build(widget_tree_builder& b, State& state) {
+  auto build(widget_builder b, State& state) {
+    auto this_id = b.next_id();
     auto build_res = child.build(b, state);
-    b.make_pod()
-    return make_tuple( scrollable_widget{b.make_widget(build_res)}, empty_lens{}, widget_ctor_args{size} );
+    auto child = b.make_widget(this_id, build_res);
+    return make_tuple( scrollable_widget{child}, empty_lens{}, widget_ctor_args{this_id, size} );
   }
   
   template <class State>
-  void rebuild(scrollable<View>& New, widget_tree_updater& up, State& s) {
-    child.rebuild(New.child, up, s);
+  void rebuild(scrollable<View>& New, widget& w, widget_updater up, State& s) {
+    child.rebuild(New.child, *w.as<scrollable_widget>().child, up, s);
   }
   
   vec2f size;
@@ -54,4 +80,4 @@ struct scrollable {
 };
 
 template <class V>
-scrollable(vec2f sz, V view) -> scrollable<V>; */ 
+scrollable(vec2f sz, V view) -> scrollable<V>;  

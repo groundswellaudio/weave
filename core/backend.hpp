@@ -71,7 +71,12 @@ class sdl_backend
       }
       
       case SDL_MOUSEWHEEL :
+      {
+        auto delta = pos(e.wheel.x, e.wheel.y);
+        auto ev = mouse_event{pos(e.wheel.mouseX, e.wheel.mouseY), mouse_scroll{delta}};
+        vis(ev);
         break;
+      }
     
       case SDL_TEXTEDITING :
       case SDL_TEXTINPUT :
