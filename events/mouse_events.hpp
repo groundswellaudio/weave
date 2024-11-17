@@ -50,6 +50,7 @@ struct mouse_event {
   bool is_mouse_enter() { return is<mouse_enter>(); }
   bool is_mouse_exit() { return is<mouse_exit>(); }
   bool is_mouse_move() { return is<mouse_move>(); }
+  auto mouse_drag_delta() { return get_as<mouse_move>().delta; }
   bool is_mouse_drag() { return is<mouse_move>() && get_as<mouse_move>().is_dragging; }
   bool is_mouse_down() { return is<mouse_down>(); }
 };

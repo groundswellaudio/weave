@@ -29,10 +29,16 @@ struct scrollable_widget {
   {
     if (e.is_mouse_scroll()) {
       scrollbar = true;
-      child->set_position(0, child->position().y + e.mouse_scroll_delta().y);
+      auto new_y = std::clamp(child->position().y + e.mouse_scroll_delta().y, -child->size().y, 0.f);
+      
+      child->set_position(0, new_y);
       scrollbar_start = -child->position().y / child->size().y;
+      scrollbar_ratio = ec.this_size().y / child->size().y;
     }
-    if (e.is_mouse_drag() && e.position.x > ec.this_size().x - 15)
+    if (e.is_mouse_drag() && e.position.x > ec.this_size().x - bar_width) {
+      scrollbar_start += e.mouse_drag_delta().y / ec.this_size().x;
+      child->set_position( 0, -scrollbar_start * child->size().y );
+    }
       ;;
   }
   

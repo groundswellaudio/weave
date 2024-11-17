@@ -66,7 +66,8 @@ class sdl_backend
       case SDL_MOUSEMOTION :
       {
         auto p = pos(e.motion.x, e.motion.y);
-        vis( mouse_event{p, mouse_move{{}, mouse_is_dragging, to_mouse_button(e.button.button)}} );
+        auto delta = pos(e.motion.xrel, e.motion.yrel);
+        vis( mouse_event{p, mouse_move{delta, mouse_is_dragging, to_mouse_button(e.button.button)}} );
         break;
       }
       
