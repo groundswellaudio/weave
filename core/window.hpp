@@ -2,28 +2,22 @@
 #include <SDL.h>
 
 struct window {
-
-  window() : win{nullptr}, gl_ctx{nullptr} {}
+  
+  window(const char* name, int x, int y) {
+    init(name, x, y);
+  }
+  
+  //window() : win{nullptr}, gl_ctx{nullptr} {}
   
   window(window&& w) noexcept {
     win    = std::exchange(w.win,  nullptr);
     gl_ctx = std::exchange(gl_ctx, nullptr);
   }
   
-  window(const char* name, int x, int y)
-  {
-    init(name, x, y);
-  }
-  
   ~window(){
-    if (not win) return;
+    if (!win) return;
     SDL_DestroyWindow(win);
     SDL_GL_DeleteContext(gl_ctx);
-  }
-  
-  void init(const char* name, int x, int y) {
-    win    = SDL_CreateWindow(name, 0, 0, x, y, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
-    gl_ctx = SDL_GL_CreateContext(win);
   }
   
   SDL_Window* get(){ return win; }
@@ -61,6 +55,11 @@ struct window {
   }
   
   private :
+  
+  void init(const char* name, int x, int y) {
+    win    = SDL_CreateWindow(name, 0, 0, x, y, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
+    gl_ctx = SDL_GL_CreateContext(win);
+  }
   
   SDL_Window* win;
   void* gl_ctx;

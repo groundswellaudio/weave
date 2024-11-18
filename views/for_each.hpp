@@ -58,7 +58,7 @@ struct for_each {
                                    up.builder(), state );
       }
       
-      up.parent_widget()->layout();
+      up.parent_widget().layout();
     }
   }
   

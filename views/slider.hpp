@@ -12,19 +12,21 @@ struct slider_properties {
   rgba_u8 text_color = colors::white;
 };
 
-struct slider_x_widget 
+struct slider_x_widget : widget_base
 {
   slider_properties prop;
-  float ratio;
+  float ratio = 0;
   
   using value_type = float;
   
-  void on(mouse_event e, event_context<float> ec) 
+  using EvCtx = event_context<slider_x_widget>;
+  
+  void on(mouse_event e, EvCtx ec) 
   {
     if (!e.is_mouse_drag() && !e.is_mouse_down())
       return;
     
-    auto sz = ec.this_size();
+    auto sz = size();
     ratio = std::min(e.position.x / sz.x, 1.f);
     ratio = std::max(0.f, ratio);
     
@@ -33,9 +35,9 @@ struct slider_x_widget
     //ec.repaint_request();
   }
   
-  void paint(painter& p, float pc, vec2f this_size) 
+  void paint(painter& p, float pc) 
   {
-    auto sz = this_size;
+    auto sz = size();
     p.fill_style(prop.background_color);
     p.fill_rounded_rect({0, 0}, sz, 6);
     p.fill_style(prop.active_color);
@@ -44,13 +46,13 @@ struct slider_x_widget
     
     static constexpr auto outline_col = rgba_f{colors::white}.with_alpha(0.5);
     p.stroke_style(outline_col);
-    p.stroke_rounded_rect({0, 0}, this_size, 6, 1);
+    p.stroke_rounded_rect({0, 0}, sz, 6, 1);
     
     p.fill_style(colors::white);
     p.text_alignment(text_align::x::center, text_align::y::center);
     auto str = std::format("{}", pc);
     p.font_size(11);
-    p.text({this_size.x / 2, this_size.y / 2}, str);
+    p.text({sz.x / 2, sz.y / 2}, str);
   }
 };
 
@@ -60,12 +62,12 @@ struct slider : view<slider<Lens>> {
   slider(Lens L) : lens{L} {}
   
   template <class S>
-  auto build(widget_builder b, S& state) {
-    return tuple{slider_x_widget{properties}, lens, widget_ctor_args{b.next_id(), size}};
+  auto build(const widget_builder& b, S& state) {
+    return with_lens{slider_x_widget{{size}, properties}, dyn_lens<float>{lens}};
   }
   
   template <class S>
-  void rebuild(slider<Lens> New, widget& wb, widget_updater up, S& state) {
+  void rebuild(slider<Lens> New, widget_ref wb, widget_updater up, S& state) {
     auto& w = wb.as<slider_x_widget>();
     if (w.prop != New.properties)
       w.prop = New.properties; 
@@ -78,10 +80,7 @@ struct slider : view<slider<Lens>> {
     return *this;
   }
   
-  /* 
-  void destroy(widget_tree& t) {
-    //t.destroy(view::this_id);
-  } */ 
+  void destroy(widget_ref w) {}
   
   slider_properties properties;
   Lens lens;

@@ -30,19 +30,12 @@ template <class T, std::meta::field_decl FD>
 struct lifted_field_lens
 {
   using input = T;
-  
-  constexpr decltype(auto) operator()(auto&& head) const {
-    return (head.%(FD));
-  }
-  
-  /* 
   using value_type = %type_of(FD);
   
-  value_type& read(void* state) const { return static_cast<T*>(state)->%(FD); }
+  constexpr decltype(auto) operator()(auto&& head) const { return (head.%(FD)); }
   
-  void write(value_type val, void* state) const { 
-    read(state) = val;
-  } */ 
+  decltype(auto) read(const T& state) { return (state.%(FD)); }
+  void write(T& state, value_type val) const { (*this)(state) = val; }
 };
 
 consteval expr lens(field_expr f) {

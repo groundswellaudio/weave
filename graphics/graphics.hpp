@@ -222,9 +222,6 @@ struct painter : painter_state
 struct graphics_context 
 {
   graphics_context()
-  {}
-  
-  void init() 
   {
     if (!gladLoadGLLoader((GLADloadproc) SDL_GL_GetProcAddress))
     {

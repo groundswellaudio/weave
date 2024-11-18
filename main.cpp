@@ -38,14 +38,13 @@ auto make_demo_app(AppState& state)
      .with_interspace(30)
   };
   
-  return vstack{ s
-    /* 
+  return vstack{
     slider{%lens(^(state.x))}, 
-    hstack {
-      slider{%lens(^(state.y))}, 
+    vstack {
+      slider{%lens(^(state.y))},
       slider{%lens(^(state.z))}, 
-      text{"hello"}
-    },  */
+      //text{"hello"}
+    },
     /* 
     toggle_button{%lens(^(state.flag)), "Flag"},
     for_each{

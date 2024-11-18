@@ -29,12 +29,12 @@ struct maybe {
     {
       auto nb = up.builder();
       view.seq_build(seq_updater.consume_fn(), nb, s);
-      up.parent_widget()->layout();
+      up.parent_widget().layout();
     }
     else
     {
-      view.seq_destroy(seq_updater.destroy_fn(), up.tree);
-      up.parent_widget()->layout();
+      view.seq_destroy(seq_updater.destroy_fn());
+      up.parent_widget().layout();
     }
     *this = New;
   }

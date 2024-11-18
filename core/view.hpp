@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ui_tree.hpp"
+#include "widget.hpp"
 
 struct layout_tag {};
 
@@ -14,16 +14,16 @@ struct view_seq_rebuild_ctx {
   Destroyer destroy;
 };
 
+/// The base for a View. Any View is also a ViewSequence, so we implement this here
 template <class T>
 struct view {
   
   // must declare the following : 
-  // build(widget_builder& c, auto& state) -> tuple(widget, lens, widget_ctor_args)
+  // build(widget_builder& c, auto& state) -> Widget
   // rebuild(self& new, widget& w, widget_updater up, auto& state)
   
   void seq_build(this T& self, auto Consumer, const widget_builder& c, auto& state) {
-    auto [w, lens, args] = self.build(c, state);
-    Consumer(std::move(w), lens, args);
+    Consumer(self.build(c, state));
   }
   
   void seq_rebuild(this T& self, T& New, auto&& seq_updater, 
@@ -32,12 +32,12 @@ struct view {
     self.rebuild(New, seq_updater.next(), up, state);
   }
   
-  void seq_destroy(this T& self, auto GetForDestroy, widget_tree& tree) {
-    self.destroy( GetForDestroy(), tree );
+  void seq_destroy(this T& self, auto GetForDestroy) {
+    self.destroy( GetForDestroy() );
   }
   
-  void destroy(widget& w, widget_tree& t) {
-    t.destroy(w.id());
+  void seq_destroy(this T& self, widget_ref ref) {
+    self.destroy(ref);
   }
 };
 

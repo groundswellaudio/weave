@@ -19,7 +19,7 @@ struct toggle_button_widget
   
   using value_type = bool;
   
-  void on(mouse_event e, event_context<bool> ec) {
+  void on(mouse_event e, event_context<toggle_button_widget> ec) {
     if (e.is_mouse_enter())
       set_mouse_cursor(mouse_cursor::hand);
     else if (e.is_mouse_exit())
@@ -59,14 +59,10 @@ struct toggle_button : view<toggle_button<Lens>> {
   }
   
   auto build(widget_builder b, ignore) {
-    return make_tuple( 
-      toggle_button_widget{properties},
-      lens,
-      widget_ctor_args{b.next_id(), vec2f{60, 15}}
-    );
+    return with_lens{ toggle_button_widget{properties}, dyn_lens<bool>{lens} };
   }
   
-  void rebuild(toggle_button<Lens>& New, widget& w, ignore, ignore) {
+  void rebuild(toggle_button<Lens>& New, widget_ref w, ignore, ignore) {
     if (New.properties == this->properties)
       return;
     *this = New;
