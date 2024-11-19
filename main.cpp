@@ -38,13 +38,13 @@ auto make_demo_app(AppState& state)
      .with_interspace(30)
   };
   
-  return vstack{
+  return s; /* vstack{ s 
     slider{%lens(^(state.x))}, 
     vstack {
       slider{%lens(^(state.y))},
       slider{%lens(^(state.z))}, 
       //text{"hello"}
-    },
+    }, */ 
     /* 
     toggle_button{%lens(^(state.flag)), "Flag"},
     for_each{
@@ -64,9 +64,9 @@ auto make_demo_app(AppState& state)
       }} */ 
       
     //toggle_button{}
-  }
+  /* }
   .with_interspace(8)
-  .with_margin({10, 10});
+  .with_margin({10, 10});*/ 
 }
 
 int main()

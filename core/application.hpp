@@ -35,17 +35,6 @@ namespace impl {
         self.set_focused(*c, abs_pos + c->position());
         return true;
       }
-
-      bool find_in(widget_ref w, vec2f abs_pos) {
-        if (w.contains(e.position - abs_pos)) {
-          if (find_in_children(w, abs_pos)) {
-            return true;
-          }
-          self.set_focused(w, abs_pos);
-          return true;
-        }
-        return false;
-      }
       
       bool find_from(widget_ref w, vec2f abs_pos) 
       {
@@ -57,21 +46,33 @@ namespace impl {
           return true;
        }
        else {
-        if (parents.empty())
-          return false;
-        auto p = parents.back();
+        if (parents.empty()) {
+          // It's important that we call set_focused here as the event may lay outside 
+          // of the root widget, but we still want to make it focused if no other widget can
+          // (otherwise we'll end up focusing a child widget with an empty parent stack)
+          self.set_focused(w, abs_pos);
+          return true;
+        }
+        auto p = parents.back(); 
         parents.pop_back();
         return find_from(p, abs_pos - w.position());
        }
       }
     };
     
+    void debug_parent_stack() const {
+      for (auto p : parents)
+        p.debug_dump();
+      std::cerr << std::endl;
+    }
+    
     void set_focused(widget_ref w, vec2f absolute_pos) {
       if (w == focused)
         return;
       
       if (parents.size() == 0)
-        assert( (absolute_pos == vec2f{0, 0}) && "root is focused but offset is not 0" ); 
+        assert( (absolute_pos == vec2f{0, 0}) && "root is focused but offset is not 0" );
+      
       focused = w;
       focused_absolute_pos = absolute_pos;
       

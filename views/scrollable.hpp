@@ -36,35 +36,47 @@ struct scrollable_widget : widget_base {
     bar.on(e, ec);
   }
   
+  float display_ratio() const {
+    return size().y / child.size().y;
+  }
+  
   vec2f layout() {
+    auto sz = size();
     auto res = child.layout();
-    scrollbar_ratio = std::max(sz.y / res.y, 1.f);
-    bar.set_position(res.x, 0);
-    bar.set_size({bar_width, sz.y});
+    auto bar_ratio = std::min(sz.y / res.y, 1.f);
+    bar.set_position(res.x, bar.position().y);
+    bar.set_size({bar_width, bar_ratio * sz.y});
     return {res.x + bar_width, sz.y};
   }
   
-  void traverse_children(auto fn) {
-    fn(child);
-    fn(bar);
+  bool traverse_children(auto&& fn) {
+    return fn(child) && fn(bar);
   }
   
   void scrollbar_move(vec2f drag_delta) {
-    scrollbar_start += drag_delta.y / size().y;
-    child.set_position(0, -scrollbar_start * child.size().y);
-    bar.set_position(child.size().x - bar_width, scrollbar_start * child.size().y);
+    // drag_delta / size.y = 1 -> child_drag_delta = child_sz
+    // child_drag_delta = child_sz * drag_delta / size
+    auto delta = child.size().y * drag_delta.y / size().y;
+    auto new_pos = child.position().y - delta;
+    new_pos = std::clamp(new_pos, -child.size().y + size().y, 0.f);
+    child.set_position(0, new_pos); // -scrollbar_start * child.size().y);
+    auto new_bar_pos = bar.position().y + drag_delta.y;
+    new_bar_pos = std::clamp(new_bar_pos, 0.f, size().y - bar.size().y);
+    bar.set_position(bar.position().x, new_bar_pos); //scrollbar_start * child.size().y);
   }
   
   void on_child_event(input_event e, event_context<scrollable_widget> ec, ignore) 
   {
     if (e.is_mouse_scroll()) {
+      scrollbar_move(-e.mouse_scroll_delta());
+      /* 
       auto child_pos = child.position();
       auto child_sz = child.size();
       auto new_y = std::clamp(child_pos.y + e.mouse_scroll_delta().y, -child_sz.y, 0.f);
       
-      child.set_position(0, new_y);
-      scrollbar_start = -child_pos.y / child_sz.y;
-      scrollbar_ratio = size().y / child_sz.y;
+      child.set_position(0, new_y); */ 
+      //scrollbar_start = -child_pos.y / child_sz.y;
+      //scrollbar_ratio = size().y / child_sz.y;
     }
     /* 
     if (e.is_mouse_drag() && e.position.x > size().x - bar_width) {
@@ -73,15 +85,7 @@ struct scrollable_widget : widget_base {
     } */ 
   }
   
-  void paint(painter& p) 
-  {
-    p.fill_style(colors::white);
-    p.fill_rounded_rect({sz.x - bar_width, 0}, {bar_width, sz.y}, 6);
-    p.fill_style(colors::gray);
-    auto p2 = {sz.x - bar_width, scrollbar_ratio * sz.y};
-    p.fill_rounded_rect({sz.x - bar_width, scrollbar_start * sz.y}, 
-                        {bar_width, sz.y * scrollbar_ratio}, 6);
-  }
+  void paint(painter& p) {}
 };
 
 static_assert( is_child_event_listener<scrollable_widget> );
