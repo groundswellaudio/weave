@@ -29,17 +29,16 @@ namespace impl {
         auto c = w.find_child_at(e.position - abs_pos);
         if (!c)
           return false;
-        parents.push_front(w);
+        parents.push_back(w);
         if (find_in_children(*c, abs_pos + c->position())) 
           return true;
         self.set_focused(*c, abs_pos + c->position());
         return true;
       }
-      
+
       bool find_in(widget_ref w, vec2f abs_pos) {
         if (w.contains(e.position - abs_pos)) {
           if (find_in_children(w, abs_pos)) {
-            parents.push_front(w);
             return true;
           }
           self.set_focused(w, abs_pos);
@@ -48,20 +47,29 @@ namespace impl {
         return false;
       }
       
-      bool find_from(widget_ref w, vec2f abs_pos) {
-        if (find_in(w, abs_pos))
+      bool find_from(widget_ref w, vec2f abs_pos) 
+      {
+        if (w.contains(e.position - abs_pos)) {
+          if (find_in_children(w, abs_pos)) {
+            return true;
+          }
+          self.set_focused(w, abs_pos);
           return true;
-        if (parents.size() == 0)
-          return true;
+       }
+       else {
+        if (parents.empty())
+          return false;
         auto p = parents.back();
         parents.pop_back();
         return find_from(p, abs_pos - w.position());
+       }
       }
     };
     
     void set_focused(widget_ref w, vec2f absolute_pos) {
       if (w == focused)
         return;
+      
       if (parents.size() == 0)
         assert( (absolute_pos == vec2f{0, 0}) && "root is focused but offset is not 0" ); 
       focused = w;
