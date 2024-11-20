@@ -6,7 +6,7 @@
 template <class Range, class ViewCtor>
 struct for_each : view_sequence_base {
   
-  simple_for_each(auto&& range, ViewCtor ctor) : range{range}, view_ctor{ctor} {}
+  for_each(auto&& range, ViewCtor ctor) : range{range}, view_ctor{ctor} {}
   
   using element = decltype( std::declval<ViewCtor>()(std::declval<Range>().front()) );
    
@@ -17,7 +17,7 @@ struct for_each : view_sequence_base {
     }
   }
   
-  void seq_rebuild(simple_for_each& NewView, auto&& seq_updater, widget_updater& up, auto& state) 
+  void seq_rebuild(for_each& NewView, auto&& seq_updater, widget_updater& up, auto& state) 
   {
     for (auto e : NewView.range) {
       NewView.elements.push_back(view_ctor(e));
@@ -44,10 +44,10 @@ struct for_each : view_sequence_base {
 };
 
 template <class R, class V>
-simple_for_each(R&, V) -> simple_for_each<R&, V>;
+for_each(R&, V) -> for_each<R&, V>;
 
 template <class R, class V>
-simple_for_each(R&&, V) -> simple_for_each<R, V>;
+for_each(R&&, V) -> for_each<R, V>;
 
 inline auto iota(int k) {
   return std::ranges::iota_view(0, k);

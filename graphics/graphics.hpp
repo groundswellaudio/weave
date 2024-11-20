@@ -149,6 +149,21 @@ struct painter : painter_state
     glDisable(GL_STENCIL_TEST);
   }
   
+  void move_to(vec2f p) {
+    nvgMoveTo(ctx, p.x, p.y);
+  }
+
+  void line_to(vec2f p) {
+    nvgLineTo(ctx, p.x, p.y);
+  }
+  
+  void line(vec2f a, vec2f b) {
+    begin_path();
+    move_to(a);
+    line_to(b);
+    nvgFill(ctx);
+  }
+  
   void stroke_rect(vec2f pos, vec2f size, float thick = 1) {
     nvgBeginPath(ctx);
     nvgRect(ctx, pos.x, pos.y, size.x, size.y);

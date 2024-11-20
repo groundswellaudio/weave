@@ -7,3 +7,4 @@
 #include "for_each.hpp"
 #include "maybe.hpp"
 #include "scrollable.hpp"
+#include "numeric_field.hpp"

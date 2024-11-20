@@ -12,6 +12,12 @@
 #include "../events/mouse_events.hpp"
 #include "../vec.hpp"
 
+inline vec2f current_mouse_position() {
+  int x, y;
+  SDL_GetMouseState(&x, &y);
+  return {(float)x, (float)y};
+}
+
 namespace impl {
 
   struct mouse_event_dispatcher 
@@ -189,8 +195,8 @@ struct application
       auto new_scissor_sz = new_scissor_end - new_scissor_pos;
       new_scissor_sz = max(new_scissor_sz, {0, 0});
       
-      //p.stroke_style(colors::red);
-      //p.stroke_rect(new_scissor_pos, new_scissor_sz);
+      // p.stroke_style(colors::red);
+      // p.stroke_rect(new_scissor_pos, new_scissor_sz);
       p.scissor(new_scissor_pos, new_scissor_sz);
       p.translate(pos);
       w.paint(p, &state);

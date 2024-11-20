@@ -26,6 +26,8 @@ auto& operator<<(std::ostream& os, const vec<T, 2>& v) {
   return os;
 }
 
+struct widget_ref;
+
 struct widget_base {
   
   vec2f size() const { return sz; }
@@ -39,11 +41,17 @@ struct widget_base {
     pos = vec2f{x, y};
   }
   
+  void set_position(vec2f p) {
+    pos = p;
+  }
+  
   bool contains(vec2f pos) {
     auto p = position();
     auto sz = size();
     return p.x <= pos.x && p.y <= pos.y && p.x + sz.x >= pos.x && p.y + sz.y >= pos.y;
   }
+  
+  std::optional<widget_ref> find_child_at(this auto& self, vec2f pos);
   
   void paint(this auto& self, painter& p, void* any_state) {
     self.paint(p);
@@ -51,8 +59,6 @@ struct widget_base {
   
   vec2f sz, pos = {0, 0};
 };
-
-struct widget_ref;
 
 template <class T>
 class dyn_lens {
@@ -303,6 +309,33 @@ struct widget_box : widget_ref {
   ~widget_box() { if (data) vptr->destroy(data); }
 };
 
+namespace impl {
+  
+  template <class T>
+    requires (is_base_of(^widget_base, remove_reference(^T)))
+  widget_ref to_widget_ref(T&& val) {
+    return widget_ref{&val};
+  }
+  
+  widget_ref to_widget_ref(widget_box& box) {
+    return box.borrow();
+  }
+  
+} // impl
+
+optional<widget_ref> widget_base::find_child_at(this auto& self, vec2f pos) {
+  if constexpr ( widget_has_children<decltype(self)> ) {
+    optional<widget_ref> res;
+    self.traverse_children( [&res, pos] (auto& elem) {
+      return !elem.contains(pos) || (res = impl::to_widget_ref(elem), false);
+    });
+    return res;
+  }
+  else {
+    return {};
+  }
+}
+
 /// A stack of parents [p+n...p0] which is constructed on traversal
 /// and provided by event_context
 using event_context_parent_stack = std::vector<widget_ref>;
@@ -356,16 +389,6 @@ namespace impl {
       return nullptr;
   }
   
-  template <class T>
-    requires (is_base_of(^widget_base, remove_reference(^T)))
-  widget_ref to_widget_ref(T&& val) {
-    return widget_ref{&val};
-  }
-  
-  widget_ref to_widget_ref(widget_box& box) {
-    return box.borrow();
-  }
-  
   template <class W>
   struct widget_vtable_impl 
   {
@@ -393,17 +416,7 @@ namespace impl {
       child_event_fn_ptr<W>(),
       +[] (widget_base* self, vec2f pos) -> optional<widget_ref> {
         auto& obj = *static_cast<W*>(self);
-        if constexpr ( requires { obj.find_child_at(pos); } )
-          return obj.find_child_at(pos);
-        else if constexpr ( widget_has_children<W> ) {
-          optional<widget_ref> res;
-          obj.traverse_children( [&res, pos] (auto& elem) {
-            return !elem.contains(pos) || (res = to_widget_ref(elem), false);
-          });
-          return res;
-        }
-        else
-          return {};
+        return obj.find_child_at(pos);
       },
       +[] (widget_base* self, widget_children_vec& vec) {
         if constexpr ( widget_has_children<W> )

@@ -69,7 +69,7 @@ struct view_sequence_updater {
 template <class Widget, class Lens = empty_lens, class Prop = ignore>
 struct simple_view_for : view<simple_view_for<Widget, Lens, Prop>>, Prop {
   
-  simple_view_for(Lens lens) : lens{lens} {}
+  simple_view_for(Lens lens = {}) : lens{lens} {}
   
   simple_view_for(Lens lens, Prop prop)
     requires (^Prop != ^ignore)

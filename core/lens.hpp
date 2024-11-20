@@ -63,6 +63,8 @@ constexpr auto compose_lens(LensA A, LensB B) {
     return composed_lens<LensB, LensA>{B, {A}};
 }
 
+#define MLens(Expr) [=] (auto& x0) -> decltype(auto) { return (Expr); }
+
 /* 
 template <class... Ls, class LensB>
 auto compose_lens(composed_lens<Ls...> A, LensB B) {
