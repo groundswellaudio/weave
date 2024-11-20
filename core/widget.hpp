@@ -123,8 +123,15 @@ template <class Fn, class State>
 struct invocable_lens {
   using input = State;
   
-  decltype(auto) read(State& s) { return (fn(s)); }
-  void write(State& s, auto&& val) { fn(s) = val; }
+  decltype(auto) read(State& s) {
+    auto _ = s.read_scope();
+    return (fn(s));
+  }
+  
+  void write(State& s, auto&& val) {
+    auto _ = s.write_scope();
+    fn(s) = (decltype(val)&&)val;
+  }
   
   Fn fn;
 };
@@ -296,7 +303,7 @@ struct widget_box : widget_ref {
 
 /// A stack of parents [p+n...p0] which is constructed on traversal
 /// and provided by event_context
-using event_context_parent_stack = std::deque<widget_ref>;
+using event_context_parent_stack = std::vector<widget_ref>;
 
 template <class T>
 struct event_context_t;

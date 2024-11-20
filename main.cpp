@@ -1,5 +1,7 @@
 #include "spiral.hpp"
 #include <ranges>
+#include <shared_mutex>
+#include <mutex>
 
 #define MINIAUDIO_IMPLEMENTATION
 #include "deps/miniaudio/miniaudio.h"
@@ -15,23 +17,41 @@ struct AppState : audio_renderer<AppState> {
   std::vector<float> vals = {0.2, 0.3, 0.4};
 };
 
-struct PmSynth : audio_renderer<PmSynth> {
+struct PmSynth : audio_renderer<PmSynth>, app_state
+{
+  static constexpr int num_osc = 4;
   
-  void render_audio(audio_output_stream os) 
+  auto read_scope() { return std::shared_lock{mut}; }
+  auto write_scope() { return std::unique_lock{mut}; }
+  
+  void render_audio(audio_output_stream os)
   {
-    /* 
-    for (auto s : os) {
-      auto x = std::sin(intern.delta * 2 * 3.14 * 440);
-      intern.delta += 1.f / 44100.f;
-      s[0] = x;
-      s[1] = x; 
-    } */ 
+    auto _ = read_scope();
+    
+    for (auto s : os) 
+    {
+      float res = 0;
+      int OscIndex = 0;
+      for (auto& o : osc)
+      {
+        float acc = 0;
+        for (int k = 0; k < num_osc; ++k)
+          acc += osc[k] * mod_matrix[OscIndex][k];
+        o = std::sin( osc_phase[OscIndex] * 2 * 3.14 * 440 + acc );
+        osc_phase[OscIndex] += 1.f / 44100.f;
+        res += o * osc_vol[OscIndex];
+        ++OscIndex;
+      }
+      s[0] = res;
+      s[1] = res;
+    }
   }
   
-  static constexpr int num_osc = 4;
+  std::shared_mutex mut;
   float mod_matrix[num_osc][num_osc] = {0};
-  float osc[4] = {0.0};
-  float osc_vol[4] = {1.0};
+  float osc_phase[num_osc] {0};
+  float osc[num_osc] = {0.0};
+  float osc_vol[num_osc] = {1.0, 0.0};
 };
 
 auto make_demo_app(AppState& state)
@@ -81,7 +101,7 @@ auto make_pm_synth(PmSynth& state)
   
   return hstack {
     vol, mod_matrix
-  }.with_interspace(30);
+  }.with_interspace(30).with_margin({30, 30});
 }
 
 int main()
