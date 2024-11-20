@@ -119,6 +119,22 @@ class dyn_lens {
 template <class W>
 using dyn_lens_for = dyn_lens<typename W::value_type>;
 
+template <class Fn, class State>
+struct invocable_lens {
+  using input = State;
+  
+  decltype(auto) read(State& s) { return (fn(s)); }
+  void write(State& s, auto&& val) { fn(s) = val; }
+  
+  Fn fn;
+};
+
+template <class ValueType, class State, class Lens>
+auto make_lens(Lens lens) {
+  if constexpr ( requires (State& s) { lens(s); } )
+    return dyn_lens<ValueType>{invocable_lens<Lens, State>{lens}};
+}
+
 template <class T>
 struct event_context_t;
 
@@ -248,6 +264,7 @@ struct widget_box : widget_ref {
   widget_box(std::nullptr_t) : widget_ref{nullptr, nullptr} {}
   
   template <class W>
+    requires (is_base_of(^widget_base, remove_reference(^W)))
   widget_box(W&& widget) {
     data = new std::decay_t<W> { (W&&)widget };
     vptr = &impl::widget_vtable_impl<std::decay_t<W>>::value;
@@ -264,6 +281,10 @@ struct widget_box : widget_ref {
     vptr = o.vptr;
     o.data = nullptr;
     return *this;
+  }
+  
+  operator bool () const {
+    return data;
   }
   
   widget_ref borrow() {

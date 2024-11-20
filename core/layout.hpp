@@ -46,7 +46,7 @@ struct stack_updater : view_sequence_updater<stack_updater> {
   void consume(auto&& W) { 
     vec.insert( 
       vec.begin() + index++, 
-      widget_box{W}
+      widget_box{(decltype(W)&&)(W)}
     );
   }
   
@@ -145,24 +145,29 @@ struct vstack : stack_base<vstack_widget, Ts...>
   vstack(Ts... ts) : stack_base<vstack_widget, Ts...>{ts...} {}
 };
 
-/* 
-struct hstack_widget : layout_tag
+struct hstack_widget : widget_base
 {
   using value_type = void;
   
   stack_data data;
+  std::vector<widget_box> children_vec;
+  
   hstack_widget(stack_data d) : data{d} {}
   
-  void paint(painter& p, vec2f) {}
+  bool traverse_children(auto&& fn) {
+    return std::all_of(children_vec.begin(), children_vec.end(), fn);
+  }
+  
+  void paint(painter& p) {}
   void on(input_event, ignore) {}
   
-  auto layout( widget_tree::children_view c ) 
+  auto layout() 
   {
     float pos = data.margin.x, height = 0;
-    for (auto& n : c) 
+    for (auto& n : children_vec) 
     {
       n.set_position(pos, data.margin.y);
-      auto sz = n.layout(c.tree());
+      auto sz = n.layout();
       pos += sz.x + data.interspace;
       height = std::max(height, sz.y);
     }
@@ -175,4 +180,4 @@ template <class... Ts>
 struct hstack : stack_base<hstack_widget, Ts...>
 {
   hstack(Ts... ts) : stack_base<hstack_widget, Ts...>{ts...} {}
-}; */ 
+};

@@ -45,7 +45,7 @@ template <class T>
 struct view_sequence_updater {
   
   auto consume_fn(this T& self) {
-    return [&self] (auto&&... args) { self.consume(args...); };
+    return [&self] (auto&& arg) { self.consume((decltype(arg)&&)(arg)); };
   }
   
   auto next_fn(this T& self) {

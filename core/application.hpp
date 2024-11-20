@@ -38,7 +38,10 @@ namespace impl {
       
       bool find_from(widget_ref w, vec2f abs_pos) 
       {
-        if (w.contains(e.position - abs_pos)) {
+        // Note : widget::contains assumes a point relative to the position 
+        // of the *parent*, and abs_pos contains the position of w, so we have 
+        // to add the position of w 
+        if (w.contains(e.position - abs_pos + w.position())) {
           if (find_in_children(w, abs_pos)) {
             return true;
           }

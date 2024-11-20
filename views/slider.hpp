@@ -63,7 +63,7 @@ struct slider : view<slider<Lens>> {
   
   template <class S>
   auto build(const widget_builder& b, S& state) {
-    return with_lens{slider_x_widget{{size}, properties}, dyn_lens<float>{lens}};
+    return with_lens{slider_x_widget{{size}, properties}, make_lens<float, S>(lens)};
   }
   
   template <class S>
@@ -71,7 +71,7 @@ struct slider : view<slider<Lens>> {
     auto& w = wb.as<slider_x_widget>();
     if (w.prop != New.properties)
       w.prop = New.properties; 
-    *this = New;
+    properties = New.properties;
   }
   
   auto& with_range(float min, float max) {
