@@ -117,7 +117,9 @@ struct for_each {
 };
 
 template <class Range, class ViewCtor>
-struct simple_for_each {
+struct simple_for_each : view_sequence_base {
+  
+  simple_for_each(auto&& range, ViewCtor ctor) : range{range}, view_ctor{ctor} {}
   
   using element = decltype( std::declval<ViewCtor>()(std::declval<Range>().front()) );
    

@@ -3,7 +3,6 @@
 #include <cassert>
 
 #include "backend.hpp"
-#include "layout.hpp"
 #include "view.hpp"
 #include "window.hpp"
 #include "lens.hpp"
@@ -190,8 +189,8 @@ struct application
       auto new_scissor_sz = new_scissor_end - new_scissor_pos;
       new_scissor_sz = max(new_scissor_sz, {0, 0});
       
-      p.stroke_style(colors::red);
-      p.stroke_rect(new_scissor_pos, new_scissor_sz);
+      //p.stroke_style(colors::red);
+      //p.stroke_rect(new_scissor_pos, new_scissor_sz);
       p.scissor(new_scissor_pos, new_scissor_sz);
       p.translate(pos);
       w.paint(p, &state);

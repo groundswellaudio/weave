@@ -1,8 +1,6 @@
 #pragma once
 
-#include "view.hpp"
-#include "widget.hpp"
-#include "../vec.hpp"
+#include "views_core.hpp"
 #include "../util/tuple.hpp"
 #include "../util/ignore.hpp"
 #include <span>
@@ -62,6 +60,7 @@ struct stack_updater : view_sequence_updater<stack_updater> {
 };
 
 template <class T, class... Ts>
+  requires (is_view_sequence<Ts> && ...)
 struct stack_base : view<stack_base<T, Ts...>>, stack<Ts...> {
   
   template <class... Vs>
@@ -140,6 +139,7 @@ struct vstack_widget : widget_base
 };
 
 template <class... Ts>
+  requires (is_view_sequence<Ts> && ...)
 struct vstack : stack_base<vstack_widget, Ts...>
 { 
   vstack(Ts... ts) : stack_base<vstack_widget, Ts...>{ts...} {}
@@ -177,6 +177,7 @@ struct hstack_widget : widget_base
 };
 
 template <class... Ts>
+  requires (is_view_sequence<Ts> && ...)
 struct hstack : stack_base<hstack_widget, Ts...>
 {
   hstack(Ts... ts) : stack_base<hstack_widget, Ts...>{ts...} {}

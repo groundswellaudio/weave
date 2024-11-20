@@ -197,16 +197,17 @@ struct painter : painter_state
   }
   
   void text(vec2f pos, std::string_view v) {
-    nvgText(ctx, origin.x + pos.x, origin.y + pos.y - this->text_vert_offset, v.data(), v.end());
+    nvgText(ctx, pos.x, pos.y - this->text_vert_offset, v.data(), v.end());
   }
   
   void translate(vec2f delta) {
     nvgTranslate(ctx, delta.x, delta.y);
   }
   
+  /* 
   void set_origin(vec2f origin_) {
     origin = origin_;
-  }
+  } */ 
   
   void push_transform() {
     nvgSave(ctx);
@@ -216,7 +217,7 @@ struct painter : painter_state
     nvgRestore(ctx);
   }
 
-  vec2f origin {0, 0};
+  //vec2f origin {0, 0};
 };
 
 struct graphics_context 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "widget.hpp"
+#include "../util/ignore.hpp"
 
 struct layout_tag {};
 
@@ -14,9 +15,16 @@ struct view_seq_rebuild_ctx {
   Destroyer destroy;
 };
 
+struct view_sequence_base {
+  
+};
+
+template <class T>
+concept is_view_sequence = is_base_of(^view_sequence_base, ^T);
+
 /// The base for a View. Any View is also a ViewSequence, so we implement this here
 template <class T>
-struct view {
+struct view : view_sequence_base {
   
   // must declare the following : 
   // build(widget_builder& c, auto& state) -> Widget
@@ -55,4 +63,38 @@ struct view_sequence_updater {
   auto destroy_fn(this T& self) {
     return [&self] () -> auto& { return self.destroy(); };
   }
+};
+
+/// A basic view for a widget 
+template <class Widget, class Lens = empty_lens, class Prop = ignore>
+struct simple_view_for : view<simple_view_for<Widget, Lens, Prop>>, Prop {
+  
+  simple_view_for(Lens lens) : lens{lens} {}
+  
+  simple_view_for(Lens lens, Prop prop)
+    requires (^Prop != ^ignore)
+  : Prop{prop}, lens{lens}
+  {
+  }
+  
+  template <class State>
+  auto build(const auto& builder, State& state) {
+    if constexpr (^Lens == ^empty_lens)
+      return Widget{};
+    else {
+      if constexpr (^Prop != ^ignore)
+        return with_lens{Widget{(Prop&)*this},  make_lens<typename Widget::value_type, State>(lens)};
+      else
+        return with_lens{Widget{},  make_lens<typename Widget::value_type, State>(lens)};
+    }
+  }
+  
+  void rebuild(auto&& New, widget_ref w, const auto& updater, auto& state) {
+    /* if (New.prop == prop)
+      return;
+    w.template as<Widget>.set_properties(New.prop);
+    prop = New.prop; */ 
+  }
+  
+  Lens lens;
 };

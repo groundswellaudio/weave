@@ -3,7 +3,6 @@
 #include <vector>
 #include <iostream>
 #include <cassert>
-#include <deque>
 
 #include "events/mouse_events.hpp"
 #include "lens.hpp"
@@ -160,6 +159,9 @@ struct any_invocable { bool operator()(auto&& elem) { return false; } };
 
 template <class W>
 concept widget_has_children = requires (W& obj) { obj.traverse_children(any_invocable{}); };
+
+template <class W>
+concept widget_has_interface = ^typename W::value_type != ^void;
 
 namespace impl 
 {
