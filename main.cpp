@@ -37,7 +37,7 @@ struct PmSynth : audio_renderer<PmSynth>, app_state
         float acc = 0;
         for (int k = 0; k < num_osc; ++k)
           acc += osc[k] * mod_matrix[OscIndex][k];
-        o = std::sin( osc_phase[OscIndex] * 2 * 3.14 * 440 + acc );
+        o = std::sin( osc_phase[OscIndex] * 2 * 3.14 * 440 * freq_ratio[OscIndex] + acc );
         osc_phase[OscIndex] += 1.f / 44100.f;
         res += o * osc_vol[OscIndex];
         ++OscIndex;
@@ -53,6 +53,8 @@ struct PmSynth : audio_renderer<PmSynth>, app_state
   float osc[num_osc] = {0.0};
   float freq_ratio[num_osc] = {1.0};
   float osc_vol[num_osc] = {1.0, 0.0};
+  
+  bool show_modulations;
 };
 
 auto make_demo_app(AppState& state)
@@ -117,8 +119,8 @@ auto make_pm_synth(PmSynth& state)
 {
   auto slider_row = [&] (int row) {
     return hstack {
-      simple_for_each{
-        std::ranges::iota_view(0, state.num_osc),
+      for_each{
+        iota(state.num_osc),
         [row] (int col) {
           return slider{ MLens(.mod_matrix[row][col]) };
         }
@@ -127,8 +129,8 @@ auto make_pm_synth(PmSynth& state)
   };
   
   auto mod_matrix = vstack{ 
-    simple_for_each{ 
-      std::ranges::iota_view(0, state.num_osc),
+    for_each{ 
+      iota(state.num_osc),
       slider_row
     }
   }.with_interspace(10);
@@ -141,8 +143,8 @@ auto make_pm_synth(PmSynth& state)
   };
   
   auto left_panel = vstack {
-    simple_for_each { 
-      std::ranges::iota_view(0, state.num_osc),
+    for_each { 
+      iota(state.num_osc),
       osc_panel_row
     }
   }.with_interspace(10);
