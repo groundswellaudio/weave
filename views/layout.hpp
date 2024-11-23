@@ -9,6 +9,7 @@
 struct stack_data {
   float interspace = 8;
   vec2f margin;
+  float align_ratio = 0;
 };
 
 template <class... Ts>
@@ -28,6 +29,11 @@ struct stack
   
   auto&& with_margin(this auto&& self, vec2f margin) {
     self.info.margin = margin;
+    return self;
+  }
+  
+  auto&& with_align(this auto&& self, float ratio) {
+    self.info.align_ratio = ratio;
     return self;
   }
   
@@ -64,6 +70,40 @@ struct stack_updater : view_sequence_updater<stack_updater> {
   }
 };
 
+namespace impl {
+  
+  vec2f do_stack_layout(std::vector<widget_box>& children, stack_data data, int axis) {
+    float pos = data.margin[axis];
+    float sz = 0;
+    for (auto& n : children) {
+      auto child_pos = data.margin;
+      child_pos[axis] = pos;
+      n.set_position(child_pos);
+      auto child_size = n.layout();
+      pos += child_size[axis] + data.interspace;
+      sz = std::max(sz, child_size[1 - axis]);
+    }
+    
+    // Align the element
+    
+    if (data.align_ratio != 0)
+      for (auto& n : children) {
+        vec2f child_pos;
+        child_pos[axis] = n.position()[axis];
+        child_pos[1 - axis] = data.margin[1 - axis] 
+                              + data.align_ratio * (sz + data.margin[1 - axis] * 2) 
+                              - n.size()[1 - axis] / 2;
+        n.set_position(child_pos);
+      } 
+    
+    vec2f res;
+    res[axis] = pos + data.margin[axis];
+    res[1 - axis] = sz + 2 * data.margin[1 - axis];
+    return res;
+  }
+  
+}
+
 template <class T, class... Ts>
   requires (is_view_sequence<Ts> && ...)
 struct stack_base : view<stack_base<T, Ts...>>, stack<Ts...> {
@@ -87,7 +127,7 @@ struct stack_base : view<stack_base<T, Ts...>>, stack<Ts...> {
   }
   
   template <class S>
-  void rebuild(auto& Old, widget_ref wb, const widget_updater& up, S& state) 
+  rebuild_result rebuild(auto& Old, widget_ref wb, const widget_updater& up, S& state) 
   {
     auto& w = wb.as<T>();
     int index = 0;
@@ -102,16 +142,21 @@ struct stack_base : view<stack_base<T, Ts...>>, stack<Ts...> {
       index
     };
     
+    rebuild_result res; 
+    
     tuple_for_each_with_index( this->children, [&] (auto& elem, auto elem_index) -> void 
     { 
-      elem.seq_rebuild(get<elem_index.value>(Old.children), seq_updater, next_up, state);
+      res |= elem.seq_rebuild(get<elem_index.value>(Old.children), seq_updater, next_up, state);
     });
     
     for (auto i : seq_updater.to_erase)
       w.children_vec.erase(w.children_vec.begin() + i);
     
-    if (seq_updater.mutated)
+    if (seq_updater.mutated) {
       wb.layout();
+      return rebuild_result{true};
+    }
+    return res;
   }
   
   void destroy(widget_ref wb) {}
@@ -127,24 +172,19 @@ struct vstack_widget : widget_base
   
   vstack_widget(stack_data d) : data{d} {}
   
-  void paint(painter& p) {}
+  void paint(painter& p) {
+    // p.stroke_style(colors::green);
+    // p.stroke_rect({0, 0}, size(), 2);
+  }
+  
   void on(ignore, ignore) {}
   
   bool traverse_children(auto&& fn) {
     return std::all_of(children_vec.begin(), children_vec.end(), fn);
   }
   
-  auto layout()
-  {
-    float pos = data.margin.y, width = 0;
-    for (auto& n : children_vec) {
-      n.set_position(data.margin.x, pos);
-      auto sz = n.layout();
-      pos += sz.y + data.interspace;
-      width = std::max(width, sz.x);
-    }
-    
-    return vec2f{width + 2 * data.margin.x, pos + data.margin.y};
+  auto layout() {
+    return impl::do_stack_layout(children_vec, data, 1);
   }
 };
 
@@ -168,21 +208,16 @@ struct hstack_widget : widget_base
     return std::all_of(children_vec.begin(), children_vec.end(), fn);
   }
   
-  void paint(painter& p) {}
+  void paint(painter& p) {
+    // p.stroke_style(colors::green);
+    // p.stroke_rect({0, 0}, size(), 2);
+  }
+  
   void on(input_event, ignore) {}
   
   auto layout() 
   {
-    float pos = data.margin.x, height = 0;
-    for (auto& n : children_vec) 
-    {
-      n.set_position(pos, data.margin.y);
-      auto sz = n.layout();
-      pos += sz.x + data.interspace;
-      height = std::max(height, sz.y);
-    }
-    
-    return vec2f{pos + data.margin.x, height + 2 * data.margin.y};
+    return impl::do_stack_layout(children_vec, data, 0);
   }
 };
 

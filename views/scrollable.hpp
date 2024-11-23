@@ -59,7 +59,7 @@ struct scrollable_widget : widget_base {
     auto delta = child.size().y * drag_delta.y / size().y;
     auto new_pos = child.position().y - delta;
     new_pos = std::clamp(new_pos, -child.size().y + size().y, 0.f);
-    child.set_position(0, new_pos); // -scrollbar_start * child.size().y);
+    child.set_position({0, new_pos}); // -scrollbar_start * child.size().y);
     auto new_bar_pos = bar.position().y + drag_delta.y;
     new_bar_pos = std::clamp(new_bar_pos, 0.f, size().y - bar.size().y);
     bar.set_position(bar.position().x, new_bar_pos); //scrollbar_start * child.size().y);

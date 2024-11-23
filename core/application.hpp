@@ -181,8 +181,11 @@ struct application
       auto old_view = *app_view;
       app_view.emplace( view_ctor(state) );
       auto upd = widget_updater{root.borrow()};
-      app_view->rebuild(old_view, root.borrow(), upd, state);
-      med.layout_changed();
+      auto rebuild_res = app_view->rebuild(old_view, root.borrow(), upd, state);
+      if (rebuild_res.layout_change) {
+        root.layout();
+        med.layout_changed();
+      }
       
       paint(state);
     }
@@ -208,7 +211,7 @@ struct application
       
       // p.stroke_style(colors::red);
       // p.stroke_rect(new_scissor_pos, new_scissor_sz);
-      p.scissor(new_scissor_pos, new_scissor_sz);
+      //p.scissor(new_scissor_pos, new_scissor_sz);
       p.translate(pos);
       w.paint(p, &state);
       for (auto& w : w.children())

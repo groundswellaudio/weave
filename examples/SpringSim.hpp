@@ -160,7 +160,7 @@ struct Editor : widget_base {
   //Editor(Properties prop) : prop{prop} {}
   
   vec2f layout() const {
-    return {400, 400};
+    return {300, 400};
   }
   
   bool traverse_children(auto&& fn) {
@@ -318,7 +318,7 @@ auto make_spring_sim(SpringSimApp& state)
     return hstack {
       text{str}, 
       View
-    };
+    }.with_align(0.5);
   };
   
   auto RelMod = vstack {
@@ -338,6 +338,7 @@ auto make_spring_sim(SpringSimApp& state)
         RelMod
       }
     }
+  //};
   }.with_margin({30, 30}).with_interspace(10);
 
   return hstack {

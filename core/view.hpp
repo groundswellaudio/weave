@@ -15,6 +15,19 @@ struct view_seq_rebuild_ctx {
   Destroyer destroy;
 };
 
+struct rebuild_result {
+  constexpr rebuild_result operator |(rebuild_result o) {
+    return {layout_change || o.layout_change};
+  }
+  
+  constexpr rebuild_result& operator |=(rebuild_result o) {
+    *this = *this | o;
+    return *this;
+  }
+  
+  bool layout_change = false;
+};
+
 struct view_sequence_base {
   
 };
@@ -34,10 +47,10 @@ struct view : view_sequence_base {
     Consumer(self.build(c, state));
   }
   
-  void seq_rebuild(this T& self, T& New, auto&& seq_updater, 
+  rebuild_result seq_rebuild(this T& self, T& New, auto&& seq_updater, 
                    const widget_updater& up, auto& state) 
   {
-    self.rebuild(New, seq_updater.next(), up, state);
+    return self.rebuild(New, seq_updater.next(), up, state);
   }
   
   void seq_destroy(this T& self, auto GetForDestroy) {
@@ -85,7 +98,8 @@ struct simple_view_for : view<simple_view_for<Widget, Lens, Prop>>, Prop {
     }
   }
   
-  void rebuild(auto&& New, widget_ref w, const auto& updater, auto& state) {
+  rebuild_result rebuild(auto&& New, widget_ref w, const auto& updater, auto& state) {
+    return {};
     /* if (New.prop == prop)
       return;
     w.template as<Widget>.set_properties(New.prop);

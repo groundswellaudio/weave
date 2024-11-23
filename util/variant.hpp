@@ -171,6 +171,8 @@ constexpr decltype(auto) visit_with_index(Fn&& fn, V&& v)
   switch(v.index())
   {
     %impl::generate_visit_with_index( ^(v.data), ^(fn) );
+    default: 
+      std::unreachable();
   }
 }
 

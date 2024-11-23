@@ -62,6 +62,10 @@ struct vec
     return not (*this == o);
   }
   
+  constexpr auto& operator[](this auto&& self, unsigned index) {
+    return self.data[index];
+  }
+  
   T data[N];
   
   %declare_arithmetic( ^const vec& );
@@ -112,6 +116,10 @@ struct vec<T, 2>
     res.x = -res.x;
     res.y = -res.y;
     return res;
+  }
+  
+  constexpr auto& operator[](this auto&& self, unsigned index) {
+    return index == 0 ? self.x : self.y;
   }
   
   %declare_arithmetic( ^const vec& );

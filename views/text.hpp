@@ -36,9 +36,10 @@ struct text : view<text> {
     return text_widget{{{60, 30}, {0, 0}}, prop};
   }
   
-  void rebuild(text Old, widget_ref w, auto& up, ignore) {
+  rebuild_result rebuild(text Old, widget_ref w, auto& up, ignore) {
     if (prop != Old.prop)
       w.as<text_widget>().prop = prop;
+    return {};
   }
   
   void destroy(widget_ref w) {}

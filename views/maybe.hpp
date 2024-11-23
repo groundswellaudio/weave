@@ -61,6 +61,8 @@ namespace impl {
   constexpr auto with_index(unsigned index, auto fn) -> decltype(fn(Index<0>{})) {
     switch(index) {
       %with_index(Max, ^(fn));
+      default : 
+        std::unreachable();
     }
   }
   
@@ -86,10 +88,10 @@ struct either : view_sequence_base {
     }, body);
   }
   
-  void seq_rebuild(auto& Old, auto&& updater, auto& up, auto& state) {
+  rebuild_result seq_rebuild(auto& Old, auto&& updater, auto& up, auto& state) {
     if (Old.body.index() == body.index()) {
-      visit_with_index( [&] (auto& elem, auto index) {
-        elem.seq_rebuild(get<index.value>(Old.body), updater, up, state);
+      return visit_with_index( [&] (auto& elem, auto index) {
+        return elem.seq_rebuild(get<index.value>(Old.body), updater, up, state);
       }, body);
     }
     else {
@@ -99,6 +101,7 @@ struct either : view_sequence_base {
       visit( [&] (auto& elem) {
         elem.seq_build(updater.consume_fn(), up.builder(), state);
       }, body);
+      return rebuild_result{true}; 
     }
   }
   

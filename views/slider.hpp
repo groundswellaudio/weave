@@ -72,11 +72,12 @@ struct slider : view<slider<Lens>> {
   }
   
   template <class S>
-  void rebuild(slider<Lens> New, widget_ref wb, widget_updater up, S& state) {
+  rebuild_result rebuild(slider<Lens> New, widget_ref wb, widget_updater up, S& state) {
     auto& w = wb.as<slider_x_widget>();
     if (w.prop != New.properties)
       w.prop = New.properties; 
     properties = New.properties;
+    return {};
   }
   
   auto& with_range(float min, float max) {

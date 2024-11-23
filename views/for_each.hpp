@@ -17,7 +17,7 @@ struct for_each : view_sequence_base {
     }
   }
   
-  void seq_rebuild(for_each& Old, auto&& seq_updater, widget_updater& up, auto& state) 
+  rebuild_result seq_rebuild(for_each& Old, auto&& seq_updater, widget_updater& up, auto& state) 
   {
     for (auto e : range) {
       elements.push_back(view_ctor(e));
@@ -31,6 +31,8 @@ struct for_each : view_sequence_base {
       for (; k < elements.size(); ++k) 
         elements[k].seq_build( seq_updater.consume_fn(), up.builder(), state );
     }
+    
+    return {};
   }
   
   Range range;

@@ -232,7 +232,7 @@ class widget_ref {
   
   vec2f position() const { return data->position(); }
   
-  void set_position(float x, float y) { data->set_position(x, y); }
+  void set_position(vec2f p) { data->set_position(p.x, p.y); }
   
   bool contains(vec2f pos) const { return data->contains(pos); }
     
