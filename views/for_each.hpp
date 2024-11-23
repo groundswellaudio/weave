@@ -30,7 +30,6 @@ struct for_each : view_sequence_base {
         elements[k].seq_rebuild(Old.elements[k], seq_updater, up, state);
       for (; k < elements.size(); ++k) 
         elements[k].seq_build( seq_updater.consume_fn(), up.builder(), state );
-      up.parent_widget().layout();
     }
   }
   

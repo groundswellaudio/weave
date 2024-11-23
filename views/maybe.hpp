@@ -99,7 +99,6 @@ struct either {
       visit( [&] (auto& elem) {
         elem.seq_build(updater.consume_fn(), up.builder(), state);
       }, body);
-      up.parent_widget().layout();
     }
   }
   

@@ -40,6 +40,8 @@ struct stack_updater : view_sequence_updater<stack_updater> {
   std::vector<widget_box>& vec;
   std::vector<int> to_erase;
   int& index;
+  bool mutated = false;
+  
   [[no_unique_address]] non_copyable _;
   
   void consume(auto&& W) { 
@@ -47,6 +49,7 @@ struct stack_updater : view_sequence_updater<stack_updater> {
       vec.begin() + index++, 
       widget_box{(decltype(W)&&)(W)}
     );
+    mutated = true;
   }
   
   widget_ref next() {
@@ -56,6 +59,7 @@ struct stack_updater : view_sequence_updater<stack_updater> {
   widget_ref destroy() {
     widget_ref res = vec[index].borrow();
     to_erase.push_back(index++);
+    mutated = true;
     return res;
   }
 };
@@ -105,6 +109,9 @@ struct stack_base : view<stack_base<T, Ts...>>, stack<Ts...> {
     
     for (auto i : seq_updater.to_erase)
       w.children_vec.erase(w.children_vec.begin() + i);
+    
+    if (seq_updater.mutated)
+      wb.layout();
   }
 };
 
