@@ -132,6 +132,11 @@ constexpr vec<T, 2> min(vec<T, 2> a, vec<T, 2> b) {
 }
 
 template <class T>
+constexpr vec<T, 2> abs(vec<T, 2> o) {
+  return { std::abs(o.x), std::abs(o.y) };
+}
+
+template <class T>
 constexpr T distance(vec<T, 2> a, vec<T, 2> b) {
   auto x = b.x - a.x;
   auto y = b.y - a.y;

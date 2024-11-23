@@ -7,7 +7,7 @@
 #include <algorithm>
 
 struct stack_data {
-  float interspace;
+  float interspace = 8;
   vec2f margin;
 };
 
@@ -113,6 +113,8 @@ struct stack_base : view<stack_base<T, Ts...>>, stack<Ts...> {
     if (seq_updater.mutated)
       wb.layout();
   }
+  
+  void destroy(widget_ref wb) {}
 };
 
 struct vstack_widget : widget_base

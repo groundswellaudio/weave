@@ -3,11 +3,16 @@
 #include "views_core.hpp"
 #include <string_view>
 
-/* 
-struct text_widget
+struct text_widget : widget_base
 {
-  std::string_view text;
-  rgba_f color;
+  struct properties {
+    bool operator==(const properties& o) const = default;
+    std::string_view text;
+    rgba_u8 color = colors::white;
+    float font_size = 11;
+  };
+  
+  properties prop;
   
   using value_type = void;
   
@@ -15,30 +20,28 @@ struct text_widget
   {
   }
   
-  void paint(painter& p, vec2f this_size) {
-    p.fill_style(rgba_f{1.f, 1.f, 0.f, 1.f});
-    p.text_alignment(text_align::x::left, text_align::y::top);
-    p.text({0, 0}, text);
+  void paint(painter& p) {
+    p.font_size(prop.font_size);
+    p.fill_style(prop.color);
+    p.text_alignment(text_align::x::left, text_align::y::center);
+    p.text({0, size().y / 2}, prop.text);
   }
 };
 
-struct text : view {
+struct text : view<text> {
   
-  text(std::string_view str) : str{str} {}
+  text(std::string_view str) : prop{str} {}
   
-  auto construct(widget_tree_builder& b, ignore) {
-    return make_tuple( text_wigdet{text}, empty_lens{} );
-    
-    return b.template create_widget<text_widget>(empty_lens{}, {100, 15}, str);
+  auto build(auto&& b, ignore) {
+    return text_widget{{{60, 30}, {0, 0}}, prop};
   }
   
-  void rebuild(text New, widget_tree_updater& b, ignore) {  
-    auto& w = b.consume_leaf().as<text_widget>();
-    if (*this == New)
-      return;
-    *this = New;
+  void rebuild(text Old, widget_ref w, auto& up, ignore) {
+    if (prop != Old.prop)
+      w.as<text_widget>().prop = prop;
   }
   
-  std::string_view str;
-  float font_size = 13;
-}; */ 
+  void destroy(widget_ref w) {}
+  
+  text_widget::properties prop;
+};

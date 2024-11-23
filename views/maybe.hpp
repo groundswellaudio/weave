@@ -73,7 +73,7 @@ namespace impl {
 }
 
 template <class... Ts>
-struct either {
+struct either : view_sequence_base {
   
   //template <class... Vs>
   either(unsigned index, Ts... vs) : body{impl::make_variant<Ts...>(index, (Ts&&)vs...)} 

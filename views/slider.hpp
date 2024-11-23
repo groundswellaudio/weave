@@ -16,10 +16,15 @@ struct slider_x_widget : widget_base
 {
   slider_properties prop;
   float ratio = 0;
+  std::string value_str;
   
   using value_type = float;
   
   using EvCtx = event_context<slider_x_widget>;
+  
+  void on_value_change(float new_val) {
+    value_str = std::format("{:.5}", new_val);
+  }
   
   void on(mouse_event e, EvCtx ec) 
   {
@@ -32,6 +37,7 @@ struct slider_x_widget : widget_base
     
     auto new_val = prop.min + ratio * (prop.max - prop.min); 
     ec.write(new_val);
+    on_value_change(new_val);
     //ec.repaint_request();
   }
   
@@ -50,9 +56,8 @@ struct slider_x_widget : widget_base
     
     p.fill_style(colors::white);
     p.text_alignment(text_align::x::center, text_align::y::center);
-    auto str = std::format("{}", pc);
     p.font_size(11);
-    p.text({sz.x / 2, sz.y / 2}, str);
+    p.text({sz.x / 2, sz.y / 2}, value_str);
   }
 };
 
