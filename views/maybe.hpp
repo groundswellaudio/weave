@@ -3,12 +3,14 @@
 #include "views_core.hpp"
 
 template <class View>
-struct maybe {
+struct maybe : view_sequence_base {
+  
+  maybe(bool flag, View v) : flag{flag}, view{v} {}
   
   using Self = maybe<View>;
   
   template <class S>
-  void seq_build(auto consumer, widget_builder& b, S& state)
+  void seq_build(auto consumer, auto&& b, S& state)
   {
     if (!flag) 
       return;
@@ -36,7 +38,7 @@ struct maybe {
       view.seq_destroy(seq_updater.destroy_fn());
       up.parent_widget().layout();
     }
-    *this = New;
+    flag = New.flag;
   }
   
   bool flag; 

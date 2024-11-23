@@ -74,7 +74,7 @@ struct stack_base : view<stack_base<T, Ts...>>, stack<Ts...> {
       Res.children_vec.push_back( widget_box{(decltype(args)&&)(args)...} );
     };
     
-    tuple_for_each(this->children, [&] (auto& elem) {
+    tuple_for_each(this->children, [&] (auto& elem) -> void {
       elem.seq_build(consumer, b, state);
     });
     
@@ -97,7 +97,7 @@ struct stack_base : view<stack_base<T, Ts...>>, stack<Ts...> {
       index
     };
       
-    tuple_for_each_with_index( this->children, [&] (auto& elem, auto elem_index) 
+    tuple_for_each_with_index( this->children, [&] (auto& elem, auto elem_index) -> void 
     { 
       elem.seq_rebuild(get<elem_index.value>(New.children), seq_updater, next_up, state);
     });

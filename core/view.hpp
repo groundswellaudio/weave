@@ -61,7 +61,7 @@ struct view_sequence_updater {
   }
   
   auto destroy_fn(this T& self) {
-    return [&self] () -> auto& { return self.destroy(); };
+    return [&self] () { return self.destroy(); };
   }
 };
 
@@ -83,9 +83,9 @@ struct simple_view_for : view<simple_view_for<Widget, Lens, Prop>>, Prop {
       return Widget{};
     else {
       if constexpr (^Prop != ^ignore)
-        return with_lens{Widget{(Prop&)*this},  make_lens<typename Widget::value_type, State>(lens)};
+        return with_lens<State>( Widget{(Prop&)*this}, lens );
       else
-        return with_lens{Widget{},  make_lens<typename Widget::value_type, State>(lens)};
+        return with_lens<State>( Widget{}, lens);
     }
   }
   

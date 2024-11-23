@@ -58,8 +58,9 @@ struct toggle_button : view<toggle_button<Lens>> {
     properties.str = str;
   }
   
-  auto build(widget_builder b, ignore) {
-    return with_lens{ toggle_button_widget{properties}, dyn_lens<bool>{lens} };
+  template <class S>
+  auto build(widget_builder b, S& s) {
+    return with_lens<S>(toggle_button_widget{properties}, lens);
   }
   
   void rebuild(toggle_button<Lens>& New, widget_ref w, ignore, ignore) {

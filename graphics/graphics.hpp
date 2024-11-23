@@ -157,11 +157,12 @@ struct painter : painter_state
     nvgLineTo(ctx, p.x, p.y);
   }
   
-  void line(vec2f a, vec2f b) {
+  void line(vec2f a, vec2f b, float thick = 3) {
     begin_path();
     move_to(a);
     line_to(b);
-    nvgFill(ctx);
+    nvgStrokeWidth(ctx, thick);
+    nvgStroke(ctx);
   }
   
   void stroke_rect(vec2f pos, vec2f size, float thick = 1) {
@@ -203,6 +204,13 @@ struct painter : painter_state
     nvgBeginPath(ctx);
     nvgRoundedRect(ctx, position.x, position.y, size.x, size.y, radius);
     nvgFill(ctx);
+  }
+  
+  void stroke_circle(vec2f pos, float rad, float thick){
+    nvgBeginPath(ctx);
+    nvgCircle(ctx, pos.x, pos.y, rad);
+    nvgStrokeWidth(ctx, thick);
+    nvgStroke(ctx);
   }
   
   void circle(vec2f position, float sz) {

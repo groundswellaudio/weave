@@ -124,29 +124,6 @@ class dyn_lens {
 template <class W>
 using dyn_lens_for = dyn_lens<typename W::value_type>;
 
-template <class Fn, class State>
-struct invocable_lens {
-  using input = State;
-  
-  decltype(auto) read(State& s) {
-    auto _ = s.read_scope();
-    return (fn(s));
-  }
-  
-  void write(State& s, auto&& val) {
-    auto _ = s.write_scope();
-    fn(s) = (decltype(val)&&)val;
-  }
-  
-  Fn fn;
-};
-
-template <class ValueType, class State, class Lens>
-auto make_lens(Lens lens) {
-  if constexpr ( requires (State& s) { lens(s); } )
-    return dyn_lens<ValueType>{invocable_lens<Lens, State>{lens}};
-}
-
 template <class T>
 struct event_context_t;
 
@@ -445,9 +422,34 @@ namespace impl {
   
 }
 
+template <class Fn, class State>
+struct invocable_lens {
+  using input = State;
+  
+  decltype(auto) read(State& s) {
+    auto _ = s.read_scope();
+    return (fn(s));
+  }
+  
+  void write(State& s, auto&& val) {
+    auto _ = s.write_scope();
+    fn(s) = (decltype(val)&&)val;
+  }
+  
+  Fn fn;
+};
+
+template <class ValueType, class State, class Lens>
+auto make_lens(Lens lens) {
+  if constexpr ( requires (State& s) { lens(s); } )
+    return dyn_lens<ValueType>{invocable_lens<Lens, State>{lens}};
+}
+
 /// A widget along its state lens
 template <class W, class Lens>
-struct with_lens : W {
+struct with_lens_t : W {
+  
+  using value_type = void;
   
   void on(input_event e, event_context_data ctx) {
     event_context<W> ev_ctx {ctx, lens};
@@ -455,7 +457,7 @@ struct with_lens : W {
   }
   
   void on_child_event(input_event e, event_context_data ctx, widget_ref child) {
-    if constexpr ( requires { W::on_child_event(e, ctx, child); } ) {
+    if constexpr ( is_child_event_listener<W> ) {
       event_context<W> ev_ctx{ctx, lens};
       W::on_child_event(e, ev_ctx, child);
     }
@@ -469,7 +471,13 @@ struct with_lens : W {
 };
 
 template <class W, class Lens>
-with_lens(W w, Lens lens) -> with_lens<W, Lens>;
+with_lens_t(W w, Lens lens) -> with_lens_t<W, Lens>;
+
+template <class State, class W, class Lens>
+auto with_lens(W&& widget, Lens lens) {
+  return with_lens_t{ (decltype(widget)&&)widget, 
+                       make_lens<typename W::value_type, State>(lens) };
+}
 
 struct widget_builder 
 {

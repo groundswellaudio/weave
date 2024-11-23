@@ -8,6 +8,7 @@
 class sdl_backend
 {
   bool mouse_is_dragging = false;
+  int last_mouse_down = 0;
   
   public :
   
@@ -49,8 +50,17 @@ class sdl_backend
     {
       case SDL_MOUSEBUTTONDOWN :
       {
+        auto time = e.button.timestamp;
+        bool is_double_click = false;
+        if (time - last_mouse_down < 250) {
+          last_mouse_down = 0;
+          is_double_click = true;
+        } else {
+          last_mouse_down = time;
+        }
         mouse_is_dragging = true;
-        auto ev = mouse_event{pos(e.button.x, e.button.y), mouse_down{to_mouse_button(e.button.button), false}};
+        auto mde = mouse_down{to_mouse_button(e.button.button), is_double_click};
+        auto ev = mouse_event{pos(e.button.x, e.button.y), mde};
         vis(ev); 
         break;
       }

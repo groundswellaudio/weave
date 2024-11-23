@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cassert>
+#include <ranges>
 
 #include "backend.hpp"
 #include "view.hpp"
@@ -84,13 +85,10 @@ namespace impl {
       focused = w;
       focused_absolute_pos = absolute_pos;
       
-      parents_listeners.clear();
-      
-      for (auto p : parents)
-      {
+      top_parent_listener = {};
+      for (auto p : std::ranges::views::reverse(parents))
         if (p.is_child_event_listener())
-          parents_listeners.push_back(p);
-      }
+          top_parent_listener = p;
     }
   
     public : 
@@ -117,8 +115,17 @@ namespace impl {
       
       e.position -= focused_absolute_pos;
       focused.on(e, ecd);
-      for (auto p : parents_listeners)
-        p.on_child_event(e, ecd, focused);
+      
+      if (top_parent_listener) {
+        e.position += focused.position();
+        for (auto p : std::ranges::views::reverse(parents)) 
+        {
+          p.on_child_event(e, ecd, focused);
+          e.position += p.position();
+          if (top_parent_listener == p)
+            break;
+        }
+      }
     }
     
     void layout_changed() {
@@ -131,7 +138,7 @@ namespace impl {
     widget_ref focused;
     vec2f focused_absolute_pos = {0, 0};
     event_context_parent_stack parents;
-    std::vector<widget_ref> parents_listeners;
+    optional<widget_ref> top_parent_listener = {};
   };
 
 } // impl

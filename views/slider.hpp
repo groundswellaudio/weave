@@ -63,7 +63,7 @@ struct slider : view<slider<Lens>> {
   
   template <class S>
   auto build(const widget_builder& b, S& state) {
-    return with_lens{slider_x_widget{{size}, properties}, make_lens<float, S>(lens)};
+    return with_lens<S>(slider_x_widget{{size}, properties}, lens);
   }
   
   template <class S>
