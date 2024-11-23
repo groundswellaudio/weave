@@ -111,6 +111,10 @@ struct SpringSimApp : SpringSim {
     return get_particle(selection.selected_particle());
   }
   
+  auto& selected_particle_set() const {
+    return selection.set;
+  }
+  
   Selection selection;
 };
 
@@ -140,11 +144,15 @@ struct Editor : widget_base {
   
   void on_child_event(mouse_event e, event_context<Editor>& ctx, widget_ref child) {
     if (e.is_mouse_down()) {
-      auto index = &child.as<Particle>() - particles.data();
+      clear_selection(ctx);
+      auto& p = child.as<Particle>();
+      auto index = &p - particles.data();
+      p.selected = true;
       ctx.read().selection.set_particle(index);
+      connecting = tuple{e.position, e.position};
     }
     else if (e.is_mouse_drag()) {
-      mouse_pos = e.position;
+      get<1>(*connecting) = e.position;
     }
     else if (e.is_mouse_up()) {
       auto w = find_child_at(e.position);
@@ -154,6 +162,7 @@ struct Editor : widget_base {
       auto selected_idx = ctx.read().selection.selected_particle();
       if (found != selected_idx)
         create_connection(selected_idx, found, ctx);
+      connecting.reset();
     }
   }
   
@@ -174,19 +183,32 @@ struct Editor : widget_base {
   
   void update_selection_rect(vec2f pos, event_context<Editor>& ec) 
   {
+    clear_selection(ec);
     int index = 0;
-    for (auto p : particles) 
+    selection_rect->b = pos;
+    for (auto& p : particles) 
     {
-      if (selection_rect->contains(p.position() + p.size() / 2))
+      if (selection_rect->contains(p.position() + p.size() / 2)) {
         ec.read().selection.add_particle(index);
+        p.selected = true;
+      }
+      else
+        p.selected = false;
       ++index;
     }
+  }
+  
+  void clear_selection(event_context<Editor>& ec) {
+    auto& s = ec.read();
+    for (auto idx : s.selected_particle_set())
+      particles[idx].selected = false;
+    s.selection.clear();  
   }
   
   void on(mouse_event e, event_context<Editor>& ec) 
   {
     if (e.is_mouse_drag() && selection_rect) {
-      selection_rect->b = e.position;
+      update_selection_rect(e.position, ec);
       return;
     }
     
@@ -205,8 +227,9 @@ struct Editor : widget_base {
     }
     
     int idx = 0;
-    bool connection_found = !traverse_connections( [&ec, &idx, &e] (vec2f a, vec2f b) {
+    bool connection_found = !traverse_connections( [&ec, &idx, &e, this] (vec2f a, vec2f b) {
       if (distance((a + b) / 2, e.position) < 5) {
+        clear_selection(ec);
         auto& s = ec.read().selection;
         s.set_relation(idx);
         return false;
@@ -215,8 +238,10 @@ struct Editor : widget_base {
       return true;
     });
     
-    if (!connection_found)
+    if (!connection_found) {
+      clear_selection(ec);
       selection_rect = SelectionRect{e.position, e.position};
+    }
   }
   
   void paint(painter& p, SpringSimApp& app) 
@@ -224,12 +249,10 @@ struct Editor : widget_base {
     p.fill_style(colors::blue);
     p.rectangle({0, 0}, size());
     p.stroke_style(colors::green);
-    //p.circle(mouse_pos)
-    auto center = [] (auto& w) { return w.position() + w.size() / 2; };
-    /* 
+
     if (connecting) {
-      p.line(center(*connecting), mouse_pos, 4);
-    } */ 
+      p.line(connecting->m0, connecting->m1, 4);
+    }
     
     p.fill_style(colors::green);
     
@@ -272,34 +295,12 @@ struct Editor : widget_base {
   std::vector<Particle> particles;
   std::vector<tuple<int, int>> connections;
   std::optional<SelectionRect> selection_rect;
-  vec2f mouse_pos;
-};
-
-//using EditorWL = with_lens<Editor>
-// static_assert( is_child_event_listener<with_lens<Editor, dyn_lens<SpringSimApp&>>> );
-
-template <class T>
-struct view_with_body : T {
-  
-  decltype(std::declval<T>().body()) body_v;
-  
-  view_with_body(auto&&... args) : T{args...}, body_v{T::body()} {} 
-  
-  auto build(auto&& builder, auto& state) {
-    return body_v.build(builder, state);
-  }
-  
-  void rebuild(auto& New, widget_ref w, auto&& updater, auto& state) {
-    auto NewBody = New.body_v;
-    body_v.rebuild(NewBody, w, updater, state);
-  }
+  std::optional<tuple<vec2f, vec2f>> connecting;
 };
 
 static constexpr auto EditorLens = [] (auto& s) -> auto& { return s; };
 
 using EditorView = simple_view_for<Editor, decltype(EditorLens)>;
-
-//using MainView = view_with_body<MainViewT>;
 
 auto make_spring_sim(SpringSimApp& state)
 { 
