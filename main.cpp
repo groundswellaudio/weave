@@ -1,5 +1,5 @@
 #include "spiral.hpp"
-#include "examples/SpringSim.hpp"
+#include "examples/SpringSim/SpringSim.hpp"
 #define MINIAUDIO_IMPLEMENTATION
 #include "deps/miniaudio/miniaudio.h"
 

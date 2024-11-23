@@ -3,8 +3,8 @@
 
 struct window {
   
-  window(const char* name, int x, int y) {
-    init(name, x, y);
+  window(const char* name, vec2f size) {
+    init(name, size.x, size.y);
   }
   
   //window() : win{nullptr}, gl_ctx{nullptr} {}

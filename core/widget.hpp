@@ -53,9 +53,10 @@ struct widget_base {
   
   std::optional<widget_ref> find_child_at(this auto& self, vec2f pos);
   
+  /* 
   void paint(this auto& self, painter& p, void* any_state) {
     self.paint(p);
-  }
+  } */ 
   
   vec2f sz, pos = {0, 0};
 };
@@ -116,6 +117,10 @@ class dyn_lens {
   }
   
   private : 
+  
+  dyn_lens(void* data, const vtable_t* vptr) : data{data}, vptr{vptr} 
+  {
+  }
   
   void* data;
   const vtable_t* vptr;  
@@ -283,6 +288,13 @@ struct widget_box : widget_ref {
     return widget_ref{data, vptr};
   }
   
+  void reset() {
+    if (data) {
+      vptr->destroy(data);
+      data = nullptr;
+    }
+  }
+  
   ~widget_box() { if (data) vptr->destroy(data); }
 };
 
@@ -320,10 +332,14 @@ using event_context_parent_stack = std::vector<widget_ref>;
 template <class T>
 struct event_context_t;
 
+struct application_context; 
+
 template <> 
 struct event_context_t<void> {
+  
   widget_ref parent() const { return parents.back(); }
   
+  application_context& ctx;
   event_context_parent_stack parents;
   void* state_ptr;
 };
@@ -331,8 +347,13 @@ struct event_context_t<void> {
 using event_context_data = event_context_t<void>;
 
 template <class T>
-struct event_context_t  
+struct event_context_t 
 {
+  template <class W, class P>
+  void open_modal_menu(W&& widget, P* parent);
+  
+  void close_modal_menu();
+  
   void write(T v) {
     lens.write(ctx.state_ptr, v);
   }
@@ -446,7 +467,7 @@ auto make_lens(Lens lens) {
 }
 
 /// A widget along its state lens
-template <class W, class Lens>
+template <class W>
 struct with_lens_t : W {
   
   using value_type = void;
@@ -471,7 +492,7 @@ struct with_lens_t : W {
 };
 
 template <class W, class Lens>
-with_lens_t(W w, Lens lens) -> with_lens_t<W, Lens>;
+with_lens_t(W w, Lens lens) -> with_lens_t<W>;
 
 template <class State, class W, class Lens>
 auto with_lens(W&& widget, Lens lens) {

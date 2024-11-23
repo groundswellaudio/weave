@@ -14,12 +14,6 @@
 #include "../events/mouse_events.hpp"
 #include "../vec.hpp"
 
-inline vec2f current_mouse_position() {
-  int x, y;
-  SDL_GetMouseState(&x, &y);
-  return {(float)x, (float)y};
-}
-
 namespace impl {
 
   struct mouse_event_dispatcher 
@@ -98,9 +92,9 @@ namespace impl {
       set_focused(root, {0, 0});
     }
   
-    void on(mouse_event e, void* state, application_context& ctx)
+    void on(mouse_event e, void* state)
     {
-      auto ecd = event_context_data{ctx, parents, state};
+      auto ecd = event_context_data{parents, state};
       
       if (!is_modal && e.is_mouse_move() && !e.is_mouse_drag())
       {
@@ -133,22 +127,8 @@ namespace impl {
       vec2f new_abs_pos = r.position();
       for (auto& p : parents_stack)
         new_abs_pos += p.position();
-      focused = r;
-      focused_absolute_pos = new_abs_pos;
+      focused_abs_pos = new_abs_pos;
       parents = std::move(parents_stack);
-      is_modal = true;
-    }
-    
-    void close_modal_menu() {
-      assert( is_modal && "close_modal_menu called outside of modal mode" );
-      focused_absolute_pos -= focused.position();
-      focused = parents.back();
-      parents.pop_back();
-      is_modal = false;
-    }
-    
-    vec2f focused_absolute_position() const {
-      return focused_absolute_pos;
     }
     
     void layout_changed() {
@@ -158,13 +138,11 @@ namespace impl {
       focused_absolute_pos = new_pos;
     }
     
-    private : 
-    
     widget_ref focused;
     vec2f focused_absolute_pos = {0, 0};
     event_context_parent_stack parents;
     optional<widget_ref> top_parent_listener = {};
-    bool is_modal = false;
+    bool is_modal_menu = false;
   };
 
 } // impl
@@ -172,10 +150,9 @@ namespace impl {
 struct application_context {
   
   template <class Root>
-  application_context(const char* win_name, vec2f win_size, Root&& root_widget)
+  application_context(const char* win_name, vec2f win_size, Root&& root_widget) 
   : win{"spiral", win_size}, 
     root{std::move(root_widget)}, 
-    modal_menu{nullptr},
     med{root.borrow()}
   {
     root.layout();
@@ -184,14 +161,7 @@ struct application_context {
   void open_modal_menu(widget_box menu, widget_ref parent, event_context_parent_stack stack) 
   {
     stack.push_back(parent);
-    modal_menu = std::move(menu);
-    med.open_modal_menu(modal_menu.borrow(), std::move(stack));
-  }
-  
-  void close_modal_menu() 
-  {
-    med.close_modal_menu();
-    modal_menu.reset();
+    med.open_modal_menu(menu.borrow(), stack);
   }
   
   sdl_backend backend;
@@ -201,18 +171,6 @@ struct application_context {
   impl::mouse_event_dispatcher med;
 };
 
-template <class T>
-template <class W, class P>
-void event_context_t<T>::open_modal_menu(W&& widget, P* parent) {
-  auto ParentWithLens = static_cast<with_lens_t<P>*>(parent);
-  ctx.ctx.open_modal_menu(with_lens_t(widget, lens.clone()), ParentWithLens, this->ctx.parents);
-}
-
-template <class T>
-void event_context_t<T>::close_modal_menu() {
-  ctx.ctx.close_modal_menu();
-}
-  
 template <class ViewCtor, class View, class State>
 struct application 
 {
@@ -233,7 +191,7 @@ struct application
     while(!impl.backend.want_quit)
     {
       impl.backend.visit_event( [this, &state] (auto&& e) {
-        impl.med.on(e, &state, impl);
+        impl.med.on(e, &state);
       });
       
       auto old_view = *app_view;
@@ -255,7 +213,7 @@ struct application
     p.set_font("default");
     p.begin_frame(impl.win.size(), 1);
     
-    auto fn = [this, &p, &state] (this auto&& self, widget_ref w, vec2f scissor_pos, vec2f scissor_sz) -> void
+    auto impl = [this, &p, &state] (auto&& self, widget_ref w, vec2f scissor_pos, vec2f scissor_sz) -> void
     {
       auto pos = w.position();
       auto sz = w.size();
@@ -273,18 +231,11 @@ struct application
       p.translate(pos);
       w.paint(p, &state);
       for (auto& w : w.children())
-        self(w, new_scissor_pos - pos, new_scissor_sz);
+        self(self, w, new_scissor_pos - pos, new_scissor_sz);
       p.translate(-pos);
     };
     
-    fn(impl.root.borrow(), {0, 0}, impl.win.size());
-    
-    if (impl.modal_menu) {
-      auto abs_pos = impl.med.focused_absolute_position();
-      p.translate(abs_pos);
-      impl.modal_menu.paint(p, &state);
-    }
-    
+    impl(impl, impl.root.borrow(), {0, 0}, impl.win.size());
     p.end_frame();
     impl.win.swap_buffer();
   }
