@@ -17,23 +17,19 @@ struct for_each : view_sequence_base {
     }
   }
   
-  void seq_rebuild(for_each& NewView, auto&& seq_updater, widget_updater& up, auto& state) 
+  void seq_rebuild(for_each& Old, auto&& seq_updater, widget_updater& up, auto& state) 
   {
-    for (auto e : NewView.range) {
-      NewView.elements.push_back(view_ctor(e));
+    for (auto e : range) {
+      elements.push_back(view_ctor(e));
     }
     
-    if (NewView.elements.size() > elements.size())
+    if (elements.size() > Old.elements.size())
     { 
       unsigned k = 0;
-      for (; k < elements.size(); ++k)
-        elements[k].seq_rebuild(NewView.elements[k], seq_updater, up, state);
-      for (; k < NewView.elements.size(); ++k) {
-        elements.emplace_back(NewView.elements[k]);
-        elements.back().seq_build( seq_updater.consume_fn(), 
-                                   up.builder(), state );
-      }
-      
+      for (; k < Old.elements.size(); ++k)
+        elements[k].seq_rebuild(Old.elements[k], seq_updater, up, state);
+      for (; k < elements.size(); ++k) 
+        elements[k].seq_build( seq_updater.consume_fn(), up.builder(), state );
       up.parent_widget().layout();
     }
   }

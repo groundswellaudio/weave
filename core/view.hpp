@@ -1,7 +1,7 @@
 #pragma once
 
 #include "widget.hpp"
-#include "../util/ignore.hpp"
+#include "../util/util.hpp"
 
 struct layout_tag {};
 
@@ -42,10 +42,6 @@ struct view : view_sequence_base {
   
   void seq_destroy(this T& self, auto GetForDestroy) {
     self.destroy( GetForDestroy() );
-  }
-  
-  void seq_destroy(this T& self, widget_ref ref) {
-    self.destroy(ref);
   }
 };
 

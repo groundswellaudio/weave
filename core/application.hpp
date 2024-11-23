@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <ranges>
+#include <optional>
 
 #include "backend.hpp"
 #include "view.hpp"
@@ -151,7 +152,9 @@ struct application
   graphics_context gctx;
   
   ViewCtor view_ctor;
-  View app_view;
+  
+  /// Some views are not assignable, so we emplace the main view instead
+  std::optional<View> app_view;
   
   widget_box root;
   
@@ -161,7 +164,7 @@ struct application
   : win{"spiral", 600, 400},
     view_ctor{ctor}, 
     app_view{view_ctor(s)}, 
-    root{app_view.build(widget_builder{}, s)}, 
+    root{app_view->build(widget_builder{}, s)}, 
     med{root.borrow()}
   {
     root.layout();
@@ -175,9 +178,10 @@ struct application
         med.on(e, &state);
       });
       
-      auto new_view = view_ctor(state);
+      auto old_view = *app_view;
+      app_view.emplace( view_ctor(state) );
       auto upd = widget_updater{root.borrow()};
-      app_view.rebuild(new_view, root.borrow(), upd, state);
+      app_view->rebuild(old_view, root.borrow(), upd, state);
       med.layout_changed();
       
       paint(state);

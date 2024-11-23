@@ -2,6 +2,8 @@
 
 #include "views_core.hpp"
 
+#include "../util/variant.hpp"
+
 template <class View>
 struct maybe : view_sequence_base {
   
@@ -17,17 +19,15 @@ struct maybe : view_sequence_base {
     view.seq_build(consumer, b, state);
   }
   
-  unsigned size() { return flag; }
-  
   template <class State>
-  void seq_rebuild(Self& New, auto seq_updater, widget_updater& up, State& s) 
+  void seq_rebuild(Self& Old, auto&& seq_updater, widget_updater& up, State& s) 
   {
-    if (flag == New.flag)
+    if (flag == Old.flag)
     {
-      if (flag)
-        view.seq_rebuild(New.view, seq_updater, up, s);
+      if (Old.flag)
+        view.seq_rebuild(Old.view, seq_updater, up, s);
     }
-    else if (!flag)
+    else if (!Old.flag)
     {
       auto nb = up.builder();
       view.seq_build(seq_updater.consume_fn(), nb, s);
@@ -35,10 +35,9 @@ struct maybe : view_sequence_base {
     }
     else
     {
-      view.seq_destroy(seq_updater.destroy_fn());
+      Old.view.seq_destroy(seq_updater.destroy_fn());
       up.parent_widget().layout();
     }
-    flag = New.flag;
   }
   
   bool flag; 
@@ -48,23 +47,70 @@ struct maybe : view_sequence_base {
 template <class V>
 maybe(bool, V) -> maybe<V>;
 
-/* 
+namespace impl {
+  
+  template <unsigned Idx>
+  struct Index {};
+  
+  consteval void with_index(function_builder& b, unsigned max, expr fn) {
+    for (int k = 0; k < max; ++k)
+      b << ^ [k, fn] { case k : return (%fn)(Index<k>{}); };
+  }
+  
+  template <unsigned Max>
+  constexpr auto with_index(unsigned index, auto fn) -> decltype(fn(Index<0>{})) {
+    switch(index) {
+      %with_index(Max, ^(fn));
+    }
+  }
+  
+  template <class... Ts, class... Vs>
+  variant<Ts...> make_variant(unsigned index, Vs&&... vs) {
+    return with_index<sizeof...(Ts)>(index, [&vs...] <unsigned I> (Index<I>) {
+      return variant<Ts...>{ in_place_index<I>, %(^(vs...)[I]) };
+    });
+  }
+}
+
 template <class... Ts>
 struct either {
   
-  template <class L, class S>
-  void construct(widget_tree_builder<L>& b, S& state)
+  //template <class... Vs>
+  either(unsigned index, Ts... vs) : body{impl::make_variant<Ts...>(index, (Ts&&)vs...)} 
   {
-    switch(flag)
-    {
-      
-    }
-    
-    if (!flag) 
-      return;
-    view.construct(b, state);
   }
   
-  unsigned flag;
-  tuple<Ts...> children;
-}; */ 
+  void seq_build(auto consumer, auto&& b, auto& state) {
+    visit( [&] (auto& elem) {
+      elem.seq_build(consumer, b, state);
+    }, body);
+  }
+  
+  void seq_rebuild(auto& Old, auto&& updater, auto& up, auto& state) {
+    if (Old.body.index() == body.index()) {
+      visit_with_index( [&] (auto& elem, auto index) {
+        elem.seq_rebuild(get<index.value>(Old.body), updater, up, state);
+      }, body);
+    }
+    else {
+      visit( [&] (auto& elem) {
+        elem.seq_destroy(updater.destroy_fn());
+      }, Old.body);
+      visit( [&] (auto& elem) {
+        elem.seq_build(updater.consume_fn(), up.builder(), state);
+      }, body);
+      up.parent_widget().layout();
+    }
+  }
+  
+  void seq_destroy(auto Destroy) {
+    visit( [&] (auto& elem) {
+      elem.seq_destroy(Destroy);
+    }, body);
+  }
+  
+  variant<Ts...> body;
+};
+
+template <class... Ts>
+either(int index, Ts... ts) -> either<Ts...>;

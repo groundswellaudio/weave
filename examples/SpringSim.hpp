@@ -7,7 +7,7 @@ struct SpringSim : app_state {
   };
   
   struct Relation {
-    float force;
+    float force, damp;
     int ia, ib;
   };
   
@@ -15,6 +15,10 @@ struct SpringSim : app_state {
     return particles[index];
   }
   
+  auto& get_relation(int index) {
+    return rels[index];
+  }
+    
   void add_particle() {
     auto _ = write_scope();
     particles.push_back({0, 0, 1.f});
@@ -22,7 +26,7 @@ struct SpringSim : app_state {
   
   void on_connection(int ia, int ib) {
     auto _ = write_scope();
-    rels.push_back(Relation{1.f, ia, ib});
+    rels.push_back(Relation{1.f, 0.f, ia, ib});
   }
   
   void render_audio(audio_output_stream os)
@@ -63,7 +67,6 @@ struct Editor : widget_base {
     
     void on(mouse_event e, event_context<Particle>& ec) 
     {
-      std::cout << "on particle event" << std::endl;
     }
      
     void paint(painter& p) {
@@ -79,17 +82,11 @@ struct Editor : widget_base {
   };
   
   void on_child_event(mouse_event e, event_context<Editor>& ctx, widget_ref child) {
-    std::cout << "on child event" << std::endl;
     if (e.is_mouse_down()) {
-      std::cout << "selected" << std::endl;
       ctx.read().selection.index = &child.as<Particle>() - particles.data();
-      //connecting = &child.as<Particle>();
-      // connecting->selected = true;
     }
     else if (e.is_mouse_drag()) {
       mouse_pos = e.position;
-      //if (connecting)
-      //connecting->set_position(connecting->position() + e.position);
     }
     else if (e.is_mouse_up()) {
       auto w = find_child_at(e.position);
@@ -125,7 +122,17 @@ struct Editor : widget_base {
       ec.read().add_particle();
     }
     else {
-      ec.read().selection.index = -1;
+      int idx = 0;
+      traverse_connections( [&ec, &idx, &e] (vec2f a, vec2f b) {
+        if (distance((a + b) / 2, e.position) < 5) {
+          auto& s = ec.read().selection;
+          s.index = idx;
+          s.kind = 1;
+          return false;
+        }
+        ++idx;
+        return true;
+      });
     }
   }
   
@@ -140,8 +147,26 @@ struct Editor : widget_base {
     if (connecting) {
       p.line(center(*connecting), mouse_pos, 4);
     }
-    for (auto [a, b] : connections)
-      p.line(center(particles[a]), center(particles[b]), 4);
+    
+    p.fill_style(colors::green);
+    
+    traverse_connections( [&p] (vec2f a, vec2f b) {
+      p.circle((a + b) / 2, 5);
+      p.line(a, b, 4);
+      return true;
+    });
+  }
+  
+  private : 
+  
+  void traverse_connections(auto fn) {
+    auto center = [] (auto& w) { return w.position() + w.size() / 2; };
+    for (auto [a, b] : connections) {
+      auto CenterA = center(particles[a]);
+      auto CenterB = center(particles[b]);
+      if (!fn(CenterA, CenterB))
+        return;
+    }
   }
   
   std::vector<Particle> particles;
@@ -174,50 +199,28 @@ static constexpr auto EditorLens = [] (auto& s) -> auto& { return s; };
 
 using EditorView = simple_view_for<Editor, decltype(EditorLens)>;
 
-struct MainViewT {
-  
-  /* auto build(const auto& builder, auto& state) {
-    //selection.reset( new Editor::Selection{} );
-  } */ 
-  
-  auto body(SpringSimApp& state) {
-    auto e = EditorView { EditorLens };
-    static_assert( is_child_event_listener<decltype(e.build(widget_builder{}, state))> );
-    
-    return hstack { 
-      EditorView {
-        EditorLens
-      }, 
-      maybe {
-        state.selection.index != -1,
-        slider{ [i = state.selection.index] (auto& s) -> auto& { return s.get_particle(i).mass; } }
-      }
-      /* 
-      vstack {
-        either {
-          selection.is_mass(), 
-          slider{ [this] (auto& s) -> auto& { return (s.get_particle(selection).mass); }}, 
-          slider{ [this] (auto& s) -> auto& { return (s.get_relation(selection).force); }}
-        }
-      } */ 
-    };
-  }
-  
-};
-
 //using MainView = view_with_body<MainViewT>;
 
 auto make_spring_sim(SpringSimApp& state)
-{
+{ 
+  auto selec_index = state.selection.index;
+  auto RightPanel = maybe {
+    selec_index != -1, 
+    either {
+      (unsigned) state.selection.kind,
+      slider{ [selec_index] (auto& s) -> auto& { return s.get_particle(selec_index).mass; } }
+      .with_range(0.01, 100),
+      slider{ [selec_index] (auto& s) -> auto& { return s.get_relation(selec_index).force; } }
+      .with_range(1, 100)
+    }
+  };
+  
   return hstack {
     EditorView {
       EditorLens
     },     
     //slider { MLens(x0.particles.back().mass) }
-    maybe {
-      state.selection.index != -1,
-      slider{ [i = state.selection.index] (auto& s) -> auto& { return s.get_particle(i).mass; } }
-    }
+    RightPanel
   };
 }
 

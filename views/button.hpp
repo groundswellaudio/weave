@@ -63,10 +63,7 @@ struct toggle_button : view<toggle_button<Lens>> {
     return with_lens<S>(toggle_button_widget{properties}, lens);
   }
   
-  void rebuild(toggle_button<Lens>& New, widget_ref w, ignore, ignore) {
-    if (New.properties == this->properties)
-      return;
-    *this = New;
+  void rebuild(toggle_button<Lens>& Old, widget_ref w, ignore, ignore) {
   }
   
   Lens lens;

@@ -3,6 +3,7 @@
 
 #include "gen-operators.hpp"
 #include <algorithm>
+#include <cmath>
 
 using namespace std::meta;
 
@@ -128,6 +129,13 @@ constexpr vec<T, 2> max(vec<T, 2> a, vec<T, 2> b) {
 template <class T>
 constexpr vec<T, 2> min(vec<T, 2> a, vec<T, 2> b) {
   return { std::min(a.x, b.x), std::min(a.y, b.y) };
+}
+
+template <class T>
+constexpr T distance(vec<T, 2> a, vec<T, 2> b) {
+  auto x = b.x - a.x;
+  auto y = b.y - a.y;
+  return std::sqrt( x * x + y * y );
 }
 
 namespace gl_types

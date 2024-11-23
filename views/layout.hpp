@@ -2,7 +2,7 @@
 
 #include "views_core.hpp"
 #include "../util/tuple.hpp"
-#include "../util/ignore.hpp"
+#include "../util/util.hpp"
 #include <span>
 #include <algorithm>
 
@@ -40,6 +40,7 @@ struct stack_updater : view_sequence_updater<stack_updater> {
   std::vector<widget_box>& vec;
   std::vector<int> to_erase;
   int& index;
+  [[no_unique_address]] non_copyable _;
   
   void consume(auto&& W) { 
     vec.insert( 
@@ -82,7 +83,7 @@ struct stack_base : view<stack_base<T, Ts...>>, stack<Ts...> {
   }
   
   template <class S>
-  void rebuild(auto& New, widget_ref wb, const widget_updater& up, S& state) 
+  void rebuild(auto& Old, widget_ref wb, const widget_updater& up, S& state) 
   {
     auto& w = wb.as<T>();
     int index = 0;
@@ -96,10 +97,10 @@ struct stack_base : view<stack_base<T, Ts...>>, stack<Ts...> {
       {}, 
       index
     };
-      
+    
     tuple_for_each_with_index( this->children, [&] (auto& elem, auto elem_index) -> void 
     { 
-      elem.seq_rebuild(get<elem_index.value>(New.children), seq_updater, next_up, state);
+      elem.seq_rebuild(get<elem_index.value>(Old.children), seq_updater, next_up, state);
     });
     
     for (auto i : seq_updater.to_erase)
