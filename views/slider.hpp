@@ -15,7 +15,6 @@ struct slider_properties {
 struct slider_x_widget : widget_base
 {
   slider_properties prop;
-  float ratio = 0;
   std::string value_str;
   
   using value_type = float;
@@ -32,7 +31,7 @@ struct slider_x_widget : widget_base
       return;
     
     auto sz = size();
-    ratio = std::min(e.position.x / sz.x, 1.f);
+    float ratio = std::min(e.position.x / sz.x, 1.f);
     ratio = std::max(0.f, ratio);
     
     auto new_val = prop.min + ratio * (prop.max - prop.min); 
@@ -47,7 +46,7 @@ struct slider_x_widget : widget_base
     p.fill_style(prop.background_color);
     p.fill_rounded_rect({0, 0}, sz, 6);
     p.fill_style(prop.active_color);
-    auto e = ratio;
+    auto e = (pc - prop.min) / (prop.max - prop.min);
     p.rectangle({0, 0}, {e * sz.x, sz.y});
     
     static constexpr auto outline_col = rgba_f{colors::white}.with_alpha(0.5);
@@ -68,15 +67,26 @@ struct slider : view<slider<Lens>> {
   
   template <class S>
   auto build(const widget_builder& b, S& state) {
-    return with_lens<S>(slider_x_widget{{size}, properties}, lens);
+    val = lens(state);
+    auto res = slider_x_widget{{size}, properties};
+    res.on_value_change(val);
+    return with_lens<S>(std::move(res), lens);
   }
   
   template <class S>
-  rebuild_result rebuild(slider<Lens> New, widget_ref wb, widget_updater up, S& state) {
+  rebuild_result rebuild(slider<Lens>& Old, widget_ref wb, widget_updater up, S& state) {
     auto& w = wb.as<slider_x_widget>();
-    if (w.prop != New.properties)
-      w.prop = New.properties; 
-    properties = New.properties;
+    val = lens(state);
+    if (properties != Old.properties) {
+      w.prop = properties;
+    }
+    if (val != Old.val) {
+      w.on_value_change(val);
+    }
+    if (size != Old.size) {
+      w.set_size(size);
+      return rebuild_result{true};
+    }
     return {};
   }
   
@@ -90,6 +100,7 @@ struct slider : view<slider<Lens>> {
   
   slider_properties properties;
   Lens lens;
+  float val;
   vec2f size = {80, 15};
 };
 

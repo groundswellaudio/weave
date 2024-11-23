@@ -326,7 +326,6 @@ auto make_spring_sim(SpringSimApp& state)
     WithLabel(RelDamp, "damp")
   };
   
-  
   auto RightPanel = vstack { 
     either {
       (unsigned) state.selection.kind(),
