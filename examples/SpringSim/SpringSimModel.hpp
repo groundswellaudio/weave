@@ -1,11 +1,23 @@
 #include "spiral.hpp"
 
 #include <algorithm>
+#include <mutex>
+#include <shared_mutex>
+#include <iostream>
 
-struct SpringSim : app_state {
+struct SpringSim : app_state, audio_renderer<SpringSim> {
+  
+  auto read_scope() {
+    return std::shared_lock{mut};
+  }
+  
+  auto write_scope() {
+    return std::unique_lock{mut};
+  }
   
   struct Particle {
-    float force = 0.f, speed = 0.f, pos = 0.f, mass = 1.f;
+    static constexpr auto anchor_mass = 10000000000;
+    float force = 0.f, vel = 0.f, pos = 0.f, mass = 1.f;
   };
   
   struct Relation {
@@ -21,9 +33,18 @@ struct SpringSim : app_state {
     return rels[index];
   }
     
-  void add_particle() {
+  void add_particle(bool is_anchor) {
     auto _ = write_scope();
-    particles.push_back({0, 0, 1.f});
+    particles.push_back({0, 0, 0.f, is_anchor ? Particle::anchor_mass : 1.f});
+  }
+  
+  void add_anchor() {
+    auto _ = write_scope();
+    particles.push_back({0, 0, 0, Particle::anchor_mass});
+  }
+  
+  bool is_anchor(int particle_index) {
+    return get_particle(particle_index).mass == Particle::anchor_mass;
   }
   
   void on_connection(int ia, int ib) {
@@ -34,6 +55,7 @@ struct SpringSim : app_state {
   template <class Range>
   auto remove_particles(Range&& range) 
   {
+    auto _ = write_scope();
     std::vector<int> new_indices;
     new_indices.resize(particles.size(), 0);
     for (auto r : range)
@@ -58,20 +80,57 @@ struct SpringSim : app_state {
     return new_indices;
   }
   
+  void trigger_particle(int index) {
+    auto _ = write_scope();
+    get_particle(index).pos = 1;
+  }
+  
   void render_audio(audio_output_stream os)
   {
     auto _ = read_scope();
     
+    float timestep = 1.f / 44100.f;
+    
+    float phase = 0;
+    
+    constexpr float non_lin_coef = 100;
+    
     for (auto s : os) 
     {
+      for (auto& p : particles)
+        p.force = 0;
+      
       for (auto r : rels) {
-        auto delta = particles[r.ia].pos - particles[r.ib].pos;
-        particles[r.ia].force -= delta * r.force;
-        particles[r.ib].force += delta * r.force;
+        auto& p0 = particles[r.ia];
+        auto& p1 = particles[r.ib];
+        auto lin_delta = p0.pos - p1.pos;
+        auto delta = lin_delta * std::sqrt( std::abs((non_lin_coef + lin_delta) / non_lin_coef) );
+        auto vdelta = p0.vel - p1.vel;
+        p0.force -= delta * r.force + vdelta * r.damp;
+        p1.force += delta * r.force + vdelta * r.damp;
       }
+      
+      for (auto& p : particles) {
+        p.vel += (p.force * timestep) / p.mass;
+        p.pos += p.vel * timestep;
+        std::cout << p.force << std::endl;
+      }
+      
+      float sum = 0;
+      for (auto p : particles) {
+        sum += p.pos;
+        std::cout << p.pos;
+      }
+      
+      // float sum = std::sin(phase);
+      // phase += 2 * 3.14 * 440 * 1.f / 44100.f;
+      s[0] = sum;
+      s[1] = sum;
     }
   }
   
+  std::shared_mutex mut;
   std::vector<Particle> particles;
   std::vector<Relation> rels;
+  std::vector<int> pick_ups;
 };

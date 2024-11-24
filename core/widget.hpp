@@ -61,6 +61,21 @@ struct widget_base {
   vec2f sz, pos = {0, 0};
 };
 
+namespace impl {
+  template <class L, class T>
+  constexpr auto dyn_lens_write_ptr() {
+    if constexpr ( !is_reference(^T)
+      && requires (L obj, typename L::input state, T val) { obj.write(state, val); } ) 
+    {
+      return + [] (void* data, void* state, T val) {
+        static_cast<L*>(data)->write(*static_cast<typename L::input*>(state), val);
+      };
+    }
+    else
+      return nullptr;
+  }
+}
+
 template <class T>
 class dyn_lens {
   
@@ -79,9 +94,7 @@ class dyn_lens {
     +[] (void* data, void* state) -> T {
       return static_cast<L*>(data)->read(*static_cast<typename L::input*>(state));
     },
-    + [] (void* data, void* state, T val) {
-      static_cast<L*>(data)->write(*static_cast<typename L::input*>(state), val);
-    },
+    impl::dyn_lens_write_ptr<L, T>(),
     + [] (void* data) {
       delete static_cast<L*>(data);
     }
@@ -109,7 +122,12 @@ class dyn_lens {
   }
   
   T read(void* state) const { return vptr->read(data, state); }
-  void write(void* state, T val) const { vptr->write(data, state, val); }
+  
+  void write(void* state, T val) const 
+  requires (!is_reference(^T)) 
+  { 
+    vptr->write(data, state, val); 
+  }
   
   ~dyn_lens() {
     if (data)
@@ -377,7 +395,9 @@ using event_context_data = event_context_t<void>;
 template <class T>
 struct event_context_t : event_context_base 
 {
-  void write(T v) {
+  void write(T v) 
+    requires (!is_reference(^T))
+  {
     lens.write(state_ptr, v);
   }
 
@@ -510,7 +530,8 @@ struct invocable_lens {
     return (fn(s));
   }
   
-  void write(State& s, auto&& val) {
+  void write(State& s, auto&& val) 
+  {
     auto _ = s.write_scope();
     fn(s) = (decltype(val)&&)val;
   }

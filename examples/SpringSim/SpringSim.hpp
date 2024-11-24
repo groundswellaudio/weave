@@ -47,6 +47,11 @@ struct SpringSimApp : SpringSim {
       return *rel_set.begin();
     }
     
+    void add_rel(int idx) {
+      rel_set.emplace(idx);
+      k = k == Mass ? Mixed : Rel;
+    }
+    
     Kind kind() {
       return k;
     }
@@ -67,6 +72,10 @@ struct SpringSimApp : SpringSim {
   
   auto& selected_particle_set() const {
     return selection.set;
+  }
+  
+  bool is_rel_selected(int idx) const {
+    return selection.rel_set.find(idx) != selection.rel_set.end();
   }
   
   auto delete_selection() {
@@ -90,7 +99,7 @@ struct Editor : widget_base {
     }
      
     void paint(painter& p) {
-      p.fill_style(colors::red);
+      p.fill_style(anchor ? colors::green : colors::red);
       p.circle(size() / 2, size().x / 2);
       if (selected) {
         p.stroke_style(colors::white);
@@ -99,13 +108,22 @@ struct Editor : widget_base {
     }
     
     bool selected = false;
+    bool anchor = false;
   };
+  
+  void trigger_particle(event_context<Editor>& ctx, int index) {
+    ctx.read().trigger_particle(index);
+  }
   
   void on_child_event(mouse_event e, event_context<Editor>& ctx, widget_ref child) {
     if (e.is_mouse_down()) {
-      clear_selection(ctx);
       auto& p = child.as<Particle>();
       auto index = &p - particles.data();
+      if (e.is_double_click()) {
+        trigger_particle(ctx, index);
+        return;
+      }
+      clear_selection(ctx);
       p.selected = true;
       ctx.read().selection.set_particle(index);
       connecting = tuple{e.position, e.position};
@@ -144,6 +162,7 @@ struct Editor : widget_base {
   
   void update_selection_rect(vec2f pos, event_context<Editor>& ec) 
   {
+    // Note : this is wasteful
     clear_selection(ec);
     int index = 0;
     selection_rect->b = pos;
@@ -157,6 +176,12 @@ struct Editor : widget_base {
         p.selected = false;
       ++index;
     }
+    
+    traverse_connections( [idx = 0, &ec, this] (vec2f a, vec2f b) mutable {
+      if (selection_rect->contains((a + b) / 2))
+        ec.read().selection.add_rel(idx++);
+      return true;
+    });
   }
   
   void clear_selection(event_context<Editor>& ec) {
@@ -164,6 +189,12 @@ struct Editor : widget_base {
     for (auto idx : s.selected_particle_set())
       particles[idx].selected = false;
     s.selection.clear();  
+  }
+  
+  void add_particle(vec2f pos, event_context<Editor>& ec) {
+    bool is_anchor = ec.read().particle_kind;
+    particles.push_back( Particle{{{20, 20}, pos}, false, is_anchor} );
+    ec.read().add_particle(is_anchor);
   }
   
   void on(mouse_event e, event_context<Editor>& ec) 
@@ -185,8 +216,7 @@ struct Editor : widget_base {
       return;
     
     if (e.is_double_click()) {
-      particles.push_back( Particle{{{20, 20}, e.position}} );
-      ec.read().add_particle();
+      add_particle(e.position, ec);
       return;
     }
     
@@ -226,9 +256,15 @@ struct Editor : widget_base {
     
     p.fill_style(colors::green);
     
-    traverse_connections( [&p] (vec2f a, vec2f b) {
+    traverse_connections( [&p, &app, idx = 0] (vec2f a, vec2f b) mutable {
       p.circle((a + b) / 2, 5);
       p.line(a, b, 4);
+      if (app.is_rel_selected(idx))
+      {
+        p.stroke_style(colors::white);
+        p.stroke_circle((a + b) / 2, 5, 1);
+        p.stroke_style(colors::green);
+      }
       return true;
     });
     
@@ -303,12 +339,12 @@ auto make_spring_sim(SpringSimApp& state)
   auto MassMod = 
     WithLabel( 
       slider{ [] (auto& s) -> auto& { return s.get_particle(s.selection.selected_particle()).mass; } }
-      .with_range(0.01, 100),
+      .with_range(1, 1000),
       "Mass" );
   
   auto RelForce = 
     slider{ [] (auto& s) -> auto& { return s.selected_relation().force; } }
-    .with_range(1, 100);
+    .with_range(1, 400000);
   
   auto RelDamp = 
     slider { [] (auto& s) -> auto& { return s.selected_relation().damp; } }
@@ -347,5 +383,6 @@ auto make_spring_sim(SpringSimApp& state)
 inline void run_spring_sim() {
   SpringSimApp state;
   auto app = make_app(state, &make_spring_sim);
+  state.start_audio_render();
   app.run(state);
 }
