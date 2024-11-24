@@ -5,14 +5,19 @@
 #include <cassert>
 
 #include "events/mouse_events.hpp"
+#include "events/keyboard.hpp"
+
 #include "lens.hpp"
 #include "../util/tuple.hpp"
 #include "../util/optional.hpp"
 #include "../util/meta.hpp"
+#include "../util/variant.hpp"
 
 struct painter;
 struct widget_builder;
 struct widget_updater;
+
+using input_event = variant<mouse_event, keyboard_event>;
 
 consteval std::meta::expr to_str(std::meta::type t) {
   std::meta::ostream os;
@@ -52,11 +57,6 @@ struct widget_base {
   }
   
   std::optional<widget_ref> find_child_at(this auto& self, vec2f pos);
-  
-  /* 
-  void paint(this auto& self, painter& p, void* any_state) {
-    self.paint(p);
-  } */ 
   
   vec2f sz, pos = {0, 0};
 };
@@ -138,9 +138,14 @@ template <class W>
 using event_context = event_context_t<typename W::value_type>;
 
 template <class T>
-concept is_child_event_listener = requires (T obj, input_event e, widget_ref r, event_context<T> ec)
+concept is_child_event_listener = requires (T obj, mouse_event e, widget_ref r, event_context<T> ec)
 {
   obj.on_child_event(e, ec, r);
+};
+
+template <class T>
+concept keyboard_event_listener = requires (T obj, keyboard_event e, event_context<T> ec) {
+  obj.on(e, ec);
 };
 
 struct any_invocable { bool operator()(auto&& elem) { return false; } };
@@ -185,14 +190,14 @@ class widget_ref {
   
   widget_ref(widget_base* data, const vtable* vptr) : data{data}, vptr{vptr} {} 
   
-  public : 
+  public :
   
   widget_ref() : data{nullptr} {}
   
   template <class W>
     requires (is_base_of(^widget_base, ^W))
   widget_ref(W* widget) {
-    data = widget;
+    data = widget;               
     vptr = &impl::widget_vtable_impl<std::remove_const_t<W>>::value;
   }
   
@@ -220,6 +225,12 @@ class widget_ref {
   
   template <class T>
   const T& as() const { return *static_cast<T*>(data); }
+  
+  template <class T>
+    requires (is_base_of(^widget_base, ^T))
+  bool is() const {
+    return vptr == &impl::widget_vtable_impl<std::remove_const_t<T>>::value;
+  }
   
   void paint(painter& p, void* state) const {
     vptr->paint(data, p, state);
@@ -334,12 +345,29 @@ struct event_context_t;
 
 struct application_context; 
 
+struct event_context_base {
+  
+  template <class W, class P>
+  void open_modal_menu(this auto& self, W&& widget, P* parent);
+  
+  void close_modal_menu();
+  
+  void grab_keyboard_focus(this auto& self, widget_ref r);
+  
+  void release_keyboard_focus();
+  
+  widget_ref current_mouse_focus();
+  
+  void reset_mouse_focus();
+  
+  application_context& ctx;
+};
+
 template <> 
-struct event_context_t<void> {
+struct event_context_t<void> : event_context_base {
   
   widget_ref parent() const { return parents.back(); }
   
-  application_context& ctx;
   event_context_parent_stack parents;
   void* state_ptr;
 };
@@ -347,24 +375,30 @@ struct event_context_t<void> {
 using event_context_data = event_context_t<void>;
 
 template <class T>
-struct event_context_t 
+struct event_context_t : event_context_base 
 {
-  template <class W, class P>
-  void open_modal_menu(W&& widget, P* parent);
-  
-  void close_modal_menu();
-  
   void write(T v) {
-    lens.write(ctx.state_ptr, v);
+    lens.write(state_ptr, v);
   }
 
   T read() const {
-    return lens.read(ctx.state_ptr);
+    return lens.read(state_ptr);
   }
   
-  event_context_t<void>& ctx;
+  const event_context_parent_stack& parents;
+  void* state_ptr;
   const dyn_lens<T>& lens;
 };
+
+template <class T>
+event_context_t<T> apply_lens(const event_context_data& ec, const dyn_lens<T>& lens) {
+  return {
+    {ec.ctx}, 
+    ec.parents,
+    ec.state_ptr,
+    lens
+  };
+}
 
 void widget_ref::on(input_event e, event_context_data ec) {
   vptr->on(data, e, ec);
@@ -375,13 +409,20 @@ void widget_ref::on_child_event(input_event e, event_context_data ec, widget_ref
     vptr->on_child_event(data, e, ec, child);
 }
 
+template <class W>
+struct with_lens_t;
+
 namespace impl {
   
   template <class W>
   consteval auto child_event_fn_ptr() {
     if constexpr ( is_child_event_listener<W> )
       return + [] (widget_base* self, input_event e, event_context_data data, widget_ref child) {
-        static_cast<W*>(self)->on_child_event(e, data, child);
+        auto& Obj = *static_cast<W*>(self);
+        if (e.index() == 0)
+          Obj.on_child_event(get<0>(e), data, child);
+        else if constexpr ( requires { Obj.on_child_event(get<1>(e), data, child); } )
+          Obj.on_child_event(get<1>(e), data, child);
       };
     else
       return nullptr;
@@ -409,7 +450,15 @@ namespace impl {
           return obj.size();
       },
       +[] (widget_base* self, input_event e, event_context_data ctx) {
-        return static_cast<W*>(self)->on(e, ctx);
+        auto& Obj = *static_cast<W*>(self);
+        if (e.index() == 0) {
+          return Obj.on(get<0>(e), ctx);
+        }
+        else {
+          // reacting to keyboard event is optional
+          if constexpr ( requires { Obj.on(get<1>(e), ctx); } )
+            return Obj.on(get<1>(e), ctx);
+        }
       },
       child_event_fn_ptr<W>(),
       +[] (widget_base* self, vec2f pos) -> optional<widget_ref> {
@@ -439,6 +488,15 @@ namespace impl {
         delete static_cast<W*>(self);
       }
     };
+  };
+  
+  // Important : the vtable of a widget that must have a lens is the vtable 
+  // of with_lens(T)
+  template <class W>
+    requires (^typename W::value_type != ^void)
+  struct widget_vtable_impl<W> 
+    : widget_vtable_impl<with_lens_t<W>> 
+  {
   };
   
 }
@@ -472,16 +530,26 @@ struct with_lens_t : W {
   
   using value_type = void;
   
-  void on(input_event e, event_context_data ctx) {
-    event_context<W> ev_ctx {ctx, lens};
+  void on(mouse_event e, event_context_data ctx) {
+    event_context<W> ev_ctx = apply_lens(ctx, lens);
     W::on(e, ev_ctx);
   }
   
-  void on_child_event(input_event e, event_context_data ctx, widget_ref child) {
-    if constexpr ( is_child_event_listener<W> ) {
-      event_context<W> ev_ctx{ctx, lens};
-      W::on_child_event(e, ev_ctx, child);
-    }
+  void on(keyboard_event e, event_context_data ctx) 
+    requires keyboard_event_listener<W>
+  {
+    event_context<W> ev_ctx = apply_lens(ctx, lens);
+    W::on(e, ev_ctx);
+  }
+  
+  void on_child_event(input_event e, event_context_data ctx, widget_ref child) 
+    requires ( is_child_event_listener<W> )
+  {
+    event_context<W> ev_ctx = apply_lens(ctx, lens);
+    if (e.index() == 0)
+      W::on_child_event(get<0>(e), ev_ctx, child);
+    else if constexpr ( requires {W::on_child_event(get<1>(e), ev_ctx, child);} )
+      W::on_child_event(get<1>(e), ev_ctx, child);
   }
   
   void paint(painter& p, void* state) {

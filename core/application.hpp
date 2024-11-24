@@ -70,12 +70,6 @@ namespace impl {
       }
     };
     
-    void debug_parent_stack() const {
-      for (auto p : parents)
-        p.debug_dump();
-      std::cerr << std::endl;
-    }
-    
     void set_focused(widget_ref w, vec2f absolute_pos) {
       if (w == focused)
         return;
@@ -91,13 +85,18 @@ namespace impl {
         if (p.is_child_event_listener())
           top_parent_listener = p;
     }
-  
+    
     public : 
     
     mouse_event_dispatcher(widget_ref root) {
       set_focused(root, {0, 0});
     }
-  
+    
+    void reset_focus(widget_ref root) {
+      parents.clear();
+      set_focused(root, {0, 0});
+    }
+    
     void on(mouse_event e, void* state, application_context& ctx)
     {
       auto ecd = event_context_data{ctx, parents, state};
@@ -158,6 +157,8 @@ namespace impl {
       focused_absolute_pos = new_pos;
     }
     
+    widget_ref current_focus() const { return focused; }
+    
     private : 
     
     widget_ref focused;
@@ -166,7 +167,32 @@ namespace impl {
     optional<widget_ref> top_parent_listener = {};
     bool is_modal = false;
   };
-
+  
+  struct keyboard_event_dispatcher {
+    
+    void set_focused(widget_ref r, const event_context_parent_stack& stack) {
+      if (focused == r)
+        return;
+      focused = r;
+      parents = stack;
+    }
+    
+    void reset_focus() {
+      focused.reset();
+      parents.clear();
+    }
+    
+    void on(keyboard_event e, void* state, application_context& ctx) {
+      if (focused) {
+        auto ecd = event_context_data{ctx, parents, state};
+        focused->on(e, ecd);
+      }
+    }
+    
+    optional<widget_ref> focused;
+    event_context_parent_stack parents;
+  };
+  
 } // impl
 
 struct application_context {
@@ -194,23 +220,53 @@ struct application_context {
     modal_menu.reset();
   }
   
+  void grab_keyboard_focus(widget_ref r, const event_context_parent_stack& stack) {
+    keyboard.set_focused(r, stack);
+  }
+  
+  void release_keyboard_focus() {
+    keyboard.reset_focus();
+  }
+  
+  widget_ref current_mouse_focus() {
+    return med.current_focus();
+  }
+  
+  void reset_mouse_focus() {
+    med.reset_focus(root.borrow());
+  }
+  
   sdl_backend backend;
   window win;
   graphics_context gctx;
   widget_box root, modal_menu;
   impl::mouse_event_dispatcher med;
+  impl::keyboard_event_dispatcher keyboard;
 };
 
-template <class T>
 template <class W, class P>
-void event_context_t<T>::open_modal_menu(W&& widget, P* parent) {
-  auto ParentWithLens = static_cast<with_lens_t<P>*>(parent);
-  ctx.ctx.open_modal_menu(with_lens_t(widget, lens.clone()), ParentWithLens, this->ctx.parents);
+void event_context_base::open_modal_menu(this auto& self, W&& widget, P* parent) {
+  self.ctx.open_modal_menu((W&&)widget, parent, self.parents);
 }
 
-template <class T>
-void event_context_t<T>::close_modal_menu() {
-  ctx.ctx.close_modal_menu();
+void event_context_base::close_modal_menu() {
+  ctx.close_modal_menu();
+}
+
+void event_context_base::grab_keyboard_focus(this auto& self, widget_ref focused) {
+  self.ctx.grab_keyboard_focus(focused, self.parents);
+}
+
+void event_context_base::release_keyboard_focus() {
+  ctx.release_keyboard_focus();
+}
+
+widget_ref event_context_base::current_mouse_focus() {
+  return ctx.current_mouse_focus();
+}
+  
+void event_context_base::reset_mouse_focus() {
+  ctx.reset_mouse_focus();
 }
   
 template <class ViewCtor, class View, class State>
@@ -233,7 +289,10 @@ struct application
     while(!impl.backend.want_quit)
     {
       impl.backend.visit_event( [this, &state] (auto&& e) {
-        impl.med.on(e, &state, impl);
+        if constexpr ( remove_reference(type_of(^e)) == ^keyboard_event )
+          impl.keyboard.on(e, &state, impl);
+        else
+          impl.med.on(e, &state, impl);
       });
       
       auto old_view = *app_view;

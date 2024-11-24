@@ -69,6 +69,10 @@ struct SpringSimApp : SpringSim {
     return selection.set;
   }
   
+  auto delete_selection() {
+    return remove_particles(selection.set);
+  }
+  
   Selection selection;
   int particle_kind = 0;
 };
@@ -111,8 +115,10 @@ struct Editor : widget_base {
     }
     else if (e.is_mouse_up()) {
       auto w = find_child_at(e.position);
-      if (!w)
+      if (!w) {
+        connecting.reset();
         return;
+      }
       auto found = &w->as<Particle>() - particles.data();
       auto selected_idx = ctx.read().selection.selected_particle();
       if (found != selected_idx)
@@ -162,6 +168,9 @@ struct Editor : widget_base {
   
   void on(mouse_event e, event_context<Editor>& ec) 
   {
+    if (e.is_mouse_enter())
+      ec.grab_keyboard_focus(this);
+    
     if (e.is_mouse_drag() && selection_rect) {
       update_selection_rect(e.position, ec);
       return;
@@ -199,6 +208,12 @@ struct Editor : widget_base {
     }
   }
   
+  void on(keyboard_event e, event_context<Editor>& Ec) {
+    if (e.is_key_down() && e.key == keycode::backspace) {
+      delete_selection(Ec);
+    }
+  }
+  
   void paint(painter& p, SpringSimApp& app) 
   {
     p.fill_style(colors::blue);
@@ -219,11 +234,30 @@ struct Editor : widget_base {
     
     if (selection_rect) {
       p.stroke_style(colors::white);
-      p.stroke_rect(selection_rect->a, selection_rect->b - selection_rect->a);
+      p.stroke_rect(selection_rect->a, selection_rect->b - selection_rect->a, 1);
     }
   }
   
   private : 
+  
+  void delete_selection(event_context<Editor>& Ec) {
+    auto& S = Ec.read();
+    // It's up to the user to signal that a widget will be destroyed and must lose 
+    // mouse/keyboard focus
+    if (Ec.current_mouse_focus().is<Particle>())
+      Ec.reset_mouse_focus();
+    auto IndicesMap = S.delete_selection();
+    auto new_end = std::remove_if(particles.begin(), particles.end(), 
+      [q = 0, &IndicesMap] (auto&) mutable { return IndicesMap[q++] == -1; });
+    particles.erase(new_end, particles.end());
+    auto NewRelEnd = std::remove_if(connections.begin(), connections.end(), 
+      [&IndicesMap] (auto& r) {
+        r.m0 = IndicesMap[r.m0];
+        r.m1 = IndicesMap[r.m1];
+        return r.m0 == -1 || r.m1 == -1;
+      });
+    connections.erase( NewRelEnd, connections.end() );
+  }
   
   bool traverse_connections(auto fn) {
     auto center = [] (auto& w) { return w.position() + w.size() / 2; };
@@ -259,17 +293,6 @@ using EditorView = simple_view_for<Editor, decltype(EditorLens)>;
 
 auto make_spring_sim(SpringSimApp& state)
 { 
-  auto MassMod = 
-    slider{ [] (auto& s) -> auto& { return s.get_particle(s.selection.selected_particle()).mass; } }
-    .with_range(0.01, 100);
-  
-  auto RelForce =
-    slider{ [] (auto& s) -> auto& { return s.selected_relation().force; } }
-    .with_range(1, 100);
-  auto RelDamp = 
-    slider { [] (auto& s) -> auto& { return s.selected_relation().damp; } }
-    .with_range(0, 1);
-  
   auto WithLabel = [] (auto View, std::string_view str) {
     return hstack {
       text{str}, 
@@ -277,14 +300,28 @@ auto make_spring_sim(SpringSimApp& state)
     }.with_align(0.5);
   };
   
+  auto MassMod = 
+    WithLabel( 
+      slider{ [] (auto& s) -> auto& { return s.get_particle(s.selection.selected_particle()).mass; } }
+      .with_range(0.01, 100),
+      "Mass" );
+  
+  auto RelForce = 
+    slider{ [] (auto& s) -> auto& { return s.selected_relation().force; } }
+    .with_range(1, 100);
+  
+  auto RelDamp = 
+    slider { [] (auto& s) -> auto& { return s.selected_relation().damp; } }
+    .with_range(0, 1);
+  
   auto RelMod = vstack {
     WithLabel(RelForce, "force"),
     WithLabel(RelDamp, "damp")
   };
-  
+
   auto RightPanel = vstack { 
     combo_box_v{ [] (auto& s) -> auto& { return s.particle_kind; },
-               {"Mass", "Anchor"} }, 
+               {"Mass", "Anchor", "Pickup"} },
     either {
       (unsigned) state.selection.kind(),
       text{"No mass or particles selected"}, 

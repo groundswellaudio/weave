@@ -1,9 +1,11 @@
 
 #pragma once
 
-#include "events/mouse_events.hpp"
 #include <SDL.h>
 #include <glad/glad.h>
+
+#include "events/mouse_events.hpp"
+#include "events/keyboard.hpp"
 
 class sdl_backend
 {
@@ -91,9 +93,14 @@ class sdl_backend
     
       case SDL_TEXTEDITING :
       case SDL_TEXTINPUT :
+      
       case SDL_KEYDOWN :
       case SDL_KEYUP :
-        break;
+      {
+        auto& KE = e.key;
+        auto code = impl::from_sdl_keycode(KE.keysym);
+        vis( keyboard_event{code, KE.type == SDL_KEYDOWN} );
+      }
     
       case SDL_WINDOWEVENT :
         break;

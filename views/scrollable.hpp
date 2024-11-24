@@ -65,7 +65,7 @@ struct scrollable_widget : widget_base {
     bar.set_position(bar.position().x, new_bar_pos); //scrollbar_start * child.size().y);
   }
   
-  void on_child_event(input_event e, event_context<scrollable_widget> ec, ignore) 
+  void on_child_event(mouse_event e, event_context<scrollable_widget> ec, ignore) 
   {
     if (e.is_mouse_scroll()) {
       scrollbar_move(-e.mouse_scroll_delta());
@@ -88,7 +88,7 @@ struct scrollable_widget : widget_base {
   void paint(painter& p) {}
 };
 
-static_assert( is_child_event_listener<scrollable_widget> );
+//static_assert( is_child_event_listener<scrollable_widget> );
 
 template <class View>
 struct scrollable : view<scrollable<View>> {

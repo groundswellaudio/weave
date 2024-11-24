@@ -9,6 +9,14 @@ struct basic_modal_menu : widget_base {
   
   static constexpr float row_size = 15;
   
+  using vec = std::vector<std::string>; 
+  
+  basic_modal_menu(vec2f pos, const vec& choices) 
+  : widget_base{{70, choices.size() * row_size}, pos}, 
+    choices{choices} 
+  { 
+  }
+  
   void on(mouse_event e, event_context<basic_modal_menu>& ec) 
   {
     if (e.is_mouse_down())
@@ -26,14 +34,16 @@ struct basic_modal_menu : widget_base {
   }
   
   void paint(painter& p, unsigned val) {
-    p.fill_style(colors::white);
-    p.rectangle({0, 0}, size());
+    p.fill_style(colors::gray);
+    p.fill_rounded_rect({0, 0}, size(), 6);
+    p.stroke_style(colors::black);
+    p.stroke_rounded_rect({0, 0}, size(), 6);
     float pos = 2;
-    p.fill_style(colors::black);
+    p.fill_style(colors::white);
     p.text_alignment(text_align::x::left, text_align::y::center);
     p.font_size(11);
     for (auto& c : choices) {
-      p.text( {2, pos + 11 / 2}, c );
+      p.text( {10, pos + 11 / 2}, c );
       pos += row_size;
     }
     
@@ -58,8 +68,8 @@ struct combo_box : widget_base {
   void on(mouse_event e, event_context<combo_box>& ec) {
     if (!e.is_mouse_down())
       return;
-    auto height = choices.size() * basic_modal_menu::row_size;
-    ec.open_modal_menu(basic_modal_menu{{{50, (float)height}, {0, size().y}}, choices}, this);
+    auto menu = basic_modal_menu{{0, size().y}, choices};
+    ec.open_modal_menu(with_lens_t{menu, ec.lens.clone()}, this);
   }
   
   void paint(painter& p, unsigned val) {

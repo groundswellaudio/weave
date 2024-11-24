@@ -62,20 +62,20 @@ inline char to_character(keycode k){
 // backend stuff
 namespace impl {
 
-	inline flux::keycode to_flux_keycode(SDL_Keysym s){
+	inline keycode from_sdl_keycode(SDL_Keysym s){
 		switch(s.sym)
 		{
-			#define N(NUM)  case SDLK_##NUM   : return flux::keycode::n##NUM;
-			#define K(N, C) case SDLK_##C     : return flux::keycode::N;
-			#define L(N, C) case SDLK_##N     : return flux::keycode::N;
-			#define S(N, C, Z) case SDLK_##C  : return flux::keycode::N;
+			#define N(NUM)  case SDLK_##NUM   : return keycode::n##NUM;
+			#define K(N, C) case SDLK_##C     : return keycode::N;
+			#define L(N, C) case SDLK_##N     : return keycode::N;
+			#define S(N, C, Z) case SDLK_##C  : return keycode::N;
 				#include "keys.def"
 			#undef K
 			#undef N
 			#undef L
 			#undef S
 			default :
-				return flux::keycode::invalid_key;
+				return keycode::invalid_key;
 		}
 	}
 
@@ -83,10 +83,10 @@ namespace impl {
 	{
 		switch(k)
 		{
-			#define N(NUM)  case flux::keycode::n##NUM : return SDLK_##NUM;
-			#define K(N, C) case flux::keycode::N      : return SDLK_##C;
-			#define L(N, C) case flux::keycode::N      : return SDLK_##N;
-			#define S(N, C, Z) case flux::keycode::N   : return SDLK_##C;
+			#define N(NUM)  case keycode::n##NUM : return SDLK_##NUM;
+			#define K(N, C) case keycode::N      : return SDLK_##C;
+			#define L(N, C) case keycode::N      : return SDLK_##N;
+			#define S(N, C, Z) case keycode::N   : return SDLK_##C;
 				#include "keys.def"
 			#undef K
 			#undef N
@@ -99,7 +99,7 @@ namespace impl {
 
 } // impl
 
-inline bool is_being_held(flux::keycode k)
+inline bool is_being_held(keycode k)
 {
 	auto* state = SDL_GetKeyboardState(nullptr);
 	return state[SDL_GetScancodeFromKey(impl::to_sdl_keycode(k))];

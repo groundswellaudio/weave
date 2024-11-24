@@ -1,7 +1,7 @@
 #pragma once
 
 #include "vec.hpp"
-#include <variant>
+#include "../util/variant.hpp"
 
 struct mouse_enter {};
 
@@ -37,13 +37,13 @@ struct mouse_scroll {
 
 struct mouse_event {
   vec2f position;
-  std::variant<mouse_enter, mouse_exit, mouse_down, mouse_up, mouse_move, mouse_scroll> event; 
+  variant<mouse_enter, mouse_exit, mouse_down, mouse_up, mouse_move, mouse_scroll> event; 
   
   template <class T>
   bool is() const { return holds_alternative<T>(event); } 
   
   template <class T>
-  auto& get_as(this auto&& self) { return std::get<T>(self.event); }
+  auto& get_as(this auto&& self) { return get<T>(self.event); }
   
   bool is_double_click() const { return is_mouse_down() && get_as<mouse_down>().double_click; }
   vec2f mouse_scroll_delta() const { return get_as<mouse_scroll>().delta; }
@@ -56,8 +56,6 @@ struct mouse_event {
   bool is_mouse_down() const { return is<mouse_down>(); }
   bool is_mouse_up() const { return is<mouse_up>(); }
 };
-
-using input_event = mouse_event;
 
 template <class T, class... Ts>
 static constexpr auto is_one_of = ((^T == ^Ts) or ...);

@@ -1,3 +1,5 @@
+#pragma once
+
 using namespace std::meta;
 
 #include <memory>
@@ -343,3 +345,16 @@ template <unsigned Index, class V>
 constexpr auto&& get(V&& var) {
   return var.data.%(cat("m", Index));
 }
+
+template <class T, class V>
+  requires (is_instance_of(remove_reference(^V), ^variant))
+constexpr auto&& get(V&& var) {
+  return var.template get<T>();
+}
+
+template <class T, class... Vs>
+constexpr bool holds_alternative(const variant<Vs...>& v) {
+  constexpr auto idx = impl::find_first_pos({^Vs...}, ^T);
+  //static_assert( idx != -1, "type not contained in variant" );
+  return idx == v.index();
+} 
