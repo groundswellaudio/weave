@@ -122,6 +122,11 @@ struct vec<T, 2>
     return index == 0 ? self.x : self.y;
   }
   
+  template <class V>
+  constexpr operator vec<V, 2>() const {
+    return {static_cast<V>(x), static_cast<V>(y)};
+  }
+  
   %declare_arithmetic( ^const vec& );
   %declare_arithmetic( ^T );
   
@@ -150,6 +155,9 @@ constexpr T distance(vec<T, 2> a, vec<T, 2> b) {
   auto y = b.y - a.y;
   return std::sqrt( x * x + y * y );
 }
+
+template <class T>
+using vec2 = vec<T, 2>;
 
 namespace gl_types
 {

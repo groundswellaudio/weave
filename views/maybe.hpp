@@ -20,7 +20,7 @@ struct maybe : view_sequence_base {
   }
   
   template <class State>
-  void seq_rebuild(Self& Old, auto&& seq_updater, widget_updater& up, State& s) 
+  rebuild_result seq_rebuild(Self& Old, auto&& seq_updater, widget_updater& up, State& s) 
   {
     if (flag == Old.flag)
     {
@@ -31,12 +31,12 @@ struct maybe : view_sequence_base {
     {
       auto nb = up.builder();
       view.seq_build(seq_updater.consume_fn(), nb, s);
-      up.parent_widget().layout();
+      return {};
     }
     else
     {
       Old.view.seq_destroy(seq_updater.destroy_fn());
-      up.parent_widget().layout();
+      return {};
     }
   }
   

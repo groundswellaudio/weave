@@ -1,5 +1,5 @@
 #include "spiral.hpp"
-#include "examples/SpringSim/SpringSim.hpp"
+#include "examples/TextureSynthesis/TextureSynthesis.hpp"
 #define MINIAUDIO_IMPLEMENTATION
 #include "deps/miniaudio/miniaudio.h"
 
@@ -31,5 +31,5 @@ auto make_demo_app(AppState& state)
 
 int main()
 {
-  run_spring_sim();
+  run_texture_synth();
 }

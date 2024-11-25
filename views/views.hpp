@@ -9,3 +9,4 @@
 #include "scrollable.hpp"
 #include "numeric_field.hpp"
 #include "combo_box.hpp"
+#include "image.hpp"

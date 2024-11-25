@@ -84,7 +84,7 @@ namespace impl {
       sz = std::max(sz, child_size[1 - axis]);
     }
     
-    // Align the element
+    // Align the elements
     
     if (data.align_ratio != 0)
       for (auto& n : children) {
@@ -132,8 +132,6 @@ struct stack_base : view<stack_base<T, Ts...>>, stack<Ts...> {
     auto& w = wb.as<T>();
     int index = 0;
     
-    auto next_up = up.with_parent(wb);
-    
     stack_updater seq_updater {
       {}, 
       up.builder(), 
@@ -146,13 +144,14 @@ struct stack_base : view<stack_base<T, Ts...>>, stack<Ts...> {
     
     tuple_for_each_with_index( this->children, [&] (auto& elem, auto elem_index) -> void 
     { 
-      res |= elem.seq_rebuild(get<elem_index.value>(Old.children), seq_updater, next_up, state);
+      res |= elem.seq_rebuild(get<elem_index.value>(Old.children), seq_updater, up, state);
     });
     
     for (auto i : seq_updater.to_erase)
       w.children_vec.erase(w.children_vec.begin() + i);
     
     if (seq_updater.mutated) {
+      // FIXME : don't propagte layout_changed if the size has not changed here
       wb.layout();
       return rebuild_result{true};
     }

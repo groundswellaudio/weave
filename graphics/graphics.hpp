@@ -2,6 +2,7 @@
 
 #include "color.hpp"
 #include "nanovg.h"
+#include "stb_image.h"
 
 #define NANOVG_GL3_IMPLEMENTATION
 
@@ -28,6 +29,45 @@ namespace text_align
 		bottom  = NVG_ALIGN_BOTTOM
 	};
 }
+
+struct image_data {
+  
+  auto data() const { return buffer.data(); }
+  auto size() const { return size_v; }
+  
+  std::vector<unsigned char> buffer;
+  vec2<int> size_v {0, 0};
+};
+
+inline std::optional<image_data> load_image_from_file(const std::string& path) {
+  int w, h, n;
+  stbi_set_unpremultiply_on_load(1);
+  stbi_convert_iphone_png_to_rgb(1);
+  auto img = stbi_load(path.data(), &w, &h, &n, 4);
+  if (!img) 
+    return {};
+  image_data res;
+  res.buffer.insert(res.buffer.end(), img, img + w * h * 4);
+  res.size_v = vec2<int>{w, h};
+  stbi_image_free(img);
+  return res;
+}
+
+struct graphics_context; 
+
+struct texture_handle {
+  
+  friend graphics_context;
+  friend painter;
+  
+  texture_handle(const texture_handle&) = default; 
+  
+  private :
+  
+  texture_handle(int v) : id{v} {}
+  
+  int id;
+};
 
 struct painter_state
 {
@@ -75,7 +115,7 @@ struct painter_state
     nvgFontFace(ctx, "default");
     update_font_offset();
   }
-	
+  
   /* 
   // Compute the glyph positions for @text at position @pos using the current aligment.
   void get_glyph_positions(glyph_positions& p, std::string_view text, screen_pt pos) const
@@ -189,9 +229,13 @@ struct painter : painter_state
     nvgStrokeColor(ctx, impl::to_nvg_col(c));
   }
 
-  auto& fill_style(const color& c) {
+  void fill_style(const color& c) {
     nvgFillColor(ctx, impl::to_nvg_col(c));
-    return *this;
+  }
+  
+  void fill_style(texture_handle t, vec2f top_left, vec2f size) {
+    auto p = nvgImagePattern(ctx, top_left.x, top_left.y, size.x, size.y, 0, t.id, 1.f);
+    nvgFillPaint(ctx, p);
   }
 
   void rectangle(vec2f position, vec2f size) {
@@ -226,21 +270,6 @@ struct painter : painter_state
   void translate(vec2f delta) {
     nvgTranslate(ctx, delta.x, delta.y);
   }
-  
-  /* 
-  void set_origin(vec2f origin_) {
-    origin = origin_;
-  } */ 
-  
-  void push_transform() {
-    nvgSave(ctx);
-  }
-  
-  void pop_transform() {
-    nvgRestore(ctx);
-  }
-
-  //vec2f origin {0, 0};
 };
 
 struct graphics_context 
@@ -259,6 +288,18 @@ struct graphics_context
     
     glClearColor(0,0,0,1);
 	  glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
+  }
+  
+  texture_handle create_texture(const unsigned char* data, vec2<int> size) {
+    return texture_handle{nvgCreateImageRGBA(ctx, size.x, size.y, 0, data)};
+  }
+  
+  void update_texture(texture_handle id, const unsigned char* data, vec2<int> size) {
+    nvgUpdateImage(ctx, id.id, data);
+  }
+  
+  void delete_texture(texture_handle id) {
+    nvgDeleteImage(ctx, id.id);
   }
   
   ::painter painter() { return {ctx}; }

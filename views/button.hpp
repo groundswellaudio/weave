@@ -72,9 +72,8 @@ struct toggle_button : view<toggle_button<Lens>> {
   button_properties properties;
 };
 
-/* 
 template <class State, class Callback>
-struct trigger_button_widget {
+struct trigger_button_widget : widget_base {
   
   using value_type = void;
   
@@ -82,25 +81,24 @@ struct trigger_button_widget {
   std::string_view str;
   float font_size;
   
-  void on(mouse_event e, event_context<void> ec) {
+  void on(mouse_event e, event_context<trigger_button_widget<State, Callback>> ec) {
     if (e.is_mouse_enter())
       set_mouse_cursor(mouse_cursor::hand);
     else if (e.is_mouse_exit())
       set_mouse_cursor(mouse_cursor::arrow);
     if (!e.is_mouse_down())
       return;
-    callback( *static_cast<State*>(ec.application_state()) );
+    callback( *static_cast<State*>(ec.state()) );
   }
   
-  void paint(painter& p, vec2f sz) 
+  void paint(painter& p) 
   {
     //p.stroke_style(colors::black);
     p.font_size(font_size);
     p.fill_style(colors::white);
-    p.text_alignment(text_align::x::center, text_align::y::center);
-    p.text( {sz.x / 2.f, sz.y / 2.f}, str ); 
+    p.text_alignment(text_align::x::left, text_align::y::center);
+    p.text( {0, sz.y / 2.f}, str ); 
   }
-  
 };
 
 template <class Fn>
@@ -110,19 +108,13 @@ struct trigger_button : view<trigger_button<Fn>> {
   trigger_button(T str, Fn fn) : str{str}, fn{fn} {} 
   
   template <class State>
-  void build(widget_builder& b, State& state) {
-    // ensure that the callback is well formed
-    using z = decltype(fn(state));
-    return make_tuple( trigger_button_widget<State, Fn>{fn, str, font_size}, 
-                       empty_lens{}, 
-                       widget_ctor_args{b.next_id(), {60.f, 15.f}} );
+  auto build(ignore, State&) {
+    return trigger_button_widget<State, Fn>{{60, 15}, fn, str, font_size};
   }
   
   template <class State>
-  void rebuild(trigger_button<Fn> New, widget& w, State& s) {  
-    if (str == New.str)
-      return;
-    *this = New;
+  rebuild_result rebuild(trigger_button<Fn>& Old, widget_ref w, auto&& up, State& s) {
+    return {};
   }
   
   std::string_view str;
@@ -131,8 +123,4 @@ struct trigger_button : view<trigger_button<Fn>> {
 };
 
 template <class T, class Fn>
-trigger_button(T, Fn) -> trigger_button<Fn>; */ 
-
-/*
-template <class L>
-struct toggle_button(L) -> toggle_button<L>; */ 
+trigger_button(T, Fn) -> trigger_button<Fn>; 

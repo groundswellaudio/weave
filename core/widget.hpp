@@ -3,6 +3,7 @@
 #include <vector>
 #include <iostream>
 #include <cassert>
+#include <type_traits>
 
 #include "events/mouse_events.hpp"
 #include "events/keyboard.hpp"
@@ -384,6 +385,7 @@ struct event_context_base {
 template <> 
 struct event_context_t<void> : event_context_base {
   
+  void* state() { return state_ptr; }
   widget_ref parent() const { return parents.back(); }
   
   event_context_parent_stack parents;
@@ -513,7 +515,7 @@ namespace impl {
   // Important : the vtable of a widget that must have a lens is the vtable 
   // of with_lens(T)
   template <class W>
-    requires (^typename W::value_type != ^void)
+    requires (!std::is_same_v<typename W::value_type, void>)
   struct widget_vtable_impl<W> 
     : widget_vtable_impl<with_lens_t<W>> 
   {
@@ -589,17 +591,19 @@ auto with_lens(W&& widget, Lens lens) {
                        make_lens<typename W::value_type, State>(lens) };
 }
 
+struct application_context;
+
 struct widget_builder 
 {
+  auto& context() const { return ctx; }
+  application_context& ctx;
 };
 
 struct widget_updater 
 {
-  auto parent_widget() const { return parent; }
-  auto with_parent(widget_ref w) const { widget_updater res{*this}; res.parent = w; return res; }
-  widget_builder builder() const { return {}; }
-  
-  widget_ref parent;
+  widget_builder builder() const { return {ctx}; }
+  auto& context() const { return ctx; }
+  application_context& ctx;
 };
 
 

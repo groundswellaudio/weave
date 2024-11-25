@@ -12,11 +12,14 @@ find_package(SDL2 REQUIRED)
 include_directories(${SDL2_INCLUDE_DIRS})
 include_directories(./deps/glad/include)
 include_directories(./deps/nanovg/src)
+include_directories(./deps/nativefiledialog-extended/src/include)
 include_directories(./)
 
 
 add_executable(Spiral main.cpp)
 target_sources(Spiral PRIVATE ./deps/glad/src/glad.c)
 target_sources(Spiral PRIVATE ./deps/nanovg/src/nanovg.c)
+add_subdirectory(./deps/nativefiledialog-extended)
 
 target_link_libraries(Spiral ${SDL2_LIBRARIES})
+target_link_libraries(Spiral nfd)

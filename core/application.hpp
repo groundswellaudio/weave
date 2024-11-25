@@ -14,11 +14,7 @@
 #include "../events/mouse_events.hpp"
 #include "../vec.hpp"
 
-inline vec2f current_mouse_position() {
-  int x, y;
-  SDL_GetMouseState(&x, &y);
-  return {(float)x, (float)y};
-}
+#include "nfd.h"
 
 namespace impl {
 
@@ -195,7 +191,28 @@ namespace impl {
   
 } // impl
 
+template <class ViewCtor, class View, class State>
+struct application;
+
+std::optional<std::basic_string<nfdchar_t>> open_file_dialog() 
+{
+  NFD_Init();
+  nfdchar_t* outPath;
+  nfdresult_t result = NFD_OpenDialog(&outPath, nullptr, 0, nullptr);
+  if (result == NFD_OKAY) {
+    std::string res{outPath};
+    NFD_FreePath(outPath);
+    NFD_Quit();
+    return res;
+  }
+  NFD_Quit();
+  return {};
+}
+
 struct application_context {
+  
+  template <class ViewCtor, class View, class State>
+  friend struct application;
   
   template <class Root>
   application_context(const char* win_name, vec2f win_size, Root&& root_widget)
@@ -236,9 +253,15 @@ struct application_context {
     med.reset_focus(root.borrow());
   }
   
+  ::graphics_context& graphics_context() {
+    return gctx;
+  }
+  
+  private : 
+  
   sdl_backend backend;
   window win;
-  graphics_context gctx;
+  struct graphics_context gctx;
   widget_box root, modal_menu;
   impl::mouse_event_dispatcher med;
   impl::keyboard_event_dispatcher keyboard;
@@ -280,7 +303,7 @@ struct application
   application(State& s, ViewCtor ctor) 
   : view_ctor{ctor}, 
     impl{ "spiral", {600, 400}, (app_view.emplace(view_ctor(s)), 
-                                 app_view->build(widget_builder{}, s)) } 
+                                 app_view->build(widget_builder{impl}, s)) } 
   {
   }
   
@@ -297,7 +320,7 @@ struct application
       
       auto old_view = *app_view;
       app_view.emplace( view_ctor(state) );
-      auto upd = widget_updater{impl.root.borrow()};
+      auto upd = widget_updater{impl};
       auto rebuild_res = app_view->rebuild(old_view, impl.root.borrow(), upd, state);
       if (rebuild_res.layout_change) {
         impl.root.layout();
@@ -310,7 +333,7 @@ struct application
   
   void paint(State& state)
   {
-    painter p {impl.gctx.ctx};
+    painter p = impl.graphics_context().painter();
     p.set_font("default");
     p.begin_frame(impl.win.size(), 1);
     
