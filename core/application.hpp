@@ -214,10 +214,10 @@ struct application_context {
   template <class ViewCtor, class View, class State>
   friend struct application;
   
-  template <class Root>
-  application_context(const char* win_name, vec2f win_size, Root&& root_widget)
+  template <class RootCtor>
+  application_context(const char* win_name, vec2f win_size, RootCtor Ctor)
   : win{"spiral", win_size}, 
-    root{std::move(root_widget)}, 
+    root{Ctor()}, 
     modal_menu{nullptr},
     med{root.borrow()}
   {
@@ -302,8 +302,9 @@ struct application
   
   application(State& s, ViewCtor ctor) 
   : view_ctor{ctor}, 
-    impl{ "spiral", {600, 400}, (app_view.emplace(view_ctor(s)), 
-                                 app_view->build(widget_builder{impl}, s)) } 
+    app_view{view_ctor(s)},
+    impl{ "spiral", {600, 400}, 
+          [&, this] { return app_view->build(widget_builder{impl}, s); } }
   {
   }
   

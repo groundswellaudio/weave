@@ -72,6 +72,8 @@ struct toggle_button : view<toggle_button<Lens>> {
   button_properties properties;
 };
 
+static constexpr float button_margin = 5;
+
 template <class State, class Callback>
 struct trigger_button_widget : widget_base {
   
@@ -80,12 +82,13 @@ struct trigger_button_widget : widget_base {
   Callback callback;
   std::string_view str;
   float font_size;
+  bool hovered = false;
   
   void on(mouse_event e, event_context<trigger_button_widget<State, Callback>> ec) {
     if (e.is_mouse_enter())
-      set_mouse_cursor(mouse_cursor::hand);
+      hovered = true;
     else if (e.is_mouse_exit())
-      set_mouse_cursor(mouse_cursor::arrow);
+      hovered = false;
     if (!e.is_mouse_down())
       return;
     callback( *static_cast<State*>(ec.state()) );
@@ -93,11 +96,18 @@ struct trigger_button_widget : widget_base {
   
   void paint(painter& p) 
   {
-    //p.stroke_style(colors::black);
+    p.stroke_style(colors::white);
+    p.stroke_rounded_rect({0, 0}, size(), 6, 1);
+    
+    if (hovered) {
+      p.fill_style(rgba_u8{colors::white}.with_alpha(75));
+      p.fill_rounded_rect({0, 0}, size(), 6);
+    }
+    
     p.font_size(font_size);
     p.fill_style(colors::white);
     p.text_alignment(text_align::x::left, text_align::y::center);
-    p.text( {0, sz.y / 2.f}, str ); 
+    p.text( {button_margin, sz.y / 2.f}, str ); 
   }
 };
 
@@ -107,9 +117,14 @@ struct trigger_button : view<trigger_button<Fn>> {
   template <class T>
   trigger_button(T str, Fn fn) : str{str}, fn{fn} {} 
   
+  auto text_bounds(application_context& ctx) {
+    return ctx.graphics_context().text_bounds(str, font_size);
+  }
+  
   template <class State>
-  auto build(ignore, State&) {
-    return trigger_button_widget<State, Fn>{{60, 15}, fn, str, font_size};
+  auto build(const widget_builder& b, State& s) {
+    auto sz = text_bounds(b.context());
+    return trigger_button_widget<State, Fn>{ {sz + vec2f{button_margin, button_margin} * 2}, fn, str, font_size};
   }
   
   template <class State>
@@ -119,7 +134,7 @@ struct trigger_button : view<trigger_button<Fn>> {
   
   std::string_view str;
   Fn fn;
-  float font_size = 13;
+  float font_size = 11;
 };
 
 template <class T, class Fn>

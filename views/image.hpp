@@ -18,33 +18,35 @@ struct image_widget : widget_base {
 
 struct image : view<image> {
   
-  image(const image_data& data, vec2<int> sz) : img{data}, size{sz} {}
+  image(const image_data& data, optional<vec2<int>> sz) : img{data}, display_size{sz} {}
   
   auto build(auto&& b, ignore) {
     auto data_ptr = img.data();
     optional<texture_handle> texture;
-    if (size != vec2i{0, 0})
-      texture = b.context().graphics_context().create_texture(img.data(), size);
-    return image_widget{{size}, texture};
+    if (!img.empty())
+      texture = b.context().graphics_context().create_texture(img.data(), img.size());
+    auto wsize = display_size ? *display_size : img.size();
+    return image_widget{{(vec2f) wsize}, texture};
   }
   
   texture_handle make_texture(application_context& ctx) {
-    return ctx.graphics_context().create_texture(img.data(), size);
+    return ctx.graphics_context().create_texture(img.data(), img.size());
   }
   
   rebuild_result rebuild(image& old, widget_ref elem, const widget_updater& up, ignore) {
     auto& w = elem.as<image_widget>();
     if (!w.texture) {
-      if (img.size() != vec2i{0, 0})
+      if (!img.empty())
         w.texture = make_texture(up.context());
     }
     else {
-      up.context().graphics_context().update_texture(*w.texture, img.data(), size);
-      w.set_size(size);
+      up.context().graphics_context().update_texture(*w.texture, img.data(), img.size());
     }
-    return {};
+    auto new_size = display_size ? *display_size : img.size();
+    return ((vec2i)w.size() != new_size) ? (w.set_size(new_size), rebuild_result{true})
+                                  : rebuild_result{};
   }
   
   const image_data& img;
-  vec2i size;
+  optional<vec2i> display_size;
 };

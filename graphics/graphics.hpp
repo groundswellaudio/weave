@@ -32,6 +32,7 @@ namespace text_align
 
 struct image_data {
   
+  bool empty() const { return buffer.empty(); }
   auto data() const { return buffer.data(); }
   auto size() const { return size_v; }
   
@@ -71,11 +72,17 @@ struct texture_handle {
 
 struct painter_state
 {
-  painter_state(NVGcontext* backend_ptr) noexcept
-  : ctx{backend_ptr}
+  private : 
+  
+  friend graphics_context;
+
+  painter_state(NVGcontext* backend_ptr, float text_y_offset) 
+  : ctx{backend_ptr}, text_vert_offset{text_y_offset}
   {
   }
-
+  
+  public : 
+  
   void text_alignment(text_align::x alignx, text_align::y aligny = text_align::y::center)
   {
     current_aligment = (int)(alignx) | (int)(aligny);
@@ -148,7 +155,7 @@ struct painter_state
   }
 
   NVGcontext* ctx;
-  int current_aligment;
+  int current_aligment = 0;
   float current_font_size = 11;
   float text_vert_offset = 0;
 };
@@ -290,6 +297,13 @@ struct graphics_context
 	  glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
   }
   
+  vec2f text_bounds(std::string_view str, int font_size) const {
+    nvgFontSize(ctx, font_size);
+		float bounds[4];
+		nvgTextBounds(ctx, 0, 0, str.data(), str.end(), bounds);
+		return vec2f{ bounds[2] - bounds[0], bounds[3] - bounds[1] };
+	}
+  
   texture_handle create_texture(const unsigned char* data, vec2<int> size) {
     return texture_handle{nvgCreateImageRGBA(ctx, size.x, size.y, 0, data)};
   }
@@ -302,7 +316,21 @@ struct graphics_context
     nvgDeleteImage(ctx, id.id);
   }
   
-  ::painter painter() { return {ctx}; }
+  ::painter painter() { return {{ctx, text_vert_offset}}; }
+  
+  private : 
+  
+  void update_font_offset()
+  {
+    // due to font format unconsistency,
+    // sometimes the ascender actually means "height max"
+    // so we have to apply an offset to correct that if it's the case
+    // ideally this should be handled by the renderer!
+    float a, d, h;
+    nvgTextMetrics(ctx, &a, &d, &h);
+    text_vert_offset = (a > h) ? a - h : 0;
+  }
   
   NVGcontext* ctx = nullptr;
+  float text_vert_offset;
 };

@@ -18,9 +18,12 @@ struct TextureSynthesis {
 
 auto make_texture_synth(TextureSynthesis& state)
 {
+  auto img_size = min(state.display_image.size(), {600, 400});
+  
   return vstack {
+    text{ "Texture Synthesis from examplar"},
     trigger_button { "Load texture", [] (auto& s) { s.load_image(); } },
-    image { state.display_image, state.display_image.size() }
+    image { state.display_image, img_size }
   };
 }
 
