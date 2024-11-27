@@ -76,8 +76,8 @@ void patch_match_search(const I& examplar, I& generated, search_map& Map, int pa
         auto nx = origin.x + rand(gen) % distance;
         auto ny = origin.y + rand(gen) % distance;
         
-        nx = std::clamp(x, 0, examplar.shape().x - 1);
-        ny = std::clamp(y, 0, examplar.shape().y - 1);
+        nx = std::clamp(nx, 0, examplar.shape().x - 1);
+        ny = std::clamp(ny, 0, examplar.shape().y - 1);
         
         auto new_index = vec2i{nx, ny};
         
@@ -101,10 +101,14 @@ void patch_match_propagation(I& examplar, I& generated, search_map& Map, int pat
     for (auto x : iota(1, Map.shape()[1]))
     {
       auto try_propagate = [&] (int dy, int dx) {
-        auto patch_dist = patch_distance(examplar, Map(y - dy, x - dx).m0, generated, vec2i{y, x}, patch_hs);
+        
+        auto new_idx = Map(y - dy, x - dx).m0 + vec2i{dy, dx};
+        new_idx = min(new_idx, examplar.shape() - vec2i{1, 1});
+        
+        auto patch_dist = patch_distance(examplar, new_idx, generated, vec2i{y, x}, patch_hs);
         if (patch_dist < Map(y, x).m1) {
           Map(y, x).m1 = patch_dist;
-          Map(y, x).m0 = Map(y-dy, x-dx).m0;
+          Map(y, x).m0 = new_idx;
         }
       };
       
@@ -221,7 +225,7 @@ auto make_texture_synth(TextureSynthesis& state)
     trigger_button { "Load texture", [] (auto& s) { s.load_image(); } }
     .disable_if(state.is_working()),
     trigger_button{ "Synthesize", [] (auto& s) { s.run_synth_step(); } }
-    .disable_if(state.is_working()), 
+    .disable_if(state.is_working() || state.examplar.empty()), 
     hstack {
       // views::image { state.display },
       views::image { state.generated }.with_corner_offset( {ImgPadding, ImgPadding} )
