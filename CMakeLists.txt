@@ -1,25 +1,38 @@
-cmake_minimum_required(VERSION 3.7)
+cmake_minimum_required(VERSION 3.10)
 
-set(CMAKE_CXX_COMPILER "/Users/groundswell/Documents/GitHub/llvm-build-release/bin/clang++")
 set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -cppmeta")
 include(FetchContent)
 
 project(Spiral)
 
+FetchContent_Declare(SDL2
+  GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
+  GIT_TAG release-2.30.0)
+FetchContent_MakeAvailable(SDL2)
 
-find_package(SDL2 REQUIRED)
-include_directories(${SDL2_INCLUDE_DIRS})
+FetchContent_Declare(nanovg
+  GIT_REPOSITORY https://github.com/memononen/nanovg.git)
+FetchContent_MakeAvailable(nanovg)
+
+FetchContent_Declare(nfd 
+  GIT_REPOSITORY https://github.com/btzy/nativefiledialog-extended.git)
+FetchContent_MakeAvailable(nfd)
+
+FetchContent_Declare(miniaudio 
+ GIT_REPOSITORY https://github.com/mackron/miniaudio.git)
+FetchContent_MakeAvailable(miniaudio)
+
 include_directories(./deps/glad/include)
-include_directories(./deps/nanovg/src)
-include_directories(./deps/nativefiledialog-extended/src/include)
 include_directories(./)
-
+include_directories(${SDL2_SOURCE_DIR}/include)
+include_directories(${nanovg_SOURCE_DIR}/src)
+include_directories(${nfd_SOURCE_DIR}/include)
+include_directories(${miniaudio_SOURCE_DIR})
 
 add_executable(Spiral main.cpp mini_audio_impl.cpp)
 target_sources(Spiral PRIVATE ./deps/glad/src/glad.c)
-target_sources(Spiral PRIVATE ./deps/nanovg/src/nanovg.c)
-add_subdirectory(./deps/nativefiledialog-extended)
+target_sources(Spiral PRIVATE ${nanovg_SOURCE_DIR}/src/nanovg.c)
 
-target_link_libraries(Spiral ${SDL2_LIBRARIES})
+target_link_libraries(Spiral SDL2::SDL2main SDL2::SDL2-static)
 target_link_libraries(Spiral nfd)

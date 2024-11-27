@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include <SDL2/SDL.h>
+#include <SDL.h>
 
 // the identifier for a (virtual) key
 enum class keycode : unsigned char {

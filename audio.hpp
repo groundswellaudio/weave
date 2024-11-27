@@ -1,7 +1,7 @@
 #pragma once
 #include <SDL.h>
 
-#include "deps/miniaudio/miniaudio.h"
+#include <miniaudio.h>
 
 struct audio_buffer_format {
   int sample_rate = 44100;

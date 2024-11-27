@@ -172,14 +172,10 @@ namespace gl_types
   {
     for (int dim = 2; dim < 5; ++dim)
     {
-      /* 
       auto id = cat(cat(vecid, dim), tsuffix[k]);
       b << ^ [id, dim, b = bases[k]] namespace {
         using %name(id) = vec< %typename(b), dim >;
-      }; */ 
-      auto type = instantiate(^vec, template_arguments{bases[k], dim});
-      auto name = cat(cat(vecid, dim), tsuffix[k]);
-      append_alias(b, name, type);
+      };
     }
   }
 } ();
