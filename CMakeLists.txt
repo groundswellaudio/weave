@@ -30,7 +30,7 @@ include_directories(${nanovg_SOURCE_DIR}/src)
 include_directories(${nfd_SOURCE_DIR}/include)
 include_directories(${miniaudio_SOURCE_DIR})
 
-add_executable(Spiral main.cpp mini_audio_impl.cpp)
+add_executable(Spiral main.cpp misc/mini_audio_impl.cpp graphics/graphics.cpp)
 target_sources(Spiral PRIVATE ./deps/glad/src/glad.c)
 target_sources(Spiral PRIVATE ${nanovg_SOURCE_DIR}/src/nanovg.c)
 

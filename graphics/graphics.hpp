@@ -2,13 +2,15 @@
 
 #include "color.hpp"
 #include "nanovg.h"
+
 #include "stb_image.h"
 
+#include <vec.hpp>
+
 #include <cassert>
-
-#define NANOVG_GL3_IMPLEMENTATION
-
-#include "nanovg_gl.h"
+#include <optional>
+#include <vector>
+#include <string>
 
 namespace impl
 {
@@ -93,6 +95,7 @@ inline std::optional<image<rgba<unsigned char>>> load_image_from_file(const std:
 }
 
 struct graphics_context; 
+struct painter;
 
 struct texture_handle {
   
@@ -157,7 +160,7 @@ struct painter_state
   }
 
   void set_font(const char* ident){
-    nvgFontFace(ctx, "default");
+    nvgFontFace(ctx, ident);
     update_font_offset();
   }
   
@@ -315,21 +318,7 @@ struct painter : painter_state
 
 struct graphics_context 
 {
-  graphics_context()
-  {
-    if (!gladLoadGLLoader((GLADloadproc) SDL_GL_GetProcAddress))
-    {
-      fprintf(stderr, "failed to initialize the OpenGL context.");
-      exit(1);
-    }
-    
-    ctx = nvgCreateGL3(NVG_ANTIALIAS | NVG_STENCIL_STROKES | NVG_DEBUG);
-    
-    auto fontId = nvgCreateFont(ctx, "default", "/Users/groundswell/Desktop/spiral/spiral/swansea.ttf");
-    
-    glClearColor(0,0,0,1);
-    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
-  }
+  graphics_context();
   
   vec2f text_bounds(std::string_view str, int font_size) const {
     nvgFontSize(ctx, font_size);
@@ -350,6 +339,15 @@ struct graphics_context
   
   void delete_texture(texture_handle id) {
     nvgDeleteImage(ctx, id.id);
+  }
+  
+  void create_font_from_memory(std::string name, std::span<unsigned char> bytes) {
+  	nvgCreateFontMem(ctx, name.data(), bytes.data(), bytes.size(), 0);
+  }
+
+  void set_font(const std::string& ident){
+    nvgFontFace(ctx, ident.c_str());
+    update_font_offset();
   }
   
   ::painter painter() { return {{ctx, text_vert_offset}}; }
