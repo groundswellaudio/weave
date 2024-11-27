@@ -82,9 +82,12 @@ struct trigger_button_widget : widget_base {
   Callback callback;
   std::string_view str;
   float font_size;
+  bool disabled = false;
   bool hovered = false;
   
   void on(mouse_event e, event_context<trigger_button_widget<State, Callback>> ec) {
+    if (disabled)
+      return;
     if (e.is_mouse_enter())
       hovered = true;
     else if (e.is_mouse_exit())
@@ -92,6 +95,12 @@ struct trigger_button_widget : widget_base {
     if (!e.is_mouse_down())
       return;
     callback( *static_cast<State*>(ec.state()) );
+  }
+  
+  void set_disabled(bool new_disabled) {
+    disabled = new_disabled;
+    if (disabled)
+      hovered = false;
   }
   
   void paint(painter& p) 
@@ -105,7 +114,7 @@ struct trigger_button_widget : widget_base {
     }
     
     p.font_size(font_size);
-    p.fill_style(colors::white);
+    p.fill_style(!disabled ? rgba{colors::white} : rgba{colors::white}.with_alpha(110));
     p.text_alignment(text_align::x::left, text_align::y::center);
     p.text( {button_margin, sz.y / 2.f}, str ); 
   }
@@ -124,17 +133,27 @@ struct trigger_button : view<trigger_button<Fn>> {
   template <class State>
   auto build(const widget_builder& b, State& s) {
     auto sz = text_bounds(b.context());
-    return trigger_button_widget<State, Fn>{ {sz + vec2f{button_margin, button_margin} * 2}, fn, str, font_size};
+    return trigger_button_widget<State, Fn>{ {sz + vec2f{button_margin, button_margin} * 2}, fn, str, font_size, disabled};
   }
   
   template <class State>
   rebuild_result rebuild(trigger_button<Fn>& Old, widget_ref w, auto&& up, State& s) {
+    auto& b = w.as<trigger_button_widget<State, Fn>>();
+    b.set_disabled(disabled);
+    b.str = str;
+    b.font_size = font_size;
     return {};
+  }
+  
+  auto& disable_if(bool flag) {
+    disabled = flag;
+    return *this;
   }
   
   std::string_view str;
   Fn fn;
   float font_size = 11;
+  bool disabled = false;
 };
 
 template <class T, class Fn>

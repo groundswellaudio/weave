@@ -4,6 +4,7 @@
 
 #include <ranges>
 #include <random>
+#include <future>
 
 auto iota(int a, int b) {
   return std::ranges::iota_view(a, b);
@@ -179,15 +180,22 @@ struct TextureSynthesis {
   }
   
   void run_synth_step() {
+    auto fn = [this] {
+      patch_match_search(examplar, generated, map, 5);
+      progress = 0.25;
+      patch_match_propagation(examplar, generated, map, 5);
+      progress = 0.5;
+      patch_match_synthesize(examplar, generated, map);
+      progress = 0.75;
+      patch_match_update_distance(examplar, generated, map, 5);
+      progress = -1;
+    };
     progress = 0;
-    patch_match_search(examplar, generated, map, 5);
-    progress = 0.25;
-    patch_match_propagation(examplar, generated, map, 5);
-    progress = 0.5;
-    patch_match_synthesize(examplar, generated, map);
-    progress = 0.75;
-    patch_match_update_distance(examplar, generated, map, 5);
-    progress = 1;
+    synth_task = std::async(fn);
+  }
+  
+  bool is_working() const {
+    return progress >= 0.f;
   }
   
   using u8 = unsigned char;
@@ -197,7 +205,8 @@ struct TextureSynthesis {
   search_map map;
   
   image<rgba<u8>> display;
-  std::optional<float> progress;
+  std::atomic<float> progress = -1;
+  std::future<void> synth_task;
 };
 
 auto make_texture_synth(TextureSynthesis& state)
@@ -209,13 +218,15 @@ auto make_texture_synth(TextureSynthesis& state)
   
   return vstack {
     text{ "Texture Synthesis from examplar"},
-    trigger_button { "Load texture", [] (auto& s) { s.load_image(); } },
-    trigger_button{ "Synthesize", [] (auto& s) { s.run_synth_step(); } },
+    trigger_button { "Load texture", [] (auto& s) { s.load_image(); } }
+    .disable_if(state.is_working()),
+    trigger_button{ "Synthesize", [] (auto& s) { s.run_synth_step(); } }
+    .disable_if(state.is_working()), 
     hstack {
       // views::image { state.display },
       views::image { state.generated }.with_corner_offset( {ImgPadding, ImgPadding} )
     },
-    progress_bar { state.progress ? *state.progress : 0 }
+    progress_bar { state.progress }
   };
 }
 

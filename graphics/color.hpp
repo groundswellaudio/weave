@@ -94,8 +94,15 @@ struct rgba {
   constexpr bool operator==(const rgba<T>& o) const = default;
 
   rgb<T> col;
-  T alpha;
+  T alpha = norm();
 };
+
+
+template <class T, rgb_encoding E>
+template <class V>
+constexpr rgb<T, E>::operator rgba<V, E>() const {
+  return {*this, rgb<V>::norm()};
+}
 
 template <class T, class X = distance_return_type<T>, rgb_encoding E>
 constexpr X distance_squared(const rgba<T, E>& a, const rgba<T, E>& b) 
@@ -113,12 +120,6 @@ constexpr auto distance(const rgba<T, E>& a, const rgba<T, E>& b)
 {
   using std::sqrt;
   return sqrt(distance_squared(a, b));
-}
-
-template <class T, rgb_encoding E>
-template <class V>
-constexpr rgb<T, E>::operator rgba<V, E>() const {
-  return {*this, rgb<V>::norm()};
 }
 
 using rgba_f = rgba<float>;
