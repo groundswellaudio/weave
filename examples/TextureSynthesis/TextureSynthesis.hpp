@@ -36,6 +36,11 @@ struct padded_image : image<T> {
 template <class I>
 auto patch_distance(const I& a, vec2<int> idxa, const I& b, vec2<int> idxb, int patch_hs) 
 {
+  assert( idxa.x < a.shape().x );
+  assert( idxa.y < a.shape().y );
+  assert( idxb.x < b.shape().x );
+  assert( idxb.y < b.shape().y );
+  
   decltype(distance_squared(a(0, 0), b(0, 0))) sum = 0;
   for (auto y : iota(-patch_hs, patch_hs + 1))
   {
@@ -51,14 +56,16 @@ using search_map = image<tuple<vec2i, float>>;
 
 template <class I>
 void patch_match_search(const I& examplar, I& generated, search_map& Map, int patch_hs)
-{
+{ 
+  assert( Map.shape() == generated.shape() );
+  
   std::random_device rd;
   std::default_random_engine gen(rd());
   std::uniform_int_distribution<int> rand{-10000000, 1000000};
     
-  for (auto y : iota(generated.shape().y))
+  for (auto y : iota(generated.shape()[0]))
   {
-    for (auto x : iota(generated.shape().x))
+    for (auto x : iota(generated.shape()[1]))
     {
       float min_dist = Map(y, x).m1;
       vec2i origin = Map(y, x).m0;
@@ -88,9 +95,9 @@ void patch_match_search(const I& examplar, I& generated, search_map& Map, int pa
 template <class I>
 void patch_match_propagation(I& examplar, I& generated, search_map& Map, int patch_hs) 
 {
-  for (auto y : iota(1, Map.shape().y))
+  for (auto y : iota(1, Map.shape()[0]))
   {
-    for (auto x : iota(1, Map.shape().x))
+    for (auto x : iota(1, Map.shape()[1]))
     {
       auto try_propagate = [&] (int dy, int dx) {
         auto patch_dist = patch_distance(examplar, Map(y - dy, x - dx).m0, generated, vec2i{y, x}, patch_hs);
@@ -109,20 +116,20 @@ void patch_match_propagation(I& examplar, I& generated, search_map& Map, int pat
 template <class I>
 void patch_match_synthesize(I& source, I& generated, search_map& map)
 {
-  for (auto y : iota(map.shape().y))
+  for (auto y : iota(map.shape()[0]))
   {
-    for (auto x : iota(map.shape().x))
+    for (auto x : iota(map.shape()[1]))
     {
       generated(y, x) = source(map(y, x).m0);
     }
   }
 }
 
-template <class T>
-void patch_match_update_distance(const image<T>& source, image<T>& generated, search_map& map, int patch_hs)
+template <class I>
+void patch_match_update_distance(const I& source, const I& generated, search_map& map, int patch_hs)
 {
-  for (auto y : iota(map.shape().y))
-    for (auto x : iota(map.shape().x))
+  for (auto y : iota(map.shape()[0]))
+    for (auto x : iota(map.shape()[1]))
       map(y, x).m1 = patch_distance(source, map(y, x).m0, generated, {y, x}, patch_hs);
 }
 
@@ -142,11 +149,11 @@ void fill_with_noise(I& img) {
 struct TextureSynthesis {
   
   TextureSynthesis() 
-  : generated{vec2i{600, 400}}
+  : generated{vec2i{500, 300}}
   {
-    map.reshape({600, 400});
-    fill_with_noise(generated);
     generated.set_padding({10, 10});
+    map.reshape(generated.shape());
+    fill_with_noise(generated);
   }
   
   void load_image() {
@@ -172,10 +179,15 @@ struct TextureSynthesis {
   }
   
   void run_synth_step() {
+    progress = 0;
     patch_match_search(examplar, generated, map, 5);
+    progress = 0.25;
     patch_match_propagation(examplar, generated, map, 5);
+    progress = 0.5;
     patch_match_synthesize(examplar, generated, map);
+    progress = 0.75;
     patch_match_update_distance(examplar, generated, map, 5);
+    progress = 1;
   }
   
   using u8 = unsigned char;
@@ -185,12 +197,15 @@ struct TextureSynthesis {
   search_map map;
   
   image<rgba<u8>> display;
+  std::optional<float> progress;
 };
 
 auto make_texture_synth(TextureSynthesis& state)
 {
-  auto img_size = min(state.examplar.shape(), {600, 400});
+  auto img_size = min(state.examplar.shape(), {1600, 800});
   auto ImgPadding = 10;
+  
+  using namespace views;
   
   return vstack {
     text{ "Texture Synthesis from examplar"},
@@ -199,7 +214,8 @@ auto make_texture_synth(TextureSynthesis& state)
     hstack {
       // views::image { state.display },
       views::image { state.generated }.with_corner_offset( {ImgPadding, ImgPadding} )
-    }
+    },
+    progress_bar { state.progress ? *state.progress : 0 }
   };
 }
 

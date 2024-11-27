@@ -48,7 +48,16 @@ struct image : view<image> {
         w.texture = make_texture(up.context());
     }
     else {
-      // up.context().graphics_context().update_texture(*w.texture, img.data(), img.shape());
+      auto& gctx = up.context().graphics_context();
+      gctx.delete_texture(*w.texture);
+      
+      if (img.empty()) {
+        w.texture = std::nullopt;
+        w.set_size({0, 0});
+        return rebuild_result::size_change;
+      }
+      
+      w.texture = gctx.create_texture(img, img.shape());
     }
     auto new_size = display_size ? *display_size : img.shape();
     return ((vec2i)w.size() != new_size) ? (w.set_size(new_size), rebuild_result::size_change)

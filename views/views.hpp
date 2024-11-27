@@ -10,3 +10,4 @@
 #include "numeric_field.hpp"
 #include "combo_box.hpp"
 #include "image.hpp"
+#include "progress_bar.hpp"

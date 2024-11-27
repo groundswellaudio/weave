@@ -4,6 +4,8 @@
 #include "nanovg.h"
 #include "stb_image.h"
 
+#include <cassert>
+
 #define NANOVG_GL3_IMPLEMENTATION
 
 #include "nanovg_gl.h"
@@ -40,11 +42,16 @@ struct image {
   
   using pixel_type = Pixel;
   
-  auto& operator()(this auto&& self, int y, int x) {
-    return self.buffer[y * self.shape().x + x];
+  template <class T>
+    requires (is_instance_of(remove_reference(^T), ^image))
+  auto&& operator()(this T&& self, int y, int x) {
+    assert( y >= 0 && y < self.shape()[0] && x >= 0 && x < self.shape()[1] );
+    return self.buffer[y * self.shape()[1] + x];
   }
   
-  auto&& operator()(this auto&& self, vec2i pt) {
+  template <class T>
+    requires (is_instance_of(remove_reference(^T), ^image))
+  auto&& operator() (this T&& self, vec2i pt) {
     return self(pt[0], pt[1]);
   }
   
@@ -167,10 +174,6 @@ struct painter_state
       grad.from_point.x, grad.from_point.y, grad.to_point.x, grad.to_point.y,
       impl::to_nvg_col(grad.from_col), impl::to_nvg_col(grad.to_col));
   } */ 
-
-  auto nvg_ctx_internal_handle__() const {
-    return ctx;
-  }
 
   protected :
 
@@ -325,15 +328,15 @@ struct graphics_context
     auto fontId = nvgCreateFont(ctx, "default", "/Users/groundswell/Desktop/spiral/spiral/swansea.ttf");
     
     glClearColor(0,0,0,1);
-	  glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
   }
   
   vec2f text_bounds(std::string_view str, int font_size) const {
     nvgFontSize(ctx, font_size);
-		float bounds[4];
-		nvgTextBounds(ctx, 0, 0, str.data(), str.end(), bounds);
-		return vec2f{ bounds[2] - bounds[0], bounds[3] - bounds[1] };
-	}
+    float bounds[4];
+    nvgTextBounds(ctx, 0, 0, str.data(), str.end(), bounds);
+    return vec2f{ bounds[2] - bounds[0], bounds[3] - bounds[1] };
+  }
   
   texture_handle create_texture(const image<rgba<unsigned char>>& data, vec2<int> size) {
     auto data_ptr = reinterpret_cast<const unsigned char*>(data.data());
