@@ -30,26 +30,57 @@ namespace text_align
 	};
 }
 
-struct image_data {
+template <class Pixel>
+struct image {
+  
+  image() = default;
+  image(vec2i size) {
+    reshape(size);
+  }
+  
+  using pixel_type = Pixel;
+  
+  auto& operator()(this auto&& self, int y, int x) {
+    return self.buffer[y * self.shape().x + x];
+  }
+  
+  auto&& operator()(this auto&& self, vec2i pt) {
+    return self(pt[0], pt[1]);
+  }
+  
+  void reshape(vec2i new_shape) {
+    buffer.resize(new_shape.x * new_shape.y);
+    shape_v = new_shape;
+  }
   
   bool empty() const { return buffer.empty(); }
   auto data() const { return buffer.data(); }
-  auto size() const { return size_v; }
+  auto shape() const { return shape_v; }
   
-  std::vector<unsigned char> buffer;
-  vec2<int> size_v {0, 0};
+  auto begin(this auto& self) { return self.buffer.begin(); }
+  auto end(this auto& self) { return self.buffer.end(); }
+  
+  std::vector<Pixel> buffer;
+  vec2<int> shape_v {0, 0};
 };
 
-inline std::optional<image_data> load_image_from_file(const std::string& path) {
+template <class Pixel, class T>
+image<Pixel> make_image_from_raw(const T* ptr, vec2<int> sz) {
+  image<Pixel> res;
+  res.buffer.resize(sz.x * sz.y);
+  res.shape_v = sz;
+  std::memcpy(res.buffer.data(), ptr, res.buffer.size());
+  return res;
+}
+
+inline std::optional<image<rgba<unsigned char>>> load_image_from_file(const std::string& path) {
   int w, h, n;
   stbi_set_unpremultiply_on_load(1);
   stbi_convert_iphone_png_to_rgb(1);
   auto img = stbi_load(path.data(), &w, &h, &n, 4);
   if (!img) 
     return {};
-  image_data res;
-  res.buffer.insert(res.buffer.end(), img, img + w * h * 4);
-  res.size_v = vec2<int>{w, h};
+  auto res = make_image_from_raw<rgba<unsigned char>>(img, {w, h});
   stbi_image_free(img);
   return res;
 }
@@ -304,8 +335,10 @@ struct graphics_context
 		return vec2f{ bounds[2] - bounds[0], bounds[3] - bounds[1] };
 	}
   
-  texture_handle create_texture(const unsigned char* data, vec2<int> size) {
-    return texture_handle{nvgCreateImageRGBA(ctx, size.x, size.y, 0, data)};
+  texture_handle create_texture(const image<rgba<unsigned char>>& data, vec2<int> size) {
+    auto data_ptr = reinterpret_cast<const unsigned char*>(data.data());
+    auto id = nvgCreateImageRGBA(ctx, size.x, size.y, 0, data_ptr);
+    return texture_handle{id};
   }
   
   void update_texture(texture_handle id, const unsigned char* data, vec2<int> size) {

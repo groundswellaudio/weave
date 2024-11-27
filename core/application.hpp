@@ -322,11 +322,13 @@ struct application
       auto old_view = *app_view;
       app_view.emplace( view_ctor(state) );
       auto upd = widget_updater{impl};
-      auto rebuild_res = app_view->rebuild(old_view, impl.root.borrow(), upd, state);
-      if (rebuild_res.layout_change) {
+      app_view->rebuild(old_view, impl.root.borrow(), upd, state);
+      
+      /* 
+      if (rebuild_res | rebuild_result::size_change) {
         impl.root.layout();
         impl.med.layout_changed();
-      }
+      } */ 
       
       paint(state);
     }

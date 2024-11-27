@@ -9,28 +9,36 @@ struct image_widget : widget_base {
   void paint(painter& p) {
     if (!texture)
       return;
-    p.fill_style(*texture, {0, 0}, size());
+    p.fill_style(*texture, -corner_offset, size());
     p.rectangle({0, 0}, size());
   }
   
   optional<texture_handle> texture;
+  vec2i corner_offset;
 };
+
+namespace views {
 
 struct image : view<image> {
   
-  image(const image_data& data, optional<vec2<int>> sz) : img{data}, display_size{sz} {}
+  using ImgT = ::image<rgba<unsigned char>>;
+  
+  image(const ImgT& data, optional<vec2<int>> sz = {}) : img{data}, display_size{sz} {
+    corner_offset = vec2i{0, 0};
+  }
+  
+  auto& with_corner_offset(vec2i corner) {
+    corner_offset = corner;
+    return *this;
+  }
   
   auto build(auto&& b, ignore) {
     auto data_ptr = img.data();
     optional<texture_handle> texture;
     if (!img.empty())
-      texture = b.context().graphics_context().create_texture(img.data(), img.size());
-    auto wsize = display_size ? *display_size : img.size();
-    return image_widget{{(vec2f) wsize}, texture};
-  }
-  
-  texture_handle make_texture(application_context& ctx) {
-    return ctx.graphics_context().create_texture(img.data(), img.size());
+      texture = b.context().graphics_context().create_texture(img, img.shape());
+    auto wsize = display_size ? *display_size : img.shape();
+    return image_widget{{(vec2f) wsize}, texture, corner_offset};
   }
   
   rebuild_result rebuild(image& old, widget_ref elem, const widget_updater& up, ignore) {
@@ -40,13 +48,22 @@ struct image : view<image> {
         w.texture = make_texture(up.context());
     }
     else {
-      up.context().graphics_context().update_texture(*w.texture, img.data(), img.size());
+      // up.context().graphics_context().update_texture(*w.texture, img.data(), img.shape());
     }
-    auto new_size = display_size ? *display_size : img.size();
-    return ((vec2i)w.size() != new_size) ? (w.set_size(new_size), rebuild_result{true})
+    auto new_size = display_size ? *display_size : img.shape();
+    return ((vec2i)w.size() != new_size) ? (w.set_size(new_size), rebuild_result::size_change)
                                   : rebuild_result{};
   }
   
-  const image_data& img;
+  private : 
+  
+  texture_handle make_texture(application_context& ctx) {
+    return ctx.graphics_context().create_texture(img, img.shape());
+  }
+  
+  const ImgT& img;
   optional<vec2i> display_size;
+  vec2i corner_offset;
 };
+
+} // views

@@ -150,11 +150,14 @@ struct stack_base : view<stack_base<T, Ts...>>, stack<Ts...> {
     for (auto i : seq_updater.to_erase)
       w.children_vec.erase(w.children_vec.begin() + i);
     
-    if (seq_updater.mutated) {
-      // FIXME : don't propagte layout_changed if the size has not changed here
-      wb.layout();
-      return rebuild_result{true};
+    if (seq_updater.mutated || (res & rebuild_result::size_change)) {
+      auto old_size = wb.size();
+      auto new_size = wb.layout();
+      if (old_size != new_size)
+        return rebuild_result::size_change;
+      return {};
     }
+    
     return res;
   }
   

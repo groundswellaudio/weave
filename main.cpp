@@ -1,7 +1,5 @@
 #include "spiral.hpp"
 #include "examples/TextureSynthesis/TextureSynthesis.hpp"
-#define MINIAUDIO_IMPLEMENTATION
-#include "deps/miniaudio/miniaudio.h"
 
 /* 
 struct AppState : audio_renderer<AppState> {

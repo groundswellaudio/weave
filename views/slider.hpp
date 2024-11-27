@@ -85,7 +85,7 @@ struct slider : view<slider<Lens>> {
     }
     if (size != Old.size) {
       w.set_size(size);
-      return rebuild_result{true};
+      return rebuild_result::size_change;
     }
     return {};
   }

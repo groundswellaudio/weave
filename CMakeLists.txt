@@ -16,7 +16,7 @@ include_directories(./deps/nativefiledialog-extended/src/include)
 include_directories(./)
 
 
-add_executable(Spiral main.cpp)
+add_executable(Spiral main.cpp mini_audio_impl.cpp)
 target_sources(Spiral PRIVATE ./deps/glad/src/glad.c)
 target_sources(Spiral PRIVATE ./deps/nanovg/src/nanovg.c)
 add_subdirectory(./deps/nativefiledialog-extended)

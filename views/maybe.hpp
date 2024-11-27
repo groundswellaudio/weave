@@ -101,7 +101,7 @@ struct either : view_sequence_base {
       visit( [&] (auto& elem) {
         elem.seq_build(updater.consume_fn(), up.builder(), state);
       }, body);
-      return rebuild_result{true}; 
+      return rebuild_result{}; 
     }
   }
   

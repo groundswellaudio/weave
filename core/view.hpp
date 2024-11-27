@@ -16,8 +16,20 @@ struct view_seq_rebuild_ctx {
 };
 
 struct rebuild_result {
+  enum flag {
+    none = 0,
+    size_change = 1
+  };
+  
+  rebuild_result() : value{flag::none} {}
+  rebuild_result(flag f) : value{f} {}
+  
   constexpr rebuild_result operator |(rebuild_result o) {
-    return {layout_change || o.layout_change};
+    return {(flag)(value | o.value)};
+  }
+  
+  bool operator&(flag f) const {
+    return value & f;
   }
   
   constexpr rebuild_result& operator |=(rebuild_result o) {
@@ -25,7 +37,7 @@ struct rebuild_result {
     return *this;
   }
   
-  bool layout_change = false;
+  flag value;
 };
 
 struct view_sequence_base {

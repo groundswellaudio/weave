@@ -1,13 +1,22 @@
 #pragma once
 
 #include <limits>
+#include <cmath>
 
-template <class T>
+enum class rgb_encoding {
+  linear, 
+  gamma22
+};
+
+template <class T, rgb_encoding>
 struct rgba;
 
 // RGB color in gamma 2.2
-template <class T>
+template <class T, rgb_encoding E = rgb_encoding::gamma22>
 struct rgb {
+  
+  using scalar = T;
+  static constexpr auto channels = 3;
   
   static constexpr auto norm() {
     if constexpr (^T == ^float or ^T == ^double)
@@ -20,7 +29,7 @@ struct rgb {
   constexpr const T& operator[](int x) const  { return data[x]; }
   
   template <class V>
-  constexpr operator rgb<V> () const 
+  constexpr operator rgb<V, E> () const 
   {
     static constexpr double norm_factor = ((double) rgb<V>::norm()) / norm();
     return { (V)(data[0] * norm_factor), (V)(data[1] * norm_factor), (V)(data[2] * norm_factor)}; 
@@ -29,17 +38,43 @@ struct rgb {
   constexpr bool operator==(const rgb<T>& o) const = default;
   
   template <class V>
-  constexpr operator rgba<V> () const;
+  constexpr operator rgba<V, E> () const;
 
   T data[3];
 };
 
+template <class T>
+using distance_return_type = %( is_integral(^T) ? ^int : ^T );
+
+template <class T, class X = distance_return_type<T>, rgb_encoding E>
+constexpr X distance_squared(const rgb<T, E>& a, const rgb<T, E>& b) 
+{
+  X res;
+  for (int k = 0; k < 3; ++k) {
+    auto diff = a[k] - b[k];
+    res += diff * diff;
+  }
+  return res;
+}
+
+template <class T, rgb_encoding E>
+constexpr auto distance(const rgb<T, E>& a, const rgb<T, E>& b)
+{ 
+  using std::sqrt;
+  return sqrt(distance_squared(a, b));
+}
+
 rgb(float, float, float) -> rgb<float>;
 
 // RGBA color in gamma 2.2 space
-template <class T>
+template <class T, rgb_encoding E = rgb_encoding::gamma22>
 struct rgba {
-
+  
+  using scalar = T;
+  static constexpr auto channels = 4;
+  
+  static constexpr auto norm() { return rgb<T, E>::norm(); }
+  
   constexpr T& operator[](int x)              { return x == 4 ? alpha : col[x]; }
   constexpr const T& operator[](int x) const  { return x == 4 ? alpha : col[x]; }
   
@@ -62,9 +97,27 @@ struct rgba {
   T alpha;
 };
 
-template <class T>
+template <class T, class X = distance_return_type<T>, rgb_encoding E>
+constexpr X distance_squared(const rgba<T, E>& a, const rgba<T, E>& b) 
+{
+  X res;
+  for (int k = 0; k < 4; ++k) {
+    auto diff = a[k] - b[k];
+    res += diff * diff;
+  }
+  return res;
+}
+
+template <class T, rgb_encoding E>
+constexpr auto distance(const rgba<T, E>& a, const rgba<T, E>& b) 
+{
+  using std::sqrt;
+  return sqrt(distance_squared(a, b));
+}
+
+template <class T, rgb_encoding E>
 template <class V>
-constexpr rgb<T>::operator rgba<V>() const {
+constexpr rgb<T, E>::operator rgba<V, E>() const {
   return {*this, rgb<V>::norm()};
 }
 
