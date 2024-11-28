@@ -1,5 +1,5 @@
 #include "spiral.hpp"
-#include "examples/TextureSynthesis/TextureSynthesis.hpp"
+#include "examples/MusicPlayer/MusicPlayer.hpp"
 
 /* 
 struct AppState : audio_renderer<AppState> {
@@ -29,5 +29,5 @@ auto make_demo_app(AppState& state)
 
 int main()
 {
-  run_texture_synth();
+  run_app();
 }

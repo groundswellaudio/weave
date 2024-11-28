@@ -55,6 +55,9 @@ struct mouse_event {
   bool is_mouse_drag() const { return is<mouse_move>() && get_as<mouse_move>().is_dragging; }
   bool is_mouse_down() const { return is<mouse_down>(); }
   bool is_mouse_up() const { return is<mouse_up>(); }
+  bool is_right_click() const { 
+    return is<mouse_down>() && get_as<mouse_down>().button == mouse_button::left; 
+  }
 };
 
 template <class T, class... Ts>
