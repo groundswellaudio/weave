@@ -124,7 +124,7 @@ struct painter_state
   
   public : 
   
-  void text_alignment(text_align::x alignx, text_align::y aligny = text_align::y::center)
+  void text_align(text_align::x alignx, text_align::y aligny = text_align::y::center)
   {
     current_aligment = (int)(alignx) | (int)(aligny);
     nvgTextAlign(ctx, current_aligment);

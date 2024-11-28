@@ -45,7 +45,7 @@ struct toggle_button_widget
     } 
     
     p.fill_style(colors::white);
-    p.text_alignment(text_align::x::center, text_align::y::center);
+    p.text_align(text_align::x::center, text_align::y::center);
     p.font_size(sz.y - 3);
     p.text(sz / 2.f, prop.str);
   }
@@ -115,7 +115,7 @@ struct trigger_button_widget : widget_base {
     
     p.font_size(font_size);
     p.fill_style(!disabled ? rgba{colors::white} : rgba{colors::white}.with_alpha(110));
-    p.text_alignment(text_align::x::left, text_align::y::center);
+    p.text_align(text_align::x::left, text_align::y::center);
     p.text( {button_margin, sz.y / 2.f}, str ); 
   }
 };

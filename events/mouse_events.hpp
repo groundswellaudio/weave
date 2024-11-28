@@ -17,18 +17,18 @@ struct mouse_down
 {
 	bool is_double_click() const { return double_click; }
 	
-	mouse_button button : 2;
-	bool double_click : 1;
+	mouse_button button;
+	bool double_click;
 };
 
 struct mouse_up {
-	mouse_button button : 2;
+	mouse_button button;
 };
 
 struct mouse_move {
 	vec2f delta;
-	bool is_dragging; 
-	mouse_button button : 2;
+	bool is_dragging;
+	mouse_button button;
 };
 
 struct mouse_scroll {
@@ -55,6 +55,7 @@ struct mouse_event {
   bool is_mouse_drag() const { return is<mouse_move>() && get_as<mouse_move>().is_dragging; }
   bool is_mouse_down() const { return is<mouse_down>(); }
   bool is_mouse_up() const { return is<mouse_up>(); }
+  bool is_right_click() const { return is_mouse_down() && get_as<mouse_down>().button == mouse_button::right; }
 };
 
 template <class T, class... Ts>

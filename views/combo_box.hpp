@@ -40,7 +40,7 @@ struct basic_modal_menu : widget_base {
     p.stroke_rounded_rect({0, 0}, size(), 6);
     float pos = 2;
     p.fill_style(colors::white);
-    p.text_alignment(text_align::x::left, text_align::y::center);
+    p.text_align(text_align::x::left, text_align::y::center);
     p.font_size(11);
     for (auto& c : choices) {
       p.text( {10, pos + 11 / 2}, c );
@@ -77,7 +77,7 @@ struct combo_box : widget_base {
     p.stroke_rounded_rect({0, 0}, size(), 1);
     
     p.fill_style(colors::white);
-    p.text_alignment(text_align::x::center, text_align::y::center);
+    p.text_align(text_align::x::center, text_align::y::center);
     p.font_size(11);
     p.text( size() / 2, choices[val] );
   }

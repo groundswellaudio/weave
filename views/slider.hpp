@@ -54,7 +54,7 @@ struct slider_x_widget : widget_base
     p.stroke_rounded_rect({0, 0}, sz, 6, 1);
     
     p.fill_style(colors::white);
-    p.text_alignment(text_align::x::center, text_align::y::center);
+    p.text_align(text_align::x::center, text_align::y::center);
     p.font_size(11);
     p.text({sz.x / 2, sz.y / 2}, value_str);
   }
