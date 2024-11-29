@@ -17,18 +17,18 @@ struct mouse_down
 {
 	bool is_double_click() const { return double_click; }
 	
-	mouse_button button : 2;
-	bool double_click : 1;
+	mouse_button button;
+	bool double_click;
 };
 
 struct mouse_up {
-	mouse_button button : 2;
+	mouse_button button;
 };
 
 struct mouse_move {
 	vec2f delta;
-	bool is_dragging; 
-	mouse_button button : 2;
+	bool is_dragging;
+	mouse_button button;
 };
 
 struct mouse_scroll {

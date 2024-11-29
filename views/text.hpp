@@ -23,7 +23,7 @@ struct text_widget : widget_base
   void paint(painter& p) {
     p.font_size(prop.font_size);
     p.fill_style(prop.color);
-    p.text_alignment(text_align::x::left, text_align::y::center);
+    p.text_align(text_align::x::left, text_align::y::center);
     p.text({0, size().y / 2}, prop.text);
   }
 };

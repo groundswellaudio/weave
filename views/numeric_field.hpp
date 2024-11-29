@@ -37,7 +37,7 @@ struct numeric_field_widget : widget_base
     p.stroke_rect({0, 0}, size());
     p.font_size(13.f);
     auto str = std::format("{:.2f}", value);
-    p.text_alignment(text_align::x::center, text_align::y::center);
+    p.text_align(text_align::x::center, text_align::y::center);
     p.text( sz / 2, str );
   }
   
