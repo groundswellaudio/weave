@@ -114,6 +114,10 @@ class sdl_backend
     }
   }
   
+  bool is_active(key_modifier mod) const {
+    return SDL_GetModState() & (SDL_KeyMod) m;
+  }
+  
   ~sdl_backend()
   {
     SDL_Quit();

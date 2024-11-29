@@ -253,6 +253,10 @@ struct application_context {
     med.reset_focus(root.borrow());
   }
   
+  bool is_active(key_modifier mod) const {
+    return backend.is_active(mod);
+  }
+  
   ::graphics_context& graphics_context() {
     return gctx;
   }

@@ -214,6 +214,9 @@ struct variant : variant_base
   static consteval type alternative(unsigned idx) { return type_list{^Ts...}[idx]; }
   static consteval unsigned index_of(type T)      { return impl::find_first_pos(type_list{^Ts...}, T); }
   
+  template <int N>
+  using alternative_t = %alternative(N);
+  
   template <class... Args>
   constexpr variant(Args&&... args)
   requires ((sizeof...(Args) > 0) && requires { ctor_selector{}({(Args&&)args...}); })  // note the brace around args here
@@ -248,10 +251,11 @@ struct variant : variant_base
   }
   
   template <unsigned N, class... Args>
-  constexpr void emplace(Args&&... args) {
+  constexpr alternative_t<N> emplace(Args&&... args) {
     destroy();
-    data.template emplace<N>( (Args&&) args... );
+    auto& res = data.template emplace<N>( (Args&&) args... );
     index_m = N;
+    return res;
   }
   
   constexpr variant& operator=(const variant& o) 
@@ -271,16 +275,9 @@ struct variant : variant_base
     : xxx{}
     {}
     
-    /* 
     template <unsigned N, class... Args>
-    constexpr Data(emplace_at_index<N>, Args&&... args) 
-    {
-      this->emplace<N>((Args&&)args...);
-    } */ 
-    
-    template <unsigned N, class... Args>
-    constexpr void emplace(Args&&... args) {
-      std::construct_at( &this->%(cat("m", N)), (Args&&)args... );
+    constexpr auto& emplace(Args&&... args) {
+      return *std::construct_at( &this->%(cat("m", N)), (Args&&)args... );
     }
     
     constexpr ~Data() 

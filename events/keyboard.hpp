@@ -27,6 +27,29 @@ enum class keycode : unsigned char {
 	invalid_key
 };
 
+enum class key_modifier : unsigned char {
+  none = 0, 
+  numlock = 1,
+  caps = 2,
+  lctrl = 4,
+  rctrl = 8,
+  rshift = 16, 
+  lshift = 32, 
+  ralt = 64, 
+  lalt = 128; 
+  ctrl = lctrl bitor rctrl;
+  shift = rshift bitor lshift; 
+  alt = ralt bitor lalt; 
+};
+
+constexpr key_modifier operator|(key_modifier a, key_modifier b) {
+  return (key_modifier)( (unsigned char) a | (unsigned char) b);
+}
+
+constexpr bool operator&(key_modifier a, key_modifier b) {
+  return (unsigned char) a & (unsigned char) b;
+}
+
 struct keyboard_event {
   keycode key;
   bool is_press;

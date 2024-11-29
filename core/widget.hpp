@@ -379,6 +379,8 @@ struct event_context_base {
   
   void reset_mouse_focus();
   
+  auto& context() const { return ctx; }
+  
   application_context& ctx;
 };
 
