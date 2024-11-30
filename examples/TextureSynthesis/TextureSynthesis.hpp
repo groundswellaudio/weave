@@ -53,6 +53,40 @@ auto patch_distance(const I& a, vec2<int> idxa, const I& b, vec2<int> idxb, int 
   return sum;
 }
 
+template <class I>
+auto mean(const I& i) {
+  using RT = typename I::template pixel_template<float>;
+  RT res {0};
+  for (auto y : iota(i.shape()[0]))
+  {
+    RT acc{0};
+    for (auto x : iota(i.shape()[1]))
+      acc += i(y, x);
+    acc /= i.shape()[1];
+    res += acc;
+  }
+  res /= i.shape()[0];
+  return res;
+}
+
+template <class I, class M>
+auto variance(const I& i, M mean) {
+  M res {0};
+  for (auto y : iota(i.shape()[0]))
+  {
+    M acc{0};
+    for (auto x : iota(i.shape()[1])) {
+      M delta = i(y, x) - mean;
+      delta *= delta;
+      acc += delta;
+    }
+    acc /= i.shape()[1];
+    res += acc;
+  }
+  res /= i.shape()[0];
+  return res;
+}
+
 using search_map = image<tuple<vec2i, float>>;
 
 template <class I>
@@ -213,7 +247,7 @@ struct TextureSynthesis {
   std::future<void> synth_task;
 };
 
-auto make_texture_synth(TextureSynthesis& state)
+auto make_view(TextureSynthesis& state)
 {
   auto img_size = min(state.examplar.shape(), {1600, 800});
   auto ImgPadding = 10;
@@ -234,8 +268,8 @@ auto make_texture_synth(TextureSynthesis& state)
   };
 }
 
-inline void run_texture_synth() {
+inline void run_app() {
   TextureSynthesis state;
-  auto app = make_app(state, &make_texture_synth);
+  auto app = make_app(state, &make_view);
   app.run(state);
 }

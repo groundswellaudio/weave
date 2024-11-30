@@ -63,7 +63,67 @@ constexpr auto compose_lens(LensA A, LensB B) {
     return composed_lens<LensB, LensA>{B, {A}};
 }
 
-#define MLens(Expr) [=] (auto& x0) -> decltype(auto) { return (Expr); }
+template <class A, class B>
+struct lens_readwrite {
+  
+  decltype(auto) operator()(auto& state) {
+    auto _ = state.read_scope();
+    return (std::invoke(r, state));
+  }
+  
+  void operator()(auto& state, auto&& val) {
+    auto _ = state.write_scope();
+    std::invoke(w, state, val);
+  }
+  
+  decltype(auto) read(auto& state) {
+    auto _ = state.read_scope();
+    return (std::invoke(r, state));
+  }
+  
+  void write(auto& state, auto&& val) {
+    auto _ = state.write_scope();
+    std::invoke(w, state, val);
+  }
+  
+  A r;
+  B w;
+};
+
+template <class Fn>
+struct simple_lens {
+
+  decltype(auto) read(auto& s) {
+    auto _ = s.read_scope();
+    return (std::invoke(fn, s));
+  }
+  
+  void write(auto& s, auto&& val) 
+  {
+    auto _ = s.write_scope();
+    std::invoke(fn, s) = (decltype(val)&&)val;
+  }
+  
+  Fn fn;
+};
+
+template <class A, class B>
+auto readwrite(A a, B b) {
+  return lens_readwrite{a, b};
+}
+
+template <class L>
+auto make_lens(L l) {
+  if constexpr (std::is_member_pointer_v<L>)
+    return simple_lens{l};
+  else if constexpr (is_instance_of(^L, ^lens_readwrite))
+    return l;
+  else 
+    return simple_lens{l};
+}
+
+template <class T>
+using make_lens_result = decltype(make_lens(std::declval<T>()));
 
 /* 
 template <class... Ls, class LensB>

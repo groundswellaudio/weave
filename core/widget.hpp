@@ -4,6 +4,7 @@
 #include <iostream>
 #include <cassert>
 #include <type_traits>
+#include <functional>
 
 #include "events/mouse_events.hpp"
 #include "events/keyboard.hpp"
@@ -13,6 +14,7 @@
 #include "../util/optional.hpp"
 #include "../util/meta.hpp"
 #include "../util/variant.hpp"
+#include "../util/util.hpp"
 
 struct painter;
 struct widget_builder;
@@ -63,13 +65,13 @@ struct widget_base {
 };
 
 namespace impl {
-  template <class L, class T>
+  template <class L, class T, class S>
   constexpr auto dyn_lens_write_ptr() {
     if constexpr ( !is_reference(^T)
-      && requires (L obj, typename L::input state, T val) { obj.write(state, val); } ) 
+      && requires (L obj, S state, T val) { obj.write(state, val); } ) 
     {
       return + [] (void* data, void* state, T val) {
-        static_cast<L*>(data)->write(*static_cast<typename L::input*>(state), val);
+        static_cast<L*>(data)->write(*static_cast<S*>(state), val);
       };
     }
     else
@@ -87,15 +89,15 @@ class dyn_lens {
     void(*destroy)(void*);
   };
   
-  template <class L>
+  template <class L, class S>
   static constexpr vtable_t vtable_for {
     +[] (void* data) -> void* {
       return new L {*static_cast<L*>(data)};
     },
     +[] (void* data, void* state) -> T {
-      return static_cast<L*>(data)->read(*static_cast<typename L::input*>(state));
+      return static_cast<L*>(data)->read(*static_cast<S*>(state));
     },
-    impl::dyn_lens_write_ptr<L, T>(),
+    impl::dyn_lens_write_ptr<L, T, S>(),
     + [] (void* data) {
       delete static_cast<L*>(data);
     }
@@ -103,8 +105,8 @@ class dyn_lens {
   
   public : 
   
-  template <class L>
-  dyn_lens(L lens) { emplace(lens); }
+  template <class L, class S>
+  dyn_lens(L lens, tag<S> t) { emplace(lens, t); }
   
   dyn_lens(dyn_lens&& o) noexcept {
     data = o.data;
@@ -112,9 +114,9 @@ class dyn_lens {
     o.data = nullptr;
   }
   
-  template <class L>
-  void emplace(L lens) {
-    vptr = &vtable_for<L>;
+  template <class L, class S>
+  void emplace(L lens, tag<S>) {
+    vptr = &vtable_for<L, S>;
     data = new L {lens};
   }
   
@@ -379,7 +381,7 @@ struct event_context_base {
   
   void reset_mouse_focus();
   
-  auto& context() const { return ctx; }
+  auto& context() const { return ctx; }
   
   application_context& ctx;
 };
@@ -525,28 +527,9 @@ namespace impl {
   
 }
 
-template <class Fn, class State>
-struct invocable_lens {
-  using input = State;
-  
-  decltype(auto) read(State& s) {
-    auto _ = s.read_scope();
-    return (fn(s));
-  }
-  
-  void write(State& s, auto&& val) 
-  {
-    auto _ = s.write_scope();
-    fn(s) = (decltype(val)&&)val;
-  }
-  
-  Fn fn;
-};
-
 template <class ValueType, class State, class Lens>
-auto make_lens(Lens lens) {
-  if constexpr ( requires (State& s) { lens(s); } )
-    return dyn_lens<ValueType>{invocable_lens<Lens, State>{lens}};
+auto make_dyn_lens(Lens lens) {
+  return dyn_lens<ValueType>{lens, tag<State>{}};
 }
 
 /// A widget along its state lens
@@ -590,7 +573,7 @@ with_lens_t(W w, Lens lens) -> with_lens_t<W>;
 template <class State, class W, class Lens>
 auto with_lens(W&& widget, Lens lens) {
   return with_lens_t{ (decltype(widget)&&)widget, 
-                       make_lens<typename W::value_type, State>(lens) };
+                       make_dyn_lens<typename W::value_type, State>(lens) };
 }
 
 struct application_context;

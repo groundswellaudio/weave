@@ -87,7 +87,7 @@ struct combo_box : widget_base {
 
 template <class Lens, class Range = std::vector<std::string>>
 struct combo_box_v : view<combo_box_v<Lens, Range>> {
-  combo_box_v(Lens l, Range choices) : lens{l}, choices{std::move(choices)} 
+  combo_box_v(auto l, Range choices) : lens{make_lens(l)}, choices{std::move(choices)} 
   {}
   
   template <class S>
@@ -102,3 +102,6 @@ struct combo_box_v : view<combo_box_v<Lens, Range>> {
   Lens lens;
   Range choices;
 };
+
+template <class Lens, class Range = std::vector<std::string>>
+combo_box_v(Lens, Range) -> combo_box_v<make_lens_result<Lens>, Range>;

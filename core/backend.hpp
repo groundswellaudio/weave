@@ -30,6 +30,8 @@ class sdl_backend
   
     // setting up a stencil buffer is necessary for nanovg to work
     SDL_GL_SetAttribute( SDL_GL_STENCIL_SIZE, 1 );
+    
+    SDL_StartTextInput();
   }
   
   void load_opengl()
@@ -115,7 +117,7 @@ class sdl_backend
   }
   
   bool is_active(key_modifier mod) const {
-    return SDL_GetModState() & (SDL_KeyMod) m;
+    return SDL_GetModState() & (SDL_Keymod) mod;
   }
   
   ~sdl_backend()

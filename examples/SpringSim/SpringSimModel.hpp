@@ -16,6 +16,7 @@ struct SpringSim : app_state, audio_renderer<SpringSim> {
   }
   
   struct Particle {
+    bool is_anchor() const { return mass == anchor_mass; }
     static constexpr auto anchor_mass = 10000000000;
     float force = 0.f, vel = 0.f, pos = 0.f, mass = 1.f;
   };
@@ -93,7 +94,7 @@ struct SpringSim : app_state, audio_renderer<SpringSim> {
     
     float phase = 0;
     
-    constexpr float non_lin_coef = 100;
+    constexpr float non_lin_coef = 10;
     
     for (auto s : os) 
     {
@@ -113,15 +114,14 @@ struct SpringSim : app_state, audio_renderer<SpringSim> {
       for (auto& p : particles) {
         p.vel += (p.force * timestep) / p.mass;
         p.pos += p.vel * timestep;
-        std::cout << p.force << std::endl;
       }
       
       float sum = 0;
       for (auto p : particles) {
         sum += p.pos;
-        std::cout << p.pos;
       }
       
+      std::cout << sum << std::endl;
       // float sum = std::sin(phase);
       // phase += 2 * 3.14 * 440 * 1.f / 44100.f;
       s[0] = sum;

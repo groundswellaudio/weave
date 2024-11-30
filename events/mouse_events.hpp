@@ -8,31 +8,31 @@ struct mouse_enter {};
 struct mouse_exit {};
 
 enum class mouse_button : unsigned char {
-	right,
-	middle,
-	left
+  right,
+  middle,
+  left
 };
 
 struct mouse_down
 {
-	bool is_double_click() const { return double_click; }
-	
-	mouse_button button;
-	bool double_click;
+  bool is_double_click() const { return double_click; }
+  
+  mouse_button button;
+  bool double_click;
 };
 
 struct mouse_up {
-	mouse_button button;
+  mouse_button button;
 };
 
 struct mouse_move {
-	vec2f delta;
-	bool is_dragging;
-	mouse_button button;
+  vec2f delta;
+  bool is_dragging;
+  mouse_button button;
 };
 
 struct mouse_scroll {
-	vec2f delta;
+  vec2f delta;
 };
 
 struct mouse_event {

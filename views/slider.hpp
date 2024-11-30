@@ -16,7 +16,6 @@ struct slider_x_widget : widget_base
 {
   slider_properties prop;
   std::string value_str;
-  
   using value_type = float;
   
   using EvCtx = event_context<slider_x_widget>;
@@ -63,11 +62,11 @@ struct slider_x_widget : widget_base
 template <class Lens>
 struct slider : view<slider<Lens>> {
   
-  slider(Lens L) : lens{L} {}
+  slider(auto L) : lens{make_lens(L)} {}
   
   template <class S>
   auto build(const widget_builder& b, S& state) {
-    val = lens(state);
+    val = lens.read(state);
     auto res = slider_x_widget{{size}, properties};
     res.on_value_change(val);
     return with_lens<S>(std::move(res), lens);
@@ -76,7 +75,7 @@ struct slider : view<slider<Lens>> {
   template <class S>
   rebuild_result rebuild(slider<Lens>& Old, widget_ref wb, widget_updater up, S& state) {
     auto& w = wb.as<slider_x_widget>();
-    val = lens(state);
+    val = lens.read(state);
     if (properties != Old.properties) {
       w.prop = properties;
     }
@@ -99,10 +98,10 @@ struct slider : view<slider<Lens>> {
   void destroy(widget_ref w) {}
   
   slider_properties properties;
-  Lens lens;
+  make_lens_result<Lens> lens;
   float val;
   vec2f size = {80, 15};
 };
 
 template <class Lens>
-slider(Lens) -> slider<Lens>;
+slider(Lens) -> slider<make_lens_result<Lens>>;

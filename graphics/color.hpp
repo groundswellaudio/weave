@@ -2,6 +2,7 @@
 
 #include <limits>
 #include <cmath>
+#include "linalg/gen-operators.hpp"
 
 enum class rgb_encoding {
   linear, 
@@ -10,6 +11,38 @@ enum class rgb_encoding {
 
 template <class T, rgb_encoding>
 struct rgba;
+
+consteval void color_operators(class_builder& b, type Elem) {
+  b << ^ [Elem] struct C {
+    
+    template <operator_kind Op>
+      requires (is_compound_assign(Op))
+    constexpr C& apply_op(const C& o) {
+      for (int k = 0; k < C::channels; ++k)
+        (%make_operator_expr(Op, ^((*this)[k]), ^(o[k])));
+      return *this;
+    }
+    
+    template <operator_kind Op>
+      requires (!is_compound_assign(Op))
+    constexpr C apply_op(auto&& o) const {
+      C res {*this};
+      (%make_operator_expr(Op, ^(res), ^(o)));
+      return res;
+    }
+    
+    template<operator_kind Op>
+      requires (is_compound_assign(Op))
+    constexpr C& apply_op( %typename(Elem) o ) {
+      for (int k = 0; k < C::channels; ++k)
+        (%make_operator_expr(Op, ^((*this)[k]), ^(o)));
+      return *this;
+    }
+    
+    %declare_arithmetic(^const C&);
+    %declare_arithmetic(Elem);
+  };
+}
 
 // RGB color in gamma 2.2
 template <class T, rgb_encoding E = rgb_encoding::gamma22>
@@ -39,7 +72,9 @@ struct rgb {
   
   template <class V>
   constexpr operator rgba<V, E> () const;
-
+  
+  // %color_operators(^T);
+  
   T data[3];
 };
 
@@ -90,6 +125,8 @@ struct rgba {
       (V)(alpha * norm_factor)
     };
   }
+  
+  // %color_operators(^T);
   
   constexpr bool operator==(const rgba<T>& o) const = default;
 

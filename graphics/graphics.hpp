@@ -19,19 +19,28 @@ namespace impl
 
 namespace text_align
 {
-	enum class x : int
-	{
-		right   = NVG_ALIGN_RIGHT,
-		center  = NVG_ALIGN_CENTER,
-		left    = NVG_ALIGN_LEFT
-	};
-	
-	enum class y : int
-	{
-		top     = NVG_ALIGN_TOP,
-		center  = NVG_ALIGN_MIDDLE,
-		bottom  = NVG_ALIGN_BOTTOM
-	};
+  enum class x : int
+  {
+    right   = NVG_ALIGN_RIGHT,
+    center  = NVG_ALIGN_CENTER,
+    left    = NVG_ALIGN_LEFT
+  };
+  
+  enum class y : int
+  {
+    top     = NVG_ALIGN_TOP,
+    center  = NVG_ALIGN_MIDDLE,
+    bottom  = NVG_ALIGN_BOTTOM
+  };
+}
+
+consteval type rebind(type templ, type elem) {
+  auto t = template_of( (class_template_spec_decl) (class_template_type) templ);
+  auto args = arguments( (class_template_type) templ );
+  template_arguments new_args {elem};
+  for (auto a : args)
+    push_back(new_args, a);
+  return instantiate(t, new_args);
 }
 
 template <class Pixel>
@@ -43,6 +52,9 @@ struct image {
   }
   
   using pixel_type = Pixel;
+  
+  template <class T>
+  using pixel_template = %rebind(^Pixel, ^T);
   
   template <class T>
     requires (is_instance_of(remove_reference(^T), ^image))
@@ -138,7 +150,7 @@ struct painter_state
     nvgTextBounds(ctx, 0, 0, str.data(), str.end(), bounds);
     return vec2f{ bounds[2] - bounds[0], bounds[3] - bounds[1] };
   }
-	
+  
   /* 
   auto make_image_from_file(const char* str)
   {
@@ -147,7 +159,7 @@ struct painter_state
       throw 1;
     return image{ctx, res};
   } */ 
-	
+  
   auto font_size() const {
     return current_font_size;
   }
@@ -219,7 +231,7 @@ struct painter : painter_state
   void reset_scissor() {
     nvgResetScissor(ctx);
   }
-	
+  
   void begin_path() {
     nvgBeginPath(ctx);
   }
@@ -227,7 +239,7 @@ struct painter : painter_state
   void close_path() {
     nvgClosePath(ctx);
   }
-	
+  
   void end_frame(){
     nvgEndFrame(ctx);
     glDisable(GL_STENCIL_TEST);
@@ -342,7 +354,7 @@ struct graphics_context
   }
   
   void create_font_from_memory(std::string name, std::span<unsigned char> bytes) {
-  	nvgCreateFontMem(ctx, name.data(), bytes.data(), bytes.size(), 0);
+    nvgCreateFontMem(ctx, name.data(), bytes.data(), bytes.size(), 0);
   }
 
   void set_font(const std::string& ident){

@@ -68,7 +68,7 @@ namespace impl {
   
   template <class... Ts, class... Vs>
   variant<Ts...> make_variant(unsigned index, Vs&&... vs) {
-    return with_index<sizeof...(Ts)>(index, [&vs...] <unsigned I> (Index<I>) {
+    return with_index<sizeof...(Vs)>(index, [&vs...] <unsigned I> (Index<I>) {
       return variant<Ts...>{ in_place_index<I>, %(^(vs...)[I]) };
     });
   }
@@ -77,10 +77,10 @@ namespace impl {
 template <class... Ts>
 struct either : view_sequence_base {
   
-  //template <class... Vs>
   either(unsigned index, Ts... vs) : body{impl::make_variant<Ts...>(index, (Ts&&)vs...)} 
   {
   }
+
   
   void seq_build(auto consumer, auto&& b, auto& state) {
     visit( [&] (auto& elem) {

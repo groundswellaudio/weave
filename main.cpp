@@ -1,5 +1,5 @@
 #include "spiral.hpp"
-#include "examples/MusicPlayer/MusicPlayer.hpp"
+#include "examples/SpringSim/SpringSim.hpp"
 
 /* 
 struct AppState : audio_renderer<AppState> {

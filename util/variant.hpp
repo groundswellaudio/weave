@@ -159,6 +159,9 @@ namespace impl
     error(os);
     return 0;
   }
+  
+  template <class T>
+  constexpr T declval();
 }
 
 struct variant_base {};
@@ -209,7 +212,9 @@ template <class... Ts>
 struct variant : variant_base
 {
   static constexpr bool trivial_dtor = (is_trivially_destructible(^Ts) && ...);
-  using ctor_selector = impl::overload_selector<Ts...>;
+  
+  template <class T>
+  using ctor_select = decltype(impl::overload_selector<Ts...>{}({impl::declval<T>()}));
   
   static consteval type alternative(unsigned idx) { return type_list{^Ts...}[idx]; }
   static consteval unsigned index_of(type T)      { return impl::find_first_pos(type_list{^Ts...}, T); }
@@ -217,13 +222,13 @@ struct variant : variant_base
   template <int N>
   using alternative_t = %alternative(N);
   
-  template <class... Args>
-  constexpr variant(Args&&... args)
-  requires ((sizeof...(Args) > 0) && requires { ctor_selector{}({(Args&&)args...}); })  // note the brace around args here
+  template <class T>
+    requires (!is_instance_of(remove_reference(^T), ^variant) && requires { typename ctor_select<T&&>; })
+  constexpr variant(T&& t)
   : data{}
   {
-    constexpr auto emplace_idx = decltype( ctor_selector{}({(Args&&)args...}) )::value;
-    data.template emplace<emplace_idx>( (Args&&) args... );
+    constexpr auto emplace_idx = ctor_select<T&&>::value;
+    data.template emplace<emplace_idx>( (T&&) t );
     index_m = emplace_idx;
   }
   
@@ -263,6 +268,7 @@ struct variant : variant_base
   {
     destroy();
     emplace_from(o);
+    return *this;
   }
   
   constexpr auto index() const {

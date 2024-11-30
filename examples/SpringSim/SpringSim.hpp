@@ -62,6 +62,23 @@ struct SpringSimApp : SpringSim {
     std::unordered_set<int> set, rel_set;
   };
   
+  bool selection_is_anchor() {
+    for (auto m : selection.set)
+      if (!get_particle(m).is_anchor())
+        return false;
+    return true;
+  }
+  
+  void set_selection_mass(float val) {
+    for (auto m : selection.set)
+      if (!get_particle(m).is_anchor())
+        get_particle(m).mass = val;
+  }
+  
+  float get_selection_mass() {
+    return get_particle(*selection.set.begin()).mass;
+  }
+    
   auto& selected_relation() {
     return get_relation(selection.selected_relation());
   }
@@ -72,6 +89,24 @@ struct SpringSimApp : SpringSim {
   
   auto& selected_particle_set() const {
     return selection.set;
+  }
+  
+  float selected_relations_force() {
+    return selected_relation().force;
+  }
+  
+  void set_selected_relations_force(float f) {
+    for (auto r : selection.rel_set)
+      this->get_relation(r).force = f;
+  }
+  
+  float selected_relation_damp() {
+    return selected_relation().damp;
+  }
+  
+  void set_selected_relations_damp(float val) {
+    for (auto r : selection.rel_set)
+      this->get_relation(r).damp = val;
   }
   
   bool is_rel_selected(int idx) const {
@@ -327,27 +362,34 @@ static constexpr auto EditorLens = [] (auto& s) -> auto& { return s; };
 
 using EditorView = simple_view_for<Editor, decltype(EditorLens)>;
 
-auto make_spring_sim(SpringSimApp& state)
+auto make_view(SpringSimApp& state)
 { 
-  auto WithLabel = [] (auto View, std::string_view str) {
+  auto WithLabel = [] (auto&& View, std::string_view str) {
     return hstack {
       text{str}, 
-      View
+      (decltype(View)&&)(View)
     }.with_align(0.5);
   };
   
   auto MassMod = 
     WithLabel( 
-      slider{ [] (auto& s) -> auto& { return s.get_particle(s.selection.selected_particle()).mass; } }
-      .with_range(1, 1000),
+      either {
+        state.selection_is_anchor(), 
+        slider{ readwrite(&SpringSimApp::get_selection_mass, &SpringSimApp::set_selection_mass) }
+        .with_range(1, 1000),
+        text {"Inf"}
+      }, 
       "Mass" );
   
+  auto ForceRead = &SpringSimApp::selected_relations_force;
+  auto ForceWrite = &SpringSimApp::set_selected_relations_force;
+  
   auto RelForce = 
-    slider{ [] (auto& s) -> auto& { return s.selected_relation().force; } }
+    slider{ readwrite(ForceRead, ForceWrite) }
     .with_range(1, 400000);
   
   auto RelDamp = 
-    slider { [] (auto& s) -> auto& { return s.selected_relation().damp; } }
+    slider { readwrite(&SpringSimApp::selected_relation_damp, &SpringSimApp::set_selected_relations_damp) }
     .with_range(0, 1);
   
   auto RelMod = vstack {
@@ -380,9 +422,9 @@ auto make_spring_sim(SpringSimApp& state)
   };
 }
 
-inline void run_spring_sim() {
+inline void run_app() {
   SpringSimApp state;
-  auto app = make_app(state, &make_spring_sim);
+  auto app = make_app(state, &make_view);
   state.start_audio_render();
   app.run(state);
 }

@@ -104,9 +104,9 @@ struct simple_view_for : view<simple_view_for<Widget, Lens, Prop>>, Prop {
       return Widget{};
     else {
       if constexpr (^Prop != ^ignore)
-        return with_lens<State>( Widget{(Prop&)*this}, lens );
+        return with_lens<State>( Widget{(Prop&)*this}, make_lens(lens) );
       else
-        return with_lens<State>( Widget{}, lens);
+        return with_lens<State>( Widget{}, make_lens(lens) );
     }
   }
   
