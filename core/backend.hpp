@@ -18,7 +18,7 @@ class sdl_backend
   
   sdl_backend()
   {
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0)
+    if (SDL_Init(SDL_INIT_VIDEO) < 0)
     {
       fprintf(stderr, "failed to initialize SDL, aborting.");
       exit(1);
@@ -38,7 +38,7 @@ class sdl_backend
   {
     if (!gladLoadGLLoader((GLADloadproc) SDL_GL_GetProcAddress))
 		{
-			//fprintf(stderr, "failed to initialize the OpenGL context.");
+			fprintf(stderr, "failed to initialize the OpenGL context.");
 			exit(1);
 		}
   }
@@ -95,6 +95,8 @@ class sdl_backend
     
       case SDL_TEXTEDITING :
       case SDL_TEXTINPUT :
+      {
+      }
       
       case SDL_KEYDOWN :
       case SDL_KEYUP :
@@ -102,6 +104,7 @@ class sdl_backend
         auto& KE = e.key;
         auto code = impl::from_sdl_keycode(KE.keysym);
         vis( keyboard_event{code, KE.type == SDL_KEYDOWN} );
+        break;
       }
     
       case SDL_WINDOWEVENT :

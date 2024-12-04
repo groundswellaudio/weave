@@ -80,7 +80,7 @@ inline bool is_number(keycode k){
 }
 
 inline char to_integer(keycode k){
-  return static_cast<std::underlying_type_t<keycode>>(k) + '0';
+  return static_cast<std::underlying_type_t<keycode>>(k) - '0';
 }
 
 inline char to_character(keycode k){

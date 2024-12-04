@@ -42,14 +42,16 @@ struct widget_base {
   vec2f position() const { return pos; }
   
   void set_size(vec2f v) {
+    assert( !std::isnan(v.x) && !std::isnan(v.y) && "NaN in widget size?" );
     sz = v;
   }
   
   void set_position(float x, float y) {
-    pos = vec2f{x, y};
+    set_position({x, y});
   }
   
   void set_position(vec2f p) {
+    assert( !std::isnan(p.x) && !std::isnan(p.y) && "NaN in widget position?" );
     pos = p;
   }
   
@@ -469,6 +471,7 @@ namespace impl {
         auto& obj = *static_cast<W*>(self);
         if constexpr ( requires {obj.layout();} ) {
           auto sz = obj.layout();
+          assert( !std::isnan(sz.x) && !std::isnan(sz.y) && "nan size result from layout?" );
           obj.set_size(sz);
           return sz;
         }

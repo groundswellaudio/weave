@@ -38,11 +38,25 @@ struct image : view<image<ImgT, Proj>> {
   }
   
   vec2f get_display_size() const {
-    if (display_size)
-      return *display_size;
-    // CAREFUL here : by convention the dimensions of images are stored as (y, x), but the size of widget is (x, y)
-    auto res = img.shape(); 
-    return vec2f{(float)res[1], (float)res[0]};
+    if (img.empty())
+      return {0, 0};
+    // CAREFUL here : by convention the dimensions of images are stored as (y, x), but the size of widget is (x, y)!
+    auto img_size = vec2f{(float)img.shape()[1], (float)img.shape()[0]};
+    if (max_bounds) {
+      if (img_size[0] == 0.f || img_size[1] == 0.f)
+        return *max_bounds;
+      auto aspect_ratio = img_size.y / img_size.x;
+      auto result_size = vec2f{ (*max_bounds)[0], (*max_bounds)[0] * aspect_ratio };
+      return result_size;
+    }
+    else
+      return img_size;
+  }
+  
+  /// Make an image view fit within a given box while preserving the aspect ratio.
+  auto& fit(vec2f box) {
+    max_bounds = box;
+    return *this;
   }
   
   auto build(auto&& b, ignore) {
@@ -60,6 +74,7 @@ struct image : view<image<ImgT, Proj>> {
         w.texture = make_texture(up.context());
     }
     else if (refresh) {
+      std::cout << "refreshing image " << std::endl;
       auto& gctx = up.context().graphics_context();
       gctx.delete_texture(*w.texture);
       
@@ -72,8 +87,10 @@ struct image : view<image<ImgT, Proj>> {
       w.texture = make_texture(up.context());
     }
     auto new_size = get_display_size();
-    return (w.size() != new_size) ? (w.set_size(new_size), rebuild_result::size_change)
-                                  : rebuild_result{};
+    if (w.size() == new_size)
+      return {};
+    w.set_size(new_size);
+    return rebuild_result::size_change;
   }
   
   private : 
@@ -93,7 +110,7 @@ struct image : view<image<ImgT, Proj>> {
   
   const ImgT& img;
   Proj image_proj;
-  optional<vec2f> display_size;
+  optional<vec2f> max_bounds;
   vec2i corner_offset = {0, 0};
   bool refresh; 
 };

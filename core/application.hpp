@@ -70,8 +70,12 @@ namespace impl {
       if (w == focused)
         return;
       
-      if (parents.size() == 0)
-        assert( (absolute_pos == vec2f{0, 0}) && "root is focused but offset is not 0" );
+      if (parents.size() == 0) {
+        // It's possible that the absolute pos is not zero here if the focused widget or 
+        // one of the parent changed its position
+        absolute_pos = vec2f{0, 0};
+        // assert( (absolute_pos == vec2f{0, 0}) && "root is focused but offset is not 0" );
+      }
       
       focused = w;
       focused_absolute_pos = absolute_pos;

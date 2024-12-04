@@ -33,7 +33,9 @@ struct text : view<text> {
   text(std::string_view str) : prop{str} {}
   
   auto build(auto&& b, ignore) {
-    return text_widget{{{60, 30}, {0, 0}}, prop};
+    auto& gctx = b.context().graphics_context();
+    auto bounds = gctx.text_bounds(prop.text, prop.font_size);
+    return text_widget{{bounds}, prop};
   }
   
   rebuild_result rebuild(text Old, widget_ref w, auto& up, ignore) {

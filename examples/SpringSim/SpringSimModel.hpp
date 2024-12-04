@@ -120,7 +120,6 @@ struct SpringSim : app_state, audio_renderer<SpringSim> {
         p.vel += (p.force * timestep) / p.mass;
         p.pos = p.pos + p.vel * timestep;
         // p.pos = std::clamp( p.pos + p.vel * timestep, -1.f, 1.f );
-        std::cout << p.pos << std::endl;
       }
       
       float sum = 0;

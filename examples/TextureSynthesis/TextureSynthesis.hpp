@@ -24,6 +24,10 @@ struct padded_image {
     return img.shape() - margin * 2;
   }
   
+  void reshape(vec2i new_shape) {
+    img.reshape(new_shape + margin * 2);
+  }
+  
   constexpr auto& operator()(this auto& self, vec2i idx) {
     return self.img(idx + self.margin);
   }
@@ -151,34 +155,35 @@ void patch_match_search(const I& examplar, I& generated, search_map& Map, int pa
   
   std::random_device rd;
   std::default_random_engine gen(rd());
-  std::uniform_int_distribution<int> rand{-10000000, 1000000};
+  std::uniform_int_distribution<int> rand{-1000, 1000};
   
   for_each_pixel( generated, [&] (auto& pix, vec2i idx) {
     auto y = idx[0];
     auto x = idx[1];
     
-    float min_dist = Map(y, x).m1;
-    vec2i origin = Map(y, x).m0;
+    float min_dist = Map(idx).m1;
+    vec2i origin = Map(idx).m0;
     
     for(int distance = 64; distance > 1; distance /= 2)
     {
-      auto nx = origin.x + rand(gen) % distance;
-      auto ny = origin.y + rand(gen) % distance;
-      
+      auto rx = rand(gen) % distance;
+      auto ry = rand(gen) % distance;
+      auto nx = origin.x + rx;
+      auto ny = origin.y + ry;
       nx = wrap(nx, 0, examplar.shape().x - 1);
       ny = wrap(ny, 0, examplar.shape().y - 1);
       
       auto new_index = vec2i{nx, ny};
       
-      auto patch_dist = patch_distance(examplar, new_index, generated, {y, x}, patch_hs);
+      auto patch_dist = patch_distance(examplar, new_index, generated, idx, patch_hs);
       if (patch_dist < min_dist) {
         min_dist = patch_dist;
         origin = new_index;
       }
     }
     
-    Map(y, x) = tuple{origin, min_dist};
-  } );
+    Map(idx) = tuple{origin, min_dist};
+  });
 }
 
 template <bool B, class R>
@@ -329,13 +334,19 @@ void dump_search_map(const search_map& m) {
 
 struct TextureSynthesis {
   
+  static constexpr auto max_gen_sz = vec2i{1080, 1920};
+  
   TextureSynthesis() 
-  : generated{vec2i{1080, 1920}}
+  : generated{vec2i{600, 800}}
   {
     generated.set_padding({20, 20});
     map.reshape(generated.shape());
     fill_with_noise(generated);
+    reset_search_map();
   }
+  
+  bool read_scope() { return true; }
+  bool write_scope() { return true; }
   
   void load_image() {
     auto path = open_file_dialog();
@@ -358,7 +369,13 @@ struct TextureSynthesis {
     auto success = save_image_to_file(*path, saved);
     assert( success );
   }
-
+  
+  void set_output_shape(vec2i new_shape) {
+    generated.reshape(new_shape);
+    map.reshape(new_shape);
+    reset_search_map();
+  }
+  
   void reset_search_map() {
     std::random_device rd;
     std::default_random_engine gen(rd());
@@ -372,7 +389,7 @@ struct TextureSynthesis {
   
   void run_synth_step() {
     auto fn = [this] {
-      int patch_hs = 5; 
+      int patch_hs = 8;
       patch_match_search(examplar, generated, map, patch_hs);
       progress = 0.25;
       if (!flip_propagation)
@@ -380,11 +397,10 @@ struct TextureSynthesis {
       else
         patch_match_propagation<-1>(examplar, generated, map, patch_hs);
       flip_propagation = !flip_propagation; 
-      
       progress = 0.5;
       patch_match_synthesize(examplar, generated, map);
       progress = 0.6;
-      match_distribution(examplar, generated); 
+      match_distribution(examplar, generated);
       progress = 0.75;
       patch_match_update_distance(examplar, generated, map, patch_hs);
       progress = -1;
@@ -407,35 +423,53 @@ struct TextureSynthesis {
   
   std::atomic<float> progress = -1;
   std::future<void> synth_task;
-  bool refresh_display = false;
+  std::atomic<bool> refresh_display = false;
   bool refresh_examplar = false;
 };
 
 auto make_view(TextureSynthesis& state)
 {
+  using State = TextureSynthesis;
+  
   auto img_size = min(state.examplar.shape(), {1600, 800});
   auto ImgPadding = 10;
   
   using namespace views;
   
   bool refresh_examplar = std::exchange(state.refresh_examplar, false);
-  bool refresh_display = std::exchange(state.refresh_display, false);
+  bool refresh_display = state.refresh_display.exchange(false);
+  
+  constexpr auto size_dial = [] (int k) {
+    return numeric_field {
+      readwrite( [k] (auto& s) { return s.generated.shape()[k]; }, 
+                 [k] (auto& s, int val) { auto new_shape = s.generated.shape(); 
+                                          new_shape[k] = val;
+                                          s.set_output_shape(new_shape);
+                                        }
+               )
+    }.range(100, 5000);
+  };
   
   return vstack {
     text{ "Texture Synthesis from examplar"},
-    trigger_button { "Load texture", &TextureSynthesis::load_image }
+    trigger_button { "Load texture", &State::load_image }
     .disable_if(state.is_working()),
-    trigger_button{ "Synthesize", [] (auto& s) { s.run_synth_step(); } }
+    trigger_button{ "Synthesize", &State::run_synth_step }
     .disable_if(state.is_working() || state.examplar.empty()),
     trigger_button{ "Save output", &TextureSynthesis::save_image }
     .disable_if(state.is_working()),
-    views::image{ state.examplar, refresh_examplar },
+    hstack {
+      text( "Generated size" ),
+      size_dial(1), 
+      size_dial(0)
+    },
+    views::image{ state.examplar, refresh_examplar }.fit({300, 300}), 
     hstack { 
-      views::image{ state.generated, refresh_display }, 
+      views::image{ state.generated, refresh_display }.fit({600, 600}),
       views::image{ state.map, refresh_display, [sz = state.examplar.shape()] (auto& elem) {
         return rgb<float>{elem.m0.x / (float) sz.x, elem.m0.y / (float) sz.y, 0}; 
-      }}, 
-    }, 
+      }}.fit({600, 600})
+    },
     /*hstack {
       // views::image { state.display },
       

@@ -92,7 +92,7 @@ using distance_return_type = %( is_integral(^T) ? ^int : ^T );
 template <class T, class X = distance_return_type<T>>
 constexpr X distance_squared(const rgb<T>& a, const rgb<T>& b) 
 {
-  X res;
+  X res = 0;
   for (int k = 0; k < 3; ++k) {
     auto diff = a[k] - b[k];
     res += diff * diff;
@@ -163,7 +163,7 @@ constexpr rgb<T>::operator rgba<V>() const {
 template <class T, class X = distance_return_type<T>>
 constexpr X distance_squared(const rgba<T>& a, const rgba<T>& b) 
 {
-  X res;
+  X res = 0;
   for (int k = 0; k < 4; ++k) {
     auto diff = a[k] - b[k];
     res += diff * diff;
