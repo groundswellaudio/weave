@@ -27,6 +27,7 @@ struct basic_modal_menu : widget_base {
     }
     else if (e.is_mouse_move()) 
     {
+      // std::cout << e.position.y << std::endl;
       hovered = e.position.y / row_size;
       if (hovered >= choices.size())
         hovered = -1;

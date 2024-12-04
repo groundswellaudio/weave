@@ -8,6 +8,9 @@
 
 #include "misc/default_font_embed"
 
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include <stb_image_write.h>
+
 graphics_context::graphics_context()
 {
   if (!gladLoadGLLoader((GLADloadproc) SDL_GL_GetProcAddress))

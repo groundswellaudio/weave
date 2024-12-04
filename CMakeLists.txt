@@ -23,12 +23,22 @@ FetchContent_Declare(miniaudio
  GIT_REPOSITORY https://github.com/mackron/miniaudio.git)
 FetchContent_MakeAvailable(miniaudio)
 
+FetchContent_Declare(dr_libs
+ GIT_REPOSITORY https://github.com/mackron/dr_libs.git)
+FetchContent_MakeAvailable(dr_libs)
+
+FetchContent_Declare(stb
+  GIT_REPOSITORY https://github.com/nothings/stb.git)
+FetchContent_MakeAvailable(stb)
+
 include_directories(./deps/glad/include)
 include_directories(./)
 include_directories(${SDL2_SOURCE_DIR}/include)
 include_directories(${nanovg_SOURCE_DIR}/src)
 include_directories(${nfd_SOURCE_DIR}/include)
 include_directories(${miniaudio_SOURCE_DIR})
+include_directories(${dr_libs_SOURCE_DIR})
+include_directories(${stb_SOURCE_DIR})
 
 add_executable(Spiral main.cpp misc/mini_audio_impl.cpp graphics/graphics.cpp)
 target_sources(Spiral PRIVATE ./deps/glad/src/glad.c)

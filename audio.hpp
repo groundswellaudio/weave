@@ -1,13 +1,20 @@
 #pragma once
-#include <SDL.h>
 
 #include <miniaudio.h>
+#include <string>
+#include <vector>
 
 struct audio_buffer_format {
   int sample_rate = 44100;
   int buffer_size = 512;
   unsigned char num_channels = 2;
 };
+
+struct audio_buffer : std::vector<float> {
+  int num_channels; 
+};
+
+audio_buffer load_audio_file(const std::string& path);
 
 struct audio_output_stream
 {

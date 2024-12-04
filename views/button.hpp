@@ -1,7 +1,9 @@
 #pragma once
 
-#include "views_core.hpp"
 #include <string_view>
+#include <functional>
+
+#include "views_core.hpp"
 #include "../cursor.hpp"
 
 struct button_properties {
@@ -94,7 +96,7 @@ struct trigger_button_widget : widget_base {
       hovered = false;
     if (!e.is_mouse_down())
       return;
-    callback( *static_cast<State*>(ec.state()) );
+    std::invoke( callback, *static_cast<State*>(ec.state()) );
   }
   
   void set_disabled(bool new_disabled) {

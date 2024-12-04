@@ -13,3 +13,12 @@ struct non_copyable {
 
 template <class T>
 struct tag {};
+
+template <class Fn>
+struct on_exit {
+  constexpr ~on_exit() { fn(); }
+  Fn fn;
+};
+
+template <class Fn>
+on_exit(Fn) -> on_exit<Fn>;

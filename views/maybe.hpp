@@ -80,7 +80,6 @@ struct either : view_sequence_base {
   either(unsigned index, Ts... vs) : body{impl::make_variant<Ts...>(index, (Ts&&)vs...)} 
   {
   }
-
   
   void seq_build(auto consumer, auto&& b, auto& state) {
     visit( [&] (auto& elem) {

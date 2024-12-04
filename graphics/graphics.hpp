@@ -4,6 +4,7 @@
 #include "nanovg.h"
 
 #include "stb_image.h"
+#include "stb_image_write.h"
 
 #include <vec.hpp>
 
@@ -11,6 +12,9 @@
 #include <optional>
 #include <vector>
 #include <string>
+#include <initializer_list>
+
+#include "util/iota.hpp"
 
 namespace impl
 {
@@ -35,19 +39,29 @@ namespace text_align
 }
 
 consteval type rebind(type templ, type elem) {
-  auto t = template_of( (class_template_spec_decl) (class_template_type) templ);
+  auto t = template_of(templ);
   auto args = arguments( (class_template_type) templ );
   template_arguments new_args {elem};
   for (auto a : args)
-    push_back(new_args, a);
-  return instantiate(t, new_args);
+  for (int k = 1; k < size(args); ++k)
+    push_back(new_args, args[k]);
+  return instantiate( (class_template_decl) t, new_args);
 }
 
 template <class Pixel>
 struct image {
   
+  image(const image& o) = default;
   image() = default;
   image(vec2i size) {
+    reshape(size);
+  }
+  
+  template <class V>
+  image(vec2i size, std::initializer_list<V> inits) 
+  {
+    for (auto i : inits)
+      buffer.emplace_back(i);
     reshape(size);
   }
   
@@ -69,6 +83,16 @@ struct image {
     return self(pt[0], pt[1]);
   }
   
+  template <class P2>
+  image<P2> to(this const auto& self) {
+    image<P2> res;
+    res.reshape(self.shape());
+    for (int y = 0; y < self.shape()[0]; ++y)
+      for (int x = 0; x < self.shape()[1]; ++x)
+        res(y, x) = static_cast<P2>(self(y, x));
+    return res;
+  }
+  
   void reshape(vec2i new_shape) {
     buffer.resize(new_shape.x * new_shape.y);
     shape_v = new_shape;
@@ -81,6 +105,18 @@ struct image {
   auto begin(this auto& self) { return self.buffer.begin(); }
   auto end(this auto& self) { return self.buffer.end(); }
   
+  bool operator==(const image& o) const {
+    if (shape() != o.shape())
+      return false;
+    for (int x0 : iota(shape()[0]))
+      for (int x1 : iota(shape()[1]))
+        if ((*this)({x0, x1}) != o({x0, x1}))
+          return false;
+    return true;
+  }
+  
+  auto size() const { return buffer.size(); }
+  
   std::vector<Pixel> buffer;
   vec2<int> shape_v {0, 0};
 };
@@ -90,7 +126,7 @@ image<Pixel> make_image_from_raw(const T* ptr, vec2<int> sz) {
   image<Pixel> res;
   res.buffer.resize(sz.x * sz.y);
   res.shape_v = sz;
-  std::memcpy(res.buffer.data(), ptr, res.buffer.size());
+  std::memcpy(res.buffer.data(), ptr, res.buffer.size() * sizeof(Pixel));
   return res;
 }
 
@@ -101,9 +137,20 @@ inline std::optional<image<rgba<unsigned char>>> load_image_from_file(const std:
   auto img = stbi_load(path.data(), &w, &h, &n, 4);
   if (!img) 
     return {};
-  auto res = make_image_from_raw<rgba<unsigned char>>(img, {w, h});
+  auto res = make_image_from_raw<rgba<unsigned char>>(img, {h, w});
   stbi_image_free(img);
   return res;
+}
+
+inline bool save_image_to_file(const std::string& path, const image<rgba<unsigned char>>& img) 
+{
+  auto w = img.shape()[1];
+  auto h = img.shape()[0];
+  
+  if (path.ends_with(".jpg") || path.ends_with(".jpeg"))
+    return stbi_write_jpg(path.c_str(), w, h, 4, img.data(), 80);
+  
+  return stbi_write_png(path.c_str(), w, h, 4, img.data(), w * 4); 
 }
 
 struct graphics_context; 
@@ -341,7 +388,7 @@ struct graphics_context
   
   texture_handle create_texture(const image<rgba<unsigned char>>& data, vec2<int> size) {
     auto data_ptr = reinterpret_cast<const unsigned char*>(data.data());
-    auto id = nvgCreateImageRGBA(ctx, size.x, size.y, 0, data_ptr);
+    auto id = nvgCreateImageRGBA(ctx, size[1], size[0], 0, data_ptr);
     return texture_handle{id};
   }
   

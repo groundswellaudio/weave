@@ -164,7 +164,10 @@ struct Editor : widget_base {
       connecting = tuple{e.position, e.position};
     }
     else if (e.is_mouse_drag()) {
-      get<1>(*connecting) = e.position;
+      if (ctx.context().is_active(key_modifier::shift))
+        child.set_position(child.position() + e.mouse_drag_delta());
+      else
+        get<1>(*connecting) = e.position;
     }
     else if (e.is_mouse_up()) {
       auto w = find_child_at(e.position);
@@ -294,14 +297,14 @@ struct Editor : widget_base {
     traverse_connections( [&p, &app, idx = 0] (vec2f a, vec2f b) mutable {
       p.circle((a + b) / 2, 5);
       p.line(a, b, 4);
-      if (app.is_rel_selected(idx))
-      {
-        p.stroke_style(colors::white);
-        p.stroke_circle((a + b) / 2, 5, 1);
-        p.stroke_style(colors::green);
-      }
       return true;
     });
+    
+    p.stroke_style(colors::white);
+    for (auto c : app.selection.rel_set) {
+      auto [a, b] = connections[c];
+      p.stroke_circle( (center(particles[a]) + center(particles[b])) / 2, 5, 1 );
+    }
     
     if (selection_rect) {
       p.stroke_style(colors::white);
@@ -310,6 +313,10 @@ struct Editor : widget_base {
   }
   
   private : 
+  
+  static vec2f center(auto& w) {
+    return w.position() + w.size() / 2;
+  }
   
   void delete_selection(event_context<Editor>& Ec) {
     auto& S = Ec.read();
@@ -331,7 +338,6 @@ struct Editor : widget_base {
   }
   
   bool traverse_connections(auto fn) {
-    auto center = [] (auto& w) { return w.position() + w.size() / 2; };
     for (auto [a, b] : connections) {
       auto CenterA = center(particles[a]);
       auto CenterB = center(particles[b]);
@@ -376,9 +382,9 @@ auto make_view(SpringSimApp& state)
       either {
         state.selection_is_anchor(), 
         slider{ readwrite(&SpringSimApp::get_selection_mass, &SpringSimApp::set_selection_mass) }
-        .with_range(1, 1000),
+        .with_range(1, 50),
         text {"Inf"}
-      }, 
+      },
       "Mass" );
   
   auto ForceRead = &SpringSimApp::selected_relations_force;
@@ -409,7 +415,8 @@ auto make_view(SpringSimApp& state)
         MassMod, 
         RelMod
       }
-    }
+    }, 
+    WithLabel( slider { &SpringSim::output_amp }.with_range(0.5, 10), "Amp" )
   //};
   }.with_margin({30, 30}).with_interspace(10);
 

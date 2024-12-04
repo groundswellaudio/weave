@@ -11,28 +11,63 @@ auto iota(int a, int b) {
 }
 
 template <class T>
-struct padded_image : image<T> {
+struct padded_image {
+  
+  template <class P>
+  using pixel_template = image<T>::template pixel_template<P>;
+  
+  using pixel_type = T;
+  
+  bool empty() const { return img.empty(); }
   
   constexpr auto shape() const {
-    return image<T>::shape() - margin * 2;
+    return img.shape() - margin * 2;
   }
   
   constexpr auto& operator()(this auto& self, vec2i idx) {
-    return ((image<T>&)self)(idx + self.margin);
+    return self.img(idx + self.margin);
+  }
+  
+  template <class Pixel>
+  image<Pixel> to() const {
+    image<Pixel> res;
+    res.reshape(shape());
+    for (int x0 : iota(shape()[0]))
+      for (int x1 : iota(shape()[1]))
+        res(x0, x1) = static_cast<Pixel>((*this)(x0, x1));
+    return res;
+  }
+  
+  template <class I>
+  constexpr bool operator==(const I& o) const {
+    if (shape() != o.shape())
+      return false;
+    for (int x0 = 0; x0 < shape()[0]; ++x0)
+      for (int x1 = 0; x1 < shape()[1]; ++x1)
+        if ((*this)(vec2i{x0, x1}) != o(vec2i{x0, x1}))
+          return false;
+    return true; 
   }
   
   constexpr auto& operator()(this auto& self, int y, int x) {
     return self({y, x});
   }
   
-  constexpr auto data() const {
-    return &(*this)({0, 0});
-  }
-  
   void set_padding(vec2i pad) { margin = pad; }
   
+  image<T> img; 
   vec2i margin;
 };
+
+template <class T>
+auto wrap(T x, T x_min, T x_max){
+  if (x < x_min)
+    return x_max - (x_min - x) % (x_max - x_min);
+  else if (x >= x_max)
+    return x_min + (x - x_min) % (x_max - x_min);
+  else
+    return x;
+}
 
 template <class I>
 auto patch_distance(const I& a, vec2<int> idxa, const I& b, vec2<int> idxb, int patch_hs) 
@@ -62,10 +97,10 @@ auto mean(const I& i) {
     RT acc{0};
     for (auto x : iota(i.shape()[1]))
       acc += i(y, x);
-    acc /= i.shape()[1];
+    acc /= (float) i.shape()[1];
     res += acc;
   }
-  res /= i.shape()[0];
+  res /= (float) i.shape()[0];
   return res;
 }
 
@@ -87,6 +122,26 @@ auto variance(const I& i, M mean) {
   return res;
 }
 
+template <class I, class Fn>
+void for_each_pixel(I& image, Fn fn) {
+  for (auto y : iota(image.shape()[0])) 
+    for (auto x : iota(image.shape()[1]))
+      fn( image(y, x), vec2i{y, x} );
+}
+
+template <class I>
+void match_distribution(const I& examplar, I& generated) {
+  auto mg = mean(generated);
+  auto dg = sqrt( variance(generated, mg) );
+  auto me = mean(examplar);
+  auto de = sqrt( variance(examplar, me) );
+  for_each_pixel( generated, [&] (auto& pix, ignore) {
+    pix = ((pix - mg) * de) / dg + me;
+    for (int k = 0; k < I::pixel_type::channels; ++k)
+      pix[k] = std::clamp(pix[k], typename I::pixel_type::scalar{0}, I::pixel_type::norm());
+  });
+}
+
 using search_map = image<tuple<vec2i, float>>;
 
 template <class I>
@@ -97,47 +152,98 @@ void patch_match_search(const I& examplar, I& generated, search_map& Map, int pa
   std::random_device rd;
   std::default_random_engine gen(rd());
   std::uniform_int_distribution<int> rand{-10000000, 1000000};
+  
+  for_each_pixel( generated, [&] (auto& pix, vec2i idx) {
+    auto y = idx[0];
+    auto x = idx[1];
     
-  for (auto y : iota(generated.shape()[0]))
-  {
-    for (auto x : iota(generated.shape()[1]))
+    float min_dist = Map(y, x).m1;
+    vec2i origin = Map(y, x).m0;
+    
+    for(int distance = 64; distance > 1; distance /= 2)
     {
-      float min_dist = Map(y, x).m1;
-      vec2i origin = Map(y, x).m0;
+      auto nx = origin.x + rand(gen) % distance;
+      auto ny = origin.y + rand(gen) % distance;
       
-      for(int distance = 64; distance > 1; distance /= 2)
-      {
-        auto nx = origin.x + rand(gen) % distance;
-        auto ny = origin.y + rand(gen) % distance;
-        
-        nx = std::clamp(nx, 0, examplar.shape().x - 1);
-        ny = std::clamp(ny, 0, examplar.shape().y - 1);
-        
-        auto new_index = vec2i{nx, ny};
-        
-        auto patch_dist = patch_distance(examplar, new_index, generated, {y, x}, patch_hs);
-        if (patch_dist < min_dist) {
-          min_dist = patch_dist;
-          origin = new_index;
-        }
+      nx = wrap(nx, 0, examplar.shape().x - 1);
+      ny = wrap(ny, 0, examplar.shape().y - 1);
+      
+      auto new_index = vec2i{nx, ny};
+      
+      auto patch_dist = patch_distance(examplar, new_index, generated, {y, x}, patch_hs);
+      if (patch_dist < min_dist) {
+        min_dist = patch_dist;
+        origin = new_index;
       }
-      
-      Map(y, x) = tuple{origin, min_dist};
     }
-  }
+    
+    Map(y, x) = tuple{origin, min_dist};
+  } );
 }
 
-template <class I>
+template <bool B, class R>
+constexpr auto maybe_reverse(R range) {
+  if constexpr (B)
+    return std::ranges::reverse_view(range);
+  else
+    return range;
+}
+
+template <class Range>
+struct drop_first_n {
+    
+  constexpr auto begin(this auto& self) { 
+    auto it = self.range.begin(); 
+    int k = self.skip; 
+    while(k--) {
+      ++it;
+    }
+    return it;
+  }
+  
+  constexpr auto end(this auto& self) { return self.range.end(); }
+
+  Range range;
+  int skip = 1;
+};
+
+template <class Range>
+constexpr auto drop_first(Range&& range, int skip) {
+  return drop_first_n<Range>{(Range&&)range, skip};
+}
+
+template <int Sign, class I>
 void patch_match_propagation(I& examplar, I& generated, search_map& Map, int patch_hs) 
 {
-  for (auto y : iota(1, Map.shape()[0]))
+  std::random_device rd;
+  std::default_random_engine gen(rd());
+  std::uniform_int_distribution distrib{0, 100};
+  
+  static_assert( Sign == -1 || Sign == +1 );
+  auto yrange = maybe_reverse<Sign == -1>(iota(0, Map.shape()[0]));
+  auto xrange = maybe_reverse<Sign == -1>(iota(0, Map.shape()[1]));
+  
+  for (auto y : drop_first(yrange, 1))
   {
-    for (auto x : iota(1, Map.shape()[1]))
+    for (auto x : drop_first(xrange, 1))
     {
+      // skip propagation for 30 percent of pixels
+      if (distrib(gen) > 70)
+        continue;
+      
       auto try_propagate = [&] (int dy, int dx) {
         
         auto new_idx = Map(y - dy, x - dx).m0 + vec2i{dy, dx};
-        new_idx = min(new_idx, examplar.shape() - vec2i{1, 1});
+        // Don't propagate if we reached the end/beginning of examplar
+        if constexpr (Sign > 0) {
+          if (new_idx[0] == examplar.shape()[0]
+             || new_idx[1] == examplar.shape()[1])
+            return;
+        }
+        else {
+          if (new_idx[0] == -1 || new_idx[1] == -1)
+            return;
+        }
         
         auto patch_dist = patch_distance(examplar, new_idx, generated, vec2i{y, x}, patch_hs);
         if (patch_dist < Map(y, x).m1) {
@@ -146,51 +252,87 @@ void patch_match_propagation(I& examplar, I& generated, search_map& Map, int pat
         }
       };
       
-      try_propagate(0, 1);
-      try_propagate(1, 0);
+      try_propagate(0, Sign);
+      try_propagate(Sign, 0);
     }
   }
 }
 
+template <class R1, class R2>
+void for_point_in(R1&& a, R2&& b, auto Fn) {
+  using scalar = decltype(*a.begin());
+  for (auto x0 : a)
+    for (auto x1 : b)
+      Fn(vec2<scalar>{x0, x1});
+}
+
+
 template <class I>
 void patch_match_synthesize(I& source, I& generated, search_map& map)
 {
-  for (auto y : iota(map.shape()[0]))
-  {
-    for (auto x : iota(map.shape()[1]))
-    {
-      generated(y, x) = source(map(y, x).m0);
-    }
-  }
+  for_each_pixel( generated, [&] (auto& pix, vec2i idx) {
+    pix = source(map(idx).m0);
+  });
+  
+  /* 
+  for_point_in( iota(1, generated.shape()[0] - 1), iota(1, generated.shape()[1] - 1), 
+                [&] (vec2i idx) {
+                  auto acc = [&] (vec2i delta) {
+                    generated(idx) += source(map(idx + delta).m0 - delta);
+                  };
+                  generated(idx) += generated(idx);
+                  acc({1, 1});
+                  acc({1, 0});
+                  acc({1, -1});
+                  acc({0, 1});
+                  acc({0, -1});
+                  acc({-1, 1});
+                  acc({-1, 0});
+                  acc({-1, -1});
+                  generated(idx) /= 10;
+                }); */ 
 }
 
 template <class I>
 void patch_match_update_distance(const I& source, const I& generated, search_map& map, int patch_hs)
 {
-  for (auto y : iota(map.shape()[0]))
-    for (auto x : iota(map.shape()[1]))
-      map(y, x).m1 = patch_distance(source, map(y, x).m0, generated, {y, x}, patch_hs);
+  for_each_pixel( map, [&] (auto& elem, vec2i idx) {
+    elem.m1 = patch_distance(source, elem.m0, generated, idx, patch_hs);
+  });
 }
 
+consteval type distrib_type(type scalar) {
+  if (is_floating_point(scalar))
+    return instantiate( ^std::uniform_real_distribution, {scalar} );
+  else
+    return instantiate( ^std::uniform_int_distribution, {scalar} );
+}
 
 template <class I>
 void fill_with_noise(I& img) {
   std::random_device rd;
   std::default_random_engine gen(rd());
-  std::uniform_int_distribution<typename I::pixel_type::scalar> 
+  using scalar = typename I::pixel_type::scalar;
+  using distrib_t = %distrib_type(^scalar);
+  distrib_t
     distrib(0, I::pixel_type::norm());
-  for (auto& p : img) {
+  for_each_pixel( img, [&] (auto& pix, ignore) {
     for (auto k : iota(I::pixel_type::channels))
-      p[k] = distrib(gen);
-  }
+      pix[k] = distrib(gen);
+  });
+}
+
+void dump_search_map(const search_map& m) {
+  for (auto& e : m)
+    std::cout << e.m0 << " ";
 }
 
 struct TextureSynthesis {
   
   TextureSynthesis() 
-  : generated{vec2i{500, 300}}
+  : generated{vec2i{1080, 1920}}
   {
-    generated.set_padding({10, 10});
+    generated.set_padding({20, 20});
     map.reshape(generated.shape());
     fill_with_noise(generated);
   }
@@ -200,12 +342,23 @@ struct TextureSynthesis {
     if (!path)
       return;
     auto res = load_image_from_file(*path);
-    if (res)
-      display = std::move(*res);
-    examplar = padded_image{display, {10, 10}};
+    if (!res)
+      return;
+    //display = res->to<rgba<unsigned char>>();
+    examplar = padded_image{res->to<rgb<float>>(), {15, 15}};
     reset_search_map();
+    refresh_examplar = true;
   }
   
+  void save_image() {
+    auto path = save_file_dialog();
+    if (!path)
+      return;
+    auto saved = generated.to<rgba<unsigned char>>();
+    auto success = save_image_to_file(*path, saved);
+    assert( success );
+  }
+
   void reset_search_map() {
     std::random_device rd;
     std::default_random_engine gen(rd());
@@ -219,14 +372,23 @@ struct TextureSynthesis {
   
   void run_synth_step() {
     auto fn = [this] {
-      patch_match_search(examplar, generated, map, 5);
+      int patch_hs = 5; 
+      patch_match_search(examplar, generated, map, patch_hs);
       progress = 0.25;
-      patch_match_propagation(examplar, generated, map, 5);
+      if (!flip_propagation)
+        patch_match_propagation<1>(examplar, generated, map, patch_hs);
+      else
+        patch_match_propagation<-1>(examplar, generated, map, patch_hs);
+      flip_propagation = !flip_propagation; 
+      
       progress = 0.5;
       patch_match_synthesize(examplar, generated, map);
+      progress = 0.6;
+      match_distribution(examplar, generated); 
       progress = 0.75;
-      patch_match_update_distance(examplar, generated, map, 5);
+      patch_match_update_distance(examplar, generated, map, patch_hs);
       progress = -1;
+      refresh_display = true;
     };
     progress = 0;
     synth_task = std::async(fn);
@@ -238,13 +400,15 @@ struct TextureSynthesis {
   
   using u8 = unsigned char;
   
-  padded_image<rgba<u8>> generated;
-  padded_image<rgba<u8>> examplar;
+  padded_image<rgb<float>> generated;
+  padded_image<rgb<float>> examplar;
   search_map map;
+  bool flip_propagation = true;
   
-  image<rgba<u8>> display;
   std::atomic<float> progress = -1;
   std::future<void> synth_task;
+  bool refresh_display = false;
+  bool refresh_examplar = false;
 };
 
 auto make_view(TextureSynthesis& state)
@@ -254,21 +418,64 @@ auto make_view(TextureSynthesis& state)
   
   using namespace views;
   
+  bool refresh_examplar = std::exchange(state.refresh_examplar, false);
+  bool refresh_display = std::exchange(state.refresh_display, false);
+  
   return vstack {
     text{ "Texture Synthesis from examplar"},
-    trigger_button { "Load texture", [] (auto& s) { s.load_image(); } }
+    trigger_button { "Load texture", &TextureSynthesis::load_image }
     .disable_if(state.is_working()),
     trigger_button{ "Synthesize", [] (auto& s) { s.run_synth_step(); } }
-    .disable_if(state.is_working() || state.examplar.empty()), 
-    hstack {
+    .disable_if(state.is_working() || state.examplar.empty()),
+    trigger_button{ "Save output", &TextureSynthesis::save_image }
+    .disable_if(state.is_working()),
+    views::image{ state.examplar, refresh_examplar },
+    hstack { 
+      views::image{ state.generated, refresh_display }, 
+      views::image{ state.map, refresh_display, [sz = state.examplar.shape()] (auto& elem) {
+        return rgb<float>{elem.m0.x / (float) sz.x, elem.m0.y / (float) sz.y, 0}; 
+      }}, 
+    }, 
+    /*hstack {
       // views::image { state.display },
-      views::image { state.generated }.with_corner_offset( {ImgPadding, ImgPadding} )
-    },
+      
+      views::image{ state.examplar, refresh_examplar }, 
+      views::image{ state.map, refresh_display, [sz = state.examplar.shape()] (auto& elem) {
+        return rgb<float>{elem.m0.x / (float) sz.x, elem.m0.y / (float) sz.y, 0}; 
+      }}, 
+    },*/
     progress_bar { state.progress }
   };
 }
 
+void test_image() {
+  image<vec2i> img {
+    vec2i{720, 725}
+  };
+  
+  for_each_pixel( img, [] (auto& pix, vec2i idx) {
+    pix = idx;
+  });
+  
+  vec2i margin = {17, 17};
+  
+  padded_image<vec2i> img2 { img, margin };
+  
+  for_each_pixel( img2, [&] (auto& p2, vec2i idx) {
+    assert( p2 == idx + margin );
+  });
+  
+  auto img3 = img;
+  img3.reshape(img3.shape() - margin * 2);
+  for_each_pixel( img3, [&] (auto& pix, vec2i idx) {
+    pix = img(idx + margin);
+  });
+  
+  assert( img2 == img3 );
+}
+
 inline void run_app() {
+  test_image();
   TextureSynthesis state;
   auto app = make_app(state, &make_view);
   app.run(state);
