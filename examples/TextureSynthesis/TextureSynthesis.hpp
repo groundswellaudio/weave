@@ -307,10 +307,11 @@ void patch_match_update_distance(const I& source, const I& generated, search_map
 }
 
 consteval type distrib_type(type scalar) {
+  auto args = template_arguments{scalar};
   if (is_floating_point(scalar))
-    return instantiate( ^std::uniform_real_distribution, {scalar} );
+    return instantiate(^std::uniform_real_distribution, args);
   else
-    return instantiate( ^std::uniform_int_distribution, {scalar} );
+    return instantiate(^std::uniform_int_distribution, args);
 }
 
 template <class I>
@@ -413,8 +414,6 @@ struct TextureSynthesis {
   bool is_working() const {
     return progress >= 0.f;
   }
-  
-  using u8 = unsigned char;
   
   padded_image<rgb<float>> generated;
   padded_image<rgb<float>> examplar;

@@ -1,3 +1,19 @@
+#ifndef K
+  #define K(code, SDLCode)
+#endif 
+
+#ifndef S 
+  #define S(CODE, SDLCODE, STR)
+#endif
+
+#ifndef N
+  #define N(NUM)
+#endif
+
+#ifndef L 
+  #define L(SMALL, BIG)
+#endif
+
 K(alt_left, LALT)
 K(ctrl_left, LCTRL)
 K(shift_left, LSHIFT)
@@ -92,3 +108,8 @@ L(w, W)
 L(x, X)
 L(y, Y)
 L(z, Z)
+
+#undef K
+#undef S
+#undef N
+#undef L

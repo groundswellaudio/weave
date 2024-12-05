@@ -19,6 +19,7 @@ struct numeric_field_widget : widget_base {
   numeric_field_properties prop;
   double value;
   std::string value_str;
+  bool accept_decimal;
   bool is_editing = false;
   
   void on(mouse_event e, event_context<Self>& Ec) {
@@ -48,10 +49,16 @@ struct numeric_field_widget : widget_base {
       return;
     }
     
+    if (to_character(e.key) == '.' && accept_decimal) 
+    {
+      if (value_str.find('.') == std::string::npos)
+        value_str.push_back('.');
+      return;
+    }
+    
     switch(e.key) {
       case keycode::backspace:
         value_str.pop_back();
-        value = strtod(value_str.data(), nullptr);
         break;
       case keycode::enter: 
         update_from_str();
@@ -86,6 +93,7 @@ struct numeric_field : view<numeric_field<Lens>> {
     auto init_val = lens.read(state);
     auto res = numeric_field_widget{{50, 15}, prop, (double)init_val};
     res.update_str();
+    res.accept_decimal = is_floating_point(type_of(^init_val));
     return with_lens<S>(std::move(res), lens);
   }
   

@@ -17,13 +17,8 @@ enum class keycode : unsigned char {
   #define K(name, CAPNAME) name,
   #define L(n, C) n = #n[0],
   #define S(name, CAPNAME, Z) name,
-  
-    #include "keys.def"
-  
-  #undef N
-  #undef K
-  #undef L
-  #undef S
+  #include "keys.def"
+
   invalid_key
 };
 
@@ -83,8 +78,16 @@ inline char to_integer(keycode k){
   return static_cast<std::underlying_type_t<keycode>>(k) - '0';
 }
 
-inline char to_character(keycode k){
-  return static_cast<std::underlying_type_t<keycode>>(k);
+inline char to_character(keycode k) {
+  switch(k)
+  {
+    #define S(CODE, SDLNAME, STR) case keycode::CODE : return STR[0];
+    #define N(NUM) case keycode::n##NUM : return #NUM[0];
+    #define L(S, B) case keycode::S : return #S[0];
+    #include "keys.def"
+    default : 
+      return 0;
+  }
 }
 
 // backend stuff
@@ -98,10 +101,6 @@ namespace impl {
       #define L(N, C) case SDLK_##N     : return keycode::N;
       #define S(N, C, Z) case SDLK_##C  : return keycode::N;
         #include "keys.def"
-      #undef K
-      #undef N
-      #undef L
-      #undef S
       default :
         return keycode::invalid_key;
     }
@@ -116,10 +115,6 @@ namespace impl {
       #define L(N, C) case keycode::N      : return SDLK_##N;
       #define S(N, C, Z) case keycode::N   : return SDLK_##C;
         #include "keys.def"
-      #undef K
-      #undef N
-      #undef L
-      #undef S
       default :
         return SDLK_0;
     }
