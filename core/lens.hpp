@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+
 struct empty_lens {};
 
 template <class... Ts>
@@ -61,27 +63,45 @@ constexpr auto compose_lens(LensA A, LensB B) {
     return composed_lens<LensB, LensA>{B, {A}};
 }
 
+template <class Fn>
+struct invocable_wrapper {
+  
+  template <class... Args>
+  constexpr decltype(auto) operator() (this auto&& self, Args&&... args) 
+  {
+    return ( std::invoke(self.fn, (Args&&)args...) );
+  }
+  
+  Fn fn;
+};
+
+template <class S>
+decltype(auto) apply_read(S& state, auto&& fn) {
+  if constexpr( requires { state.apply_read(fn); } )
+    return (state.apply_read(fn));
+  else
+    return (fn(state));
+}
+
+template <class S>
+void apply_write(S& state, auto&& fn) {
+  if constexpr ( requires {state.apply_write(fn);} )
+    state.apply_write(fn);
+  else
+    fn(state);
+}
+
 template <class A, class B>
 struct lens_readwrite {
   
-  decltype(auto) operator()(auto& state) {
-    auto _ = state.read_scope();
-    return (std::invoke(r, state));
-  }
-  
-  void operator()(auto& state, auto&& val) {
-    auto _ = state.write_scope();
-    std::invoke(w, state, val);
-  }
-  
   decltype(auto) read(auto& state) {
-    auto _ = state.read_scope();
-    return (std::invoke(r, state));
+    return (apply_read(state, r));
   }
   
   void write(auto& state, auto&& val) {
-    auto _ = state.write_scope();
-    std::invoke(w, state, val);
+    apply_write(state, [this, &val] (auto& s) {
+      w(s, (decltype(val)&&) val);
+    });
   }
   
   A r;
@@ -89,48 +109,32 @@ struct lens_readwrite {
 };
 
 template <class Fn>
-struct simple_lens {
+struct invocable_lens {
 
   decltype(auto) read(auto& s) {
-    if constexpr (remove_reference(type_of(^s)) == ^void*) 
-      return (fn(s));
-    else 
-      return (s.apply_read([this] (auto& s) -> decltype(auto) { return (std::invoke(fn, s)); }));
+    return apply_read(s, fn);
   }
   
   void write(auto& s, auto&& val) {
-    if constexpr (remove_reference(type_of(^s)) == ^void*)
-      std::invoke(fn, s) = (decltype(val)&&)val;
-    else
-      s.apply_write( [this, &val] (auto& s) {
-        std::invoke(fn, s) = (decltype(val)&&)val;
-      });
+    auto f = [this, &val] (auto& s) { fn(s) = (decltype(val)&&)val; };
+    return apply_write(s, f);
   }
   
   Fn fn;
 };
 
-template <class A, class B>
-auto readwrite(A a, B b) {
-  return lens_readwrite{a, b};
-}
-
 template <class L>
 auto make_lens(L l) {
-  if constexpr (std::is_member_pointer_v<L>)
-    return simple_lens{l};
-  else if constexpr (is_instance_of(^L, ^lens_readwrite))
+  if constexpr (is_instance_of(^L, ^lens_readwrite))
     return l;
   else 
-    return simple_lens{l};
+    return invocable_lens{invocable_wrapper{l}};
+}
+
+template <class A, class B>
+auto readwrite(A a, B b) {
+  return lens_readwrite{invocable_wrapper<A>{a}, invocable_wrapper<B>{b}};
 }
 
 template <class T>
 using make_lens_result = decltype(make_lens(std::declval<T>()));
-
-/* 
-template <class... Ls, class LensB>
-auto compose_lens(composed_lens<Ls...> A, LensB B) {
-  if constexpr 
-  return composed_lens{B, A};
-} */ 

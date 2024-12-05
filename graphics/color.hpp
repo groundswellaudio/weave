@@ -179,9 +179,9 @@ constexpr auto distance(const rgba<T>& a, const rgba<T>& b)
 }
 
 template <class T>
-struct grayscale {
+struct monochrome {
   constexpr auto& operator=(T v) { value = v; return *this; }
-  constexpr bool operator==(const grayscale& o) const = default; 
+  constexpr bool operator==(const monochrome& o) const = default; 
   T value;
 };
 

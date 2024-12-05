@@ -298,6 +298,32 @@ void patch_match_synthesize(I& source, I& generated, search_map& map)
                 }); */ 
 }
 
+/// Patch match resynthesis with completeness constraints
+template <class I>
+void patch_match_synthesize(const I& source, I& generated, const search_map& map, const search_map& invmap)
+{
+  image<monochrome<float>> norm {generated.shape()};
+  for (auto& n : norm)
+    n = 1;
+  
+  // resampling
+  for_each_pixel( generated, [&] (auto& pix, vec2i idx) {
+    pix = source(map(idx).m0);
+  });
+  
+  // completeness, combine the two maps by finding the pick with the least distance
+  for_each_pixel( source, [&] (auto& pix, vec2i idx) {
+    auto mapped_idx = invmap(idx).m0;
+    generated(mapped_idx) += pix;
+    ++norm(mapped_idx).value;
+  });
+  
+  // normalize
+  for_each_pixel( generated, [&] (auto& pix, vec2i idx) {
+    pix /= norm(idx).value;
+  });
+}
+
 template <class I>
 void patch_match_update_distance(const I& source, const I& generated, search_map& map, int patch_hs)
 {
@@ -333,7 +359,38 @@ void dump_search_map(const search_map& m) {
     std::cout << e.m0 << " ";
 }
 
-struct TextureSynthesis {
+void reset_search_map(search_map& map, vec2i source_bounds) {
+  std::random_device rd;
+  std::default_random_engine gen(rd());
+  std::uniform_int_distribution<int> gen0 (0, source_bounds[0]);
+  std::uniform_int_distribution<int> gen1 (0, source_bounds[1]);
+  for (auto& entry : map) {
+    entry.m0 = vec2i{gen0(gen), gen1(gen)};
+    entry.m1 = 1000000000000.f;
+  }
+}
+
+struct PatchMatchMap {
+  
+  template <class I>
+  void search(const I& source, const I& img, int patch_hs) {
+    patch_match_search(source, img, map, patch_hs);
+  }
+  
+  template <class I>
+  void propagate(const I& source, I& img, int patch_hs) {
+    if (!flip_propagation)
+      patch_match_propagation<1>(source, img, map, patch_hs);
+    else
+      patch_match_propagation<-1>(source, img, map, patch_hs);
+    flip_propagation = !flip_propagation; 
+  }
+  
+  search_map map;
+  bool flip_propagation = false;
+};
+
+struct TextureSynthesis : app_state {
   
   static constexpr auto max_gen_sz = vec2i{1080, 1920};
   
@@ -343,11 +400,7 @@ struct TextureSynthesis {
     generated.set_padding({20, 20});
     map.reshape(generated.shape());
     fill_with_noise(generated);
-    reset_search_map();
   }
-  
-  bool read_scope() { return true; }
-  bool write_scope() { return true; }
   
   void load_image() {
     auto path = open_file_dialog();
@@ -358,7 +411,10 @@ struct TextureSynthesis {
       return;
     //display = res->to<rgba<unsigned char>>();
     examplar = padded_image{res->to<rgb<float>>(), {15, 15}};
-    reset_search_map();
+    invmap.reshape(examplar.shape());
+    reset_search_map(map, examplar.shape());
+    reset_search_map(invmap, generated.shape());
+    
     refresh_examplar = true;
   }
   
@@ -374,36 +430,42 @@ struct TextureSynthesis {
   void set_output_shape(vec2i new_shape) {
     generated.reshape(new_shape);
     map.reshape(new_shape);
-    reset_search_map();
+    reset_search_map(map, examplar.shape());
   }
   
-  void reset_search_map() {
-    std::random_device rd;
-    std::default_random_engine gen(rd());
-    std::uniform_int_distribution<int> gen_y (0, examplar.shape()[0]);
-    std::uniform_int_distribution<int> gen_x (0, examplar.shape()[1]);
-    for (auto& entry : map) {
-      entry.m0 = vec2i{gen_y(gen), gen_x(gen)};
-      entry.m1 = 1000000000000.f;
-    }
-  }
-  
-  void run_synth_step() {
+  void v1() {
     auto fn = [this] {
-      int patch_hs = 8;
       patch_match_search(examplar, generated, map, patch_hs);
-      progress = 0.25;
       if (!flip_propagation)
         patch_match_propagation<1>(examplar, generated, map, patch_hs);
       else
         patch_match_propagation<-1>(examplar, generated, map, patch_hs);
       flip_propagation = !flip_propagation; 
-      progress = 0.5;
       patch_match_synthesize(examplar, generated, map);
-      progress = 0.6;
       match_distribution(examplar, generated);
-      progress = 0.75;
       patch_match_update_distance(examplar, generated, map, patch_hs);
+      refresh_display = true;
+    };
+    progress = 0;
+    synth_task = std::async(fn);
+  }
+  
+  void v2() {
+    auto fn = [this] {
+      patch_match_search(examplar, generated, map, patch_hs);
+      patch_match_search(generated, examplar, invmap, patch_hs);
+      if (!flip_propagation) {
+        patch_match_propagation<1>(examplar, generated, map, patch_hs);
+        patch_match_propagation<1>(generated, examplar, invmap, patch_hs);
+      }
+      else {
+        patch_match_propagation<-1>(examplar, generated, map, patch_hs);
+        patch_match_propagation<-1>(generated, examplar, invmap, patch_hs);
+      }
+      flip_propagation = !flip_propagation; 
+      patch_match_synthesize(examplar, generated, map, invmap);
+      patch_match_update_distance(examplar, generated, map, patch_hs);
+      patch_match_update_distance(generated, examplar, invmap, patch_hs);
       progress = -1;
       refresh_display = true;
     };
@@ -417,8 +479,10 @@ struct TextureSynthesis {
   
   padded_image<rgb<float>> generated;
   padded_image<rgb<float>> examplar;
-  search_map map;
+  search_map map, invmap;
   bool flip_propagation = true;
+  
+  int patch_hs = 8;
   
   std::atomic<float> progress = -1;
   std::future<void> synth_task;
@@ -453,14 +517,16 @@ auto make_view(TextureSynthesis& state)
     text{ "Texture Synthesis from examplar"},
     trigger_button { "Load texture", &State::load_image }
     .disable_if(state.is_working()),
-    trigger_button{ "Synthesize", &State::run_synth_step }
+    trigger_button{ "Synthesize", &State::v2 }
     .disable_if(state.is_working() || state.examplar.empty()),
     trigger_button{ "Save output", &TextureSynthesis::save_image }
     .disable_if(state.is_working()),
     hstack {
       text( "Generated size" ),
       size_dial(1), 
-      size_dial(0)
+      size_dial(0), 
+      text( "Patch half-size " ), 
+      numeric_field{ &State::patch_hs }.range(3, 20)
     },
     views::image{ state.examplar, refresh_examplar }.fit({300, 300}), 
     hstack { 
