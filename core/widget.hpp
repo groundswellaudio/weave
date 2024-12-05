@@ -375,11 +375,13 @@ struct event_context_base {
   
   void close_modal_menu();
   
-  void grab_keyboard_focus(this auto& self, widget_ref r);
+  void grab_keyboard_focus(this auto&& self, widget_ref r);
   
   void release_keyboard_focus();
   
   widget_ref current_mouse_focus();
+  
+  void grab_mouse_focus(this auto&& self, widget_ref w);
   
   void reset_mouse_focus();
   
@@ -390,6 +392,12 @@ struct event_context_base {
 
 template <> 
 struct event_context_t<void> : event_context_base {
+  
+  auto with_parent(widget_ref p) {
+    auto res {*this};
+    res.parents.push_back(p);
+    return res;
+  }
   
   void* state() { return state_ptr; }
   widget_ref parent() const { return parents.back(); }

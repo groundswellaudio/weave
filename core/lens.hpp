@@ -1,7 +1,5 @@
 #pragma once
 
-#include <type_traits>
-
 struct empty_lens {};
 
 template <class... Ts>
@@ -94,14 +92,19 @@ template <class Fn>
 struct simple_lens {
 
   decltype(auto) read(auto& s) {
-    auto _ = s.read_scope();
-    return (std::invoke(fn, s));
+    if constexpr (remove_reference(type_of(^s)) == ^void*) 
+      return (fn(s));
+    else 
+      return (s.apply_read([this] (auto& s) -> decltype(auto) { return (std::invoke(fn, s)); }));
   }
   
-  void write(auto& s, auto&& val) 
-  {
-    auto _ = s.write_scope();
-    std::invoke(fn, s) = (decltype(val)&&)val;
+  void write(auto& s, auto&& val) {
+    if constexpr (remove_reference(type_of(^s)) == ^void*)
+      std::invoke(fn, s) = (decltype(val)&&)val;
+    else
+      s.apply_write( [this, &val] (auto& s) {
+        std::invoke(fn, s) = (decltype(val)&&)val;
+      });
   }
   
   Fn fn;

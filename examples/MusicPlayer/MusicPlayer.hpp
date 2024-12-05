@@ -2,7 +2,7 @@
 
 #include "spiral.hpp"
 
-struct State {
+struct State : app_state {
   
   struct Table {
     
@@ -30,12 +30,14 @@ struct State {
     table.cells.push_back({"alicia keys", "unthinkable", "really good"});
   }
   
+  std::string PlaylistName;
   Table table;
 };
 
 struct table_widget : widget_base {
   
   using value_type = void; 
+  using Self = table_widget;
   
   table_widget(vec2f sz) : widget_base{sz} {
     
@@ -55,7 +57,7 @@ struct table_widget : widget_base {
   }
   
   static constexpr float first_row = 22;
-  static constexpr float row = 15;
+  static constexpr float row_height = 15;
   
   void handle_mouse_down_header(vec2f p) {
     for (unsigned k = 1; k < properties.size(); ++k) 
@@ -72,19 +74,52 @@ struct table_widget : widget_base {
     }
   }
   
-  void handle_mouse_down_body(vec2f pos, application_context& ctx) {
-    int selected = (pos.y - first_row) / row;
-    if (selected >= cells.size())
+  std::optional<vec2i> find_cell_at(vec2f pos) const {
+    int selected_row = (pos.y - first_row) / row_height;
+    if (selected_row >= cells.size())
+      return {};
+    int k = 0;
+    auto it = properties.begin();
+    ++it;
+    for (; it != properties.end(); ++it) {
+      if (get<1>(*it) > pos.x)
+        return vec2i{k, selected_row};
+      ++k;
+    }
+    return vec2i{k, selected_row};
+  }
+  
+  void handle_mouse_down_body(mouse_event e, event_context<Self>& Ec) {
+    auto cell = find_cell_at(e.position);
+    if (!cell)
       return;
-    bool select_range = ctx.is_active(key_modifier::shift);
+    auto [col, row] = *cell;
+    bool select_range = Ec.context().is_active(key_modifier::shift);
     if (select_range) {
       auto i = selection.x;
-      selection.x = std::min(i, selected);
-      selection.y = std::max(i, selected);
+      selection.x = std::min(i, row);
+      selection.y = std::max(i, row);
     }
     else {
-      selection.x = selected;
-      selection.y = -1;
+      if (focused_cell == cell) {
+      // Clicking on a single item again : edit the field
+        auto lens = [this, cell] (ignore) -> auto& { return cells[cell->y].prop[cell->x]; };
+        auto dl = dyn_lens<std::string>(make_lens(lens), tag<void*>{});
+        auto field_width = (col == properties.size() - 1) 
+          ? size().x - get<1>(properties[col])
+          : get<1>(properties[col + 1]) - get<1>(properties[col]);
+        vec2f field_size {field_width, row_height};
+        edited_field.emplace( with_lens_t<text_field_widget>{{field_size}, std::move(dl)} );
+        edited_field->set_position( {get<1>(properties[col]), first_row + row * row_height} );
+        edited_field->editing = true;
+        Ec.with_parent(this).grab_mouse_focus(&*edited_field);
+        Ec.with_parent(this).grab_keyboard_focus(&*edited_field);
+      }
+      else {
+        selection.x = row;
+        selection.y = -1;
+      }
+      focused_cell = *cell;
     }
   }
   
@@ -94,7 +129,7 @@ struct table_widget : widget_base {
       if (e.position.y < first_row) 
         handle_mouse_down_header(e.position);
       else 
-        handle_mouse_down_body(e.position, Ec.context());
+        handle_mouse_down_body(e, Ec);
     }
     
     if (e.is_mouse_drag() && dragging != -1) {
@@ -116,12 +151,16 @@ struct table_widget : widget_base {
       dragging = -1;
   }
   
+  bool traverse_children(auto fn) {
+    return edited_field ? fn(*edited_field) : true;
+  }
+  
   void paint(painter& p) {
     constexpr float first_row = 22;
     constexpr auto row = 15.f;
     p.font_size(13);
     p.fill_style(colors::white);
-    p.text_align( text_align::x::left, text_align::y::center );
+    p.text_align(text_align::x::left, text_align::y::center);
     float pos_x = 0;
     p.stroke_style(colors::white);
     p.line( {0, first_row}, {size().x, first_row}, 1 );
@@ -156,11 +195,16 @@ struct table_widget : widget_base {
   vec2<int> selection {-1, -1};
   std::vector<tuple<std::string, float>> properties;
   std::vector<cell> cells;
+  std::optional<vec2i> focused_cell;
+  std::optional<with_lens_t<text_field_widget>> edited_field;
   int dragging = -1;
+  std::function<void(event_context_t<void>& ec, vec2i, const std::string&)> on_field_edit;
 };
 
 template <class T>
-struct table_v {
+struct table_v : view<table_v<T>> {
+  
+  table_v(T& table) : table{table} {}
   
   auto build(auto&& builder, auto& state) {
     table_widget res {{400, 400}};
@@ -177,12 +221,14 @@ struct table_v {
     return {};
   }
   
-  T table;
+  T& table;
 };
 
 auto make_view(State& state)
 {
-  return table_v { state.table };
+  return vstack{ table_v { state.table },
+                 text_field{ &State::PlaylistName }
+               }.align_center();
 }
 
 inline void run_app() {

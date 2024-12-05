@@ -1,6 +1,10 @@
 #pragma once
 
 struct app_state {
-  bool read_scope() const { return true; }
-  bool write_scope() const { return true; }
+  void apply_write(this auto& self, auto&& fn) {
+    fn(self);
+  }
+  decltype(auto) apply_read(this auto& self, auto&& fn) {
+    return (fn(self));
+  }
 };

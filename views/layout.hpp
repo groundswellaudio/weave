@@ -37,6 +37,11 @@ struct stack
     return self;
   }
   
+  auto&& align_center(this auto&& self) {
+    self.info.align_ratio = 0.5;
+    return self;
+  }
+  
   tuple<Ts...> children;
   stack_data info;
 };

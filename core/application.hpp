@@ -66,7 +66,17 @@ namespace impl {
       }
     };
     
-    void set_focused(widget_ref w, vec2f absolute_pos) {
+    void set_focused(widget_ref w, vec2f abs_pos) {
+      set_focused(w, abs_pos, parents);
+    }
+    
+    public : 
+    
+    mouse_event_dispatcher(widget_ref root) {
+      set_focused(root, {0, 0});
+    }
+    
+    void set_focused(widget_ref w, vec2f absolute_pos, const event_context_parent_stack& new_parents) {
       if (w == focused)
         return;
       
@@ -84,12 +94,6 @@ namespace impl {
       for (auto p : std::ranges::views::reverse(parents))
         if (p.is_child_event_listener())
           top_parent_listener = p;
-    }
-    
-    public : 
-    
-    mouse_event_dispatcher(widget_ref root) {
-      set_focused(root, {0, 0});
     }
     
     void reset_focus(widget_ref root) {
@@ -243,6 +247,13 @@ struct application_context {
     root.layout();
   }
   
+  void grab_mouse_focus(widget_ref new_focused, event_context_parent_stack parents) {
+    vec2f abs_pos = new_focused.position();
+    for (auto p : parents)
+      abs_pos += p.position();
+    med.set_focused(new_focused, abs_pos, parents);
+  }
+  
   void open_modal_menu(widget_box menu, widget_ref parent, event_context_parent_stack stack) 
   {
     stack.push_back(parent);
@@ -266,6 +277,10 @@ struct application_context {
   
   widget_ref current_mouse_focus() {
     return med.current_focus();
+  }
+  
+  bool has_keyboard_focus(widget_ref r) const {
+    return keyboard.focused == r; 
   }
   
   void reset_mouse_focus() {
@@ -299,7 +314,11 @@ void event_context_base::close_modal_menu() {
   ctx.close_modal_menu();
 }
 
-void event_context_base::grab_keyboard_focus(this auto& self, widget_ref focused) {
+void event_context_base::grab_mouse_focus(this auto&& self, widget_ref focused) {
+  self.ctx.grab_mouse_focus(focused, self.parents);
+}
+
+void event_context_base::grab_keyboard_focus(this auto&& self, widget_ref focused) {
   self.ctx.grab_keyboard_focus(focused, self.parents);
 }
 
@@ -314,7 +333,7 @@ widget_ref event_context_base::current_mouse_focus() {
 void event_context_base::reset_mouse_focus() {
   ctx.reset_mouse_focus();
 }
-  
+
 template <class ViewCtor, class View, class State>
 struct application 
 {
