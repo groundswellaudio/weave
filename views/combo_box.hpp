@@ -75,7 +75,7 @@ struct combo_box_widget : widget_base {
   
   void paint(painter& p, unsigned val) {
     p.stroke_style(colors::white);
-    p.stroke_rounded_rect({0, 0}, size(), 1);
+    p.stroke_rounded_rect({0, 0}, size(), 6);
     
     p.fill_style(colors::white);
     p.text_align(text_align::x::center, text_align::y::center);

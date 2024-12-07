@@ -3,10 +3,23 @@
 #include <shared_mutex>
 #include <mutex>
 #include <span>
+#include <numbers>
 
 struct PmSynth;
 
-std::span<const tuple<const char*, float*(*)(PmSynth&)>> mod_slots();
+template <class T>
+struct modulable {
+  
+  auto modulated() const { return value * modulation; }
+  
+  auto& operator=(T val) { value = val; return *this; }
+  operator T() const { return value; }
+  
+  T value;
+  T modulation = 1;
+};
+
+std::span<const tuple<const char*, modulable<float>*(*)(PmSynth&)>> mod_slots();
 
 struct PmSynth : audio_renderer<PmSynth>, app_state
 {
@@ -28,11 +41,21 @@ struct PmSynth : audio_renderer<PmSynth>, app_state
     float dt = 1.f / 44100.f;
     for (auto s : os) 
     {
+      for (auto& r : mod_matrix)
+        for (auto& e : r)
+          e.modulation = 1;
+      for (auto& r : freq_ratio)
+        r.modulation = 1;
+      for (auto& o : osc_vol)
+        o.modulation = 1;
+      
       for (auto& l : lfos)
       {
         if (l.dest.dest)
-          *l.dest.dest *= (1 + l.mod * std::sin(l.phi * l.freq * 2 * 3.14));
-        l.phi += dt;
+          l.dest.dest->modulation += l.mod * std::sin(l.phi * 2 * std::numbers::pi);
+        l.phi += dt * l.freq;
+        if (l.phi >= 1)
+          l.phi -= 2;
       }
       
       float res = 0;
@@ -41,12 +64,12 @@ struct PmSynth : audio_renderer<PmSynth>, app_state
       {
         float acc = 0;
         for (int k = 0; k < num_osc; ++k)
-          acc += osc[k] * mod_matrix[OscIndex][k];
-        o = std::sin( osc_phase[OscIndex] * 2 * 3.14 * 440 * freq_ratio[OscIndex] + acc );
-        res += o * osc_vol[OscIndex];
-        osc_phase[OscIndex] += dt;
-        if (osc_phase[OscIndex] > 1)
-          osc_phase[OscIndex] -= 1;
+          acc += osc[k] * mod_matrix[OscIndex][k].modulated();
+        o = std::sin( osc_phase[OscIndex] * 2 * std::numbers::pi + acc );
+        res += o * osc_vol[OscIndex].modulated();
+        osc_phase[OscIndex] += dt * freq_ratio[OscIndex].modulated() * 440;
+        if (osc_phase[OscIndex] >= 1)
+          osc_phase[OscIndex] -= 2;
         ++OscIndex;
       }
       s[0] = res;
@@ -56,18 +79,18 @@ struct PmSynth : audio_renderer<PmSynth>, app_state
   
   void set_lfo_dest(int index, int dest) {
     auto [name, fn] = mod_slots()[dest];
-    lfos[index].dest = ModDestination{ fn(*this), dest, name };
+    lfos[index].dest = ModDestination{ fn ? fn(*this) : nullptr, dest, name };
   }
   
   std::shared_mutex mut;
-  float mod_matrix[num_osc][num_osc] = {0};
+  modulable<float> mod_matrix[num_osc][num_osc] = {0};
+  modulable<float> freq_ratio[num_osc] = {1.0};
+  modulable<float> osc_vol[num_osc] = {1.0, 0.0};
   float osc_phase[num_osc] {0};
   float osc[num_osc] = {0.0};
-  float freq_ratio[num_osc] = {1.0};
-  float osc_vol[num_osc] = {1.0, 0.0};
   
   struct ModDestination {
-    float* dest = nullptr;
+    modulable<float>* dest = nullptr;
     int index = 0; 
     std::string mod_name; 
   };
@@ -78,7 +101,7 @@ struct PmSynth : audio_renderer<PmSynth>, app_state
     };
     
     unsigned kind = 1;   
-    float freq = 10, mod = 0, phi = 0;
+    float freq = 10, mod = 1, phi = 0;
     
     ModDestination dest;
   };
@@ -89,7 +112,7 @@ struct PmSynth : audio_renderer<PmSynth>, app_state
   bool show_modulations;
 };
 
-std::span<const tuple<const char*, float*(*)(PmSynth&)>> mod_slots()
+std::span<const tuple<const char*, modulable<float>*(*)(PmSynth&)>> mod_slots()
 { 
   using Self = PmSynth;
   
@@ -100,7 +123,7 @@ std::span<const tuple<const char*, float*(*)(PmSynth&)>> mod_slots()
     for (int index : iota(num_osc))
       for (int k : iota(num_osc)) {
         std::meta::ostream os;
-        os << "Fmod " << k << "->" << index;
+        os << "Fmod " << k + 1 << "->" << index + 1;
         auto lit = make_literal_expr(os);
         auto elem = ^[k, lit, index] ( tuple{ %lit, +[] (Self& s) { return &s.mod_matrix[index][k]; }} );
         push_back(el, elem);
@@ -112,7 +135,7 @@ std::span<const tuple<const char*, float*(*)(PmSynth&)>> mod_slots()
     expr_list el;
     for (auto index : iota(num_osc)) {
       std::meta::ostream os;
-      os << "Freq " << index;
+      os << "Freq " << index + 1;
       auto lit = make_literal_expr(os);
       auto e = ^[index, lit] ( tuple{%lit, +[] (Self& s) { return &s.freq_ratio[index]; }} );
       push_back(el, e);
@@ -124,7 +147,7 @@ std::span<const tuple<const char*, float*(*)(PmSynth&)>> mod_slots()
     expr_list el;
     for (auto index : iota(num_osc)) {
       std::meta::ostream os;
-      os << "Freq " << index;
+      os << "Vol " << index + 1;
       auto lit = make_literal_expr(os);
       auto e = ^[lit, index] ( tuple{%lit, +[] (Self& s) { return &s.osc_vol[index]; }} );
       push_back(el, e);
@@ -132,7 +155,8 @@ std::span<const tuple<const char*, float*(*)(PmSynth&)>> mod_slots()
     return el;
   };
    
-  static constexpr tuple<const char*, float*(*)(Self&)> slots[] {
+  static constexpr tuple<const char*, modulable<float>*(*)(Self&)> slots[] {
+    tuple<const char*, modulable<float>*(*)(Self&)>{"none", nullptr}, 
     %...vol_slots()...,
     %...freq_slots()...,
     %...fm_slots()...
@@ -141,41 +165,6 @@ std::span<const tuple<const char*, float*(*)(PmSynth&)>> mod_slots()
   //return &slots;
   return {&slots[0], std::size(slots)};
 }
-
-/* 
-template <class Base>
-struct keypath_with_index {
-  
-  decltype(auto) operator()(auto& s) {
-    return (base(s)[index]);
-  }
-  
-  constexpr auto operator[](int idx) {
-    return keypath_with_index{*this, idx};
-  }
-  
-  Base base;
-  int index;
-};
-
-template <class B>
-struct keypath_with_index(B) -> keypath_with_index<B>;
-
-template <class Fn>
-struct keypath_t {
-  
-  decltype(auto) operator()(auto& s) {
-    return (fn(s));
-  }
-  
-  constexpr auto operator[](int idx) {
-    return keypath_with_index{*this, idx};
-  }
-  
-  Fn fn;
-};
-
-#define KEYPATH(EXPR) keypath_t{ [] (auto& s) -> auto& { return (EXPR); } }  */ 
 
 auto make_view(PmSynth& state)
 {
