@@ -113,7 +113,7 @@ template <class T, class... Ts>
 struct stack_base : view<stack_base<T, Ts...>>, stack<Ts...> {
   
   template <class... Vs>
-  constexpr stack_base(Vs&&... ts) : stack<Ts...>{{ts...}} {} 
+  constexpr stack_base(Vs&&... ts) : stack<Ts...>{{(Vs&&)(ts)...}} {} 
   
   template <class S>
   auto build(const widget_builder& b, S& state) 

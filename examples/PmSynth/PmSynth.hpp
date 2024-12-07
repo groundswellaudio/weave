@@ -83,6 +83,7 @@ struct PmSynth : audio_renderer<PmSynth>, app_state
   }
   
   std::shared_mutex mut;
+  int current_audio_device;
   modulable<float> mod_matrix[num_osc][num_osc] = {0};
   modulable<float> freq_ratio[num_osc] = {1.0};
   modulable<float> osc_vol[num_osc] = {1.0, 0.0};
@@ -227,9 +228,18 @@ auto make_view(PmSynth& state)
     lfo_panel
   }.with_interspace(10);
   
-  return hstack {
-    left_panel, mod_matrix
-  }.with_interspace(30).with_margin({30, 30});
+  auto top_panel = combo_box {
+    readwrite( [] (auto& s) { return s.current_device_index(); },
+               &State::set_audio_device ),
+    audio_output_devices()
+  };
+  
+  return vstack {
+    std::move(top_panel),
+    hstack {
+      left_panel, mod_matrix
+    }.with_interspace(30).with_margin({30, 30})
+  };
 }
 
 inline void run_app() {

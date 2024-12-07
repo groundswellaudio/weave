@@ -1,6 +1,8 @@
 #pragma once
 
 #include "views_core.hpp"
+#include "audio.hpp"
+
 #include <ranges>
 
 struct basic_modal_menu : widget_base {
@@ -100,8 +102,14 @@ struct combo_box : view<combo_box<Lens, Range>> {
       return with_lens<S>(combo_box_widget{{size}, choices}, lens);
     else {
       std::vector<std::string> vec;
-      for (auto&& e : choices)
-        vec.emplace_back(e);
+      if constexpr (^Range == ^audio_devices_range) {
+        for (auto h : choices)
+          vec.emplace_back(h.name());
+      }
+      else {
+        for (auto&& e : choices)
+          vec.emplace_back(e);
+      }
       return with_lens<S>(combo_box_widget{{size}, std::move(vec)}, lens);
     }
   }
