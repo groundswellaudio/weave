@@ -244,10 +244,16 @@ class widget_ref {
   }
 
   template <class T>
-  T& as() { return *static_cast<T*>(data); }
+  T& as() {
+    assert( is<T>() && "widget is not of the requested type" ); 
+    return *static_cast<T*>(data); 
+  }
   
   template <class T>
-  const T& as() const { return *static_cast<T*>(data); }
+  const T& as() const { 
+    assert( is<T>() && "widget is not of the requested type" ); 
+    return *static_cast<T*>(data); 
+  }
   
   template <class T>
     requires (is_base_of(^widget_base, ^T))

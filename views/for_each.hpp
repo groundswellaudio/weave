@@ -16,22 +16,24 @@ struct for_each : view_sequence_base {
     }
   }
   
-  rebuild_result seq_rebuild(for_each& Old, auto&& seq_updater, widget_updater& up, auto& state) 
+  rebuild_result seq_rebuild(for_each& Old, auto&& seq_updater, const widget_updater& up, auto& state) 
   {
     for (auto e : range) {
       elements.push_back(view_ctor(e));
     }
     
-    if (elements.size() > Old.elements.size())
+    rebuild_result res = {};
+    
+    if (elements.size() >= Old.elements.size())
     { 
       unsigned k = 0;
       for (; k < Old.elements.size(); ++k)
-        elements[k].seq_rebuild(Old.elements[k], seq_updater, up, state);
+        res |= elements[k].seq_rebuild(Old.elements[k], seq_updater, up, state);
       for (; k < elements.size(); ++k) 
         elements[k].seq_build( seq_updater.consume_fn(), up.builder(), state );
     }
     
-    return {};
+    return res;
   }
   
   Range range;

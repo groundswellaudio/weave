@@ -2,6 +2,7 @@
 
 #include "vec.hpp"
 #include "../util/variant.hpp"
+#include <string>
 
 struct mouse_enter {};
 
@@ -58,6 +59,10 @@ struct mouse_event {
   bool is_right_click() const { 
     return is<mouse_down>() && get_as<mouse_down>().button == mouse_button::left; 
   }
+};
+
+struct file_drop_event {
+  std::string filename;
 };
 
 template <class T, class... Ts>

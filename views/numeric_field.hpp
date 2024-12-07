@@ -209,7 +209,7 @@ struct numeric_dial_widget : widget_base
   numeric_field_properties prop;
   float mult_mod;
   
-  using Self = numeric_field_widget;
+  using Self = numeric_dial_widget;
   using value_type = float;
   
   void on(mouse_event e, event_context<Self>& ec) {
@@ -236,4 +236,14 @@ struct numeric_dial_widget : widget_base
 };
 
 template <class L>
-using numeric_dial = simple_view_for<numeric_dial_widget, L, numeric_field_properties>;
+struct numeric_dial : simple_view_for<numeric_dial_widget, L, numeric_field_properties> {
+  
+  numeric_dial(L lens, numeric_field_properties prop = {}) 
+    : simple_view_for<numeric_dial_widget, L, numeric_field_properties>{lens, prop} {} 
+    
+  auto& range(double min, double max) {
+    this->min = min; 
+    this->max = max;
+    return *this;
+  }
+};

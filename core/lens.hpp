@@ -4,6 +4,8 @@
 
 struct empty_lens {};
 
+/* 
+
 template <class... Ts>
 struct composed_lens {
   decltype(auto) operator()(auto&& v) const { return v; }
@@ -51,7 +53,7 @@ struct range_element_lens
   using input = Range;
   decltype(auto) operator()(Range& range) const { return (range[index]); }
   int index;
-};
+}; 
 
 template <class LensA, class LensB>
 constexpr auto compose_lens(LensA A, LensB B) {
@@ -61,7 +63,7 @@ constexpr auto compose_lens(LensA A, LensB B) {
     return A;
   else 
     return composed_lens<LensB, LensA>{B, {A}};
-}
+} */ 
 
 template <class Fn>
 struct invocable_wrapper {
@@ -125,6 +127,7 @@ struct invocable_lens {
 
 template <class L>
 auto make_lens(L l) {
+  static_assert( !is_instance_of(^L, ^invocable_lens) );
   if constexpr (is_instance_of(^L, ^lens_readwrite))
     return l;
   else 

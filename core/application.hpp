@@ -295,10 +295,14 @@ struct application_context {
     return gctx;
   }
   
+  auto& window() {
+    return win;
+  }
+  
   private : 
   
   sdl_backend backend;
-  window win;
+  struct window win;
   struct graphics_context gctx;
   widget_box root, modal_menu;
   impl::mouse_event_dispatcher med;
@@ -307,6 +311,15 @@ struct application_context {
 
 template <class W, class P>
 void event_context_base::open_modal_menu(this auto& self, W&& widget, P* parent) {
+  vec2f abs_pos {0, 0};
+  abs_pos += widget.position();
+  abs_pos += parent->position();
+  for (auto p : self.parents)
+    abs_pos += p.position();
+  auto winsz = self.ctx.window().size();
+  auto new_pos = widget.position();
+  new_pos -= max(abs_pos + widget.size() - winsz, vec2f{0, 0});
+  widget.set_position(new_pos);
   self.ctx.open_modal_menu((W&&)widget, parent, self.parents);
 }
 
@@ -365,12 +378,6 @@ struct application
       app_view.emplace( view_ctor(state) );
       auto upd = widget_updater{impl};
       app_view->rebuild(old_view, impl.root.borrow(), upd, state);
-      
-      /* 
-      if (rebuild_res | rebuild_result::size_change) {
-        impl.root.layout();
-        impl.med.layout_changed();
-      } */ 
       
       paint(state);
     }

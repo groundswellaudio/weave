@@ -62,7 +62,8 @@ struct slider_x_widget : widget_base
 template <class Lens>
 struct slider : view<slider<Lens>> {
   
-  slider(auto L) : lens{make_lens(L)} {}
+  template <class L>
+  slider(L lens) : lens{make_lens(lens)} {}
   
   template <class S>
   auto build(const widget_builder& b, S& state) {
@@ -89,7 +90,7 @@ struct slider : view<slider<Lens>> {
     return {};
   }
   
-  auto& with_range(float min, float max) {
+  auto& range(float min, float max) {
     properties.min = min;
     properties.max = max;
     return *this;
@@ -98,10 +99,10 @@ struct slider : view<slider<Lens>> {
   void destroy(widget_ref w) {}
   
   slider_properties properties;
-  make_lens_result<Lens> lens;
+  Lens lens;
   float val;
   vec2f size = {80, 15};
 };
 
 template <class Lens>
-slider(Lens) -> slider<make_lens_result<Lens>>;
+slider(Lens) -> slider<make_lens_result<Lens>>;  

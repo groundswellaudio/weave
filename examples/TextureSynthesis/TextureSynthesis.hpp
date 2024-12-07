@@ -370,6 +370,37 @@ void reset_search_map(search_map& map, vec2i source_bounds) {
   }
 }
 
+using histogram_t = std::vector<float>;
+
+template <class I>
+void histogram(const I& img, int channel, histogram_t& result, int NumBins = 256) {
+  for_each_pixel(img, [&] (auto& pix, ignore) {
+    auto val = pix[channel];
+    auto Bin = (val * num_bins) / I::pixel_type::norm();
+    ++result[Bin];
+  });
+}
+
+template <class I>
+void cdf(const I& img, int channel, histogram_t& result, int NumBins = 256) {
+  histogram(img, channel, result, NumBins);
+  auto acc = decltype(result.front()) {0};
+  for (auto& Bin : result) {
+    acc += Bin;
+    Bin = acc;
+  }
+}
+
+template <class I>
+void histogram_matching(const I& source, I& img, int numBins = 256) {
+  std::array<histogram_t, I::channels> cdf_source, cdf_img;
+  for (int k : iota(I::channels))
+    cdf(source, k, cdf_source[k], numBins);
+  for (int k : iota(I::channels))
+    cdf(img, k, cdf_img[k], numBins);
+  while( )
+}
+
 struct PatchMatchMap {
   
   template <class I>

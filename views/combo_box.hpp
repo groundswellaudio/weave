@@ -58,7 +58,7 @@ struct basic_modal_menu : widget_base {
   int hovered = -1;
 };
 
-struct combo_box : widget_base {
+struct combo_box_widget : widget_base {
   
   using value_type = unsigned;
   
@@ -66,7 +66,7 @@ struct combo_box : widget_base {
     return {50, 20};
   }
   
-  void on(mouse_event e, event_context<combo_box>& ec) {
+  void on(mouse_event e, event_context<combo_box_widget>& ec) {
     if (!e.is_mouse_down())
       return;
     auto menu = basic_modal_menu{{0, size().y}, choices};
@@ -86,17 +86,27 @@ struct combo_box : widget_base {
   std::vector<std::string> choices;
 };
 
+namespace views {
+
 template <class Lens, class Range = std::vector<std::string>>
-struct combo_box_v : view<combo_box_v<Lens, Range>> {
-  combo_box_v(auto l, Range choices) : lens{make_lens(l)}, choices{std::move(choices)} 
+struct combo_box : view<combo_box<Lens, Range>> {
+  combo_box(auto l, Range choices) : lens{make_lens(l)}, choices{std::move(choices)} 
   {}
   
   template <class S>
   auto build(auto&& builder, S& state) {
-    return with_lens<S>(combo_box{{}, choices}, lens);
+    auto size = vec2f{50, 20};
+    if constexpr (^Range == ^std::vector<std::string>)
+      return with_lens<S>(combo_box_widget{{size}, choices}, lens);
+    else {
+      std::vector<std::string> vec;
+      for (auto&& e : choices)
+        vec.emplace_back(e);
+      return with_lens<S>(combo_box_widget{{size}, std::move(vec)}, lens);
+    }
   }
   
-  rebuild_result rebuild(combo_box_v& Old, widget_ref w, ignore, auto& state) {
+  rebuild_result rebuild(combo_box& Old, widget_ref w, ignore, ignore) {
     return {};
   }
   
@@ -105,4 +115,6 @@ struct combo_box_v : view<combo_box_v<Lens, Range>> {
 };
 
 template <class Lens, class Range = std::vector<std::string>>
-combo_box_v(Lens, Range) -> combo_box_v<make_lens_result<Lens>, Range>;
+combo_box(Lens, Range) -> combo_box<make_lens_result<Lens>, Range>;
+
+} // views
