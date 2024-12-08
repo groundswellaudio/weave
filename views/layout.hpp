@@ -10,6 +10,7 @@ struct stack_data {
   float interspace = 8;
   vec2f margin;
   float align_ratio = 0;
+  rgba_u8 background_col {0, 0, 0, 0};
 };
 
 template <class... Ts>
@@ -39,6 +40,11 @@ struct stack
   
   auto&& align_center(this auto&& self) {
     self.info.align_ratio = 0.5;
+    return self;
+  }
+  
+  auto&& background(this auto&& self, rgba_u8 col) {
+    self.info.background_col = col;
     return self;
   }
   
@@ -179,6 +185,8 @@ struct vstack_widget : widget_base
   vstack_widget(stack_data d) : data{d} {}
   
   void paint(painter& p) {
+    p.fill_style(data.background_col);
+    p.rectangle({0, 0}, size());
     // p.stroke_style(colors::green);
     // p.stroke_rect({0, 0}, size(), 2);
   }
@@ -215,6 +223,8 @@ struct hstack_widget : widget_base
   }
   
   void paint(painter& p) {
+    p.fill_style(data.background_col);
+    p.rectangle({0, 0}, size());
     // p.stroke_style(colors::green);
     // p.stroke_rect({0, 0}, size(), 2);
   }

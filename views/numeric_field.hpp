@@ -227,6 +227,7 @@ struct numeric_dial_widget : widget_base
     p.stroke_style(colors::white);
     p.stroke_rounded_rect({0, 0}, size(), 6);
     p.font_size(13.f);
+    p.fill_style(colors::white);
     auto str = std::format("{:.2f}", value);
     p.text_align(text_align::x::center, text_align::y::center);
     p.text( sz / 2, str );

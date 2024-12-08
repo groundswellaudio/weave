@@ -205,6 +205,8 @@ auto make_view(PmSynth& state)
     auto baselens = [index] (auto& s) -> auto& { return s.lfos[index]; };
     auto kind = [baselens] (auto& s) -> auto& { return baselens(s).kind; };
     auto freq = [baselens] (auto& s) -> auto& { return baselens(s).freq; };
+    auto mod = [baselens] (auto& s) -> auto& { return baselens(s).mod; };
+    
     //auto mod_dest = [index] (auto &s) { s.set_lfo_dest(index, val); };
     
     return vstack {
@@ -212,7 +214,8 @@ auto make_view(PmSynth& state)
       slider{ freq }.range(0.2, 20),
       combo_box{ readwrite( [index] (auto& s) { return s.lfos[index].dest.index; },
                             [index] (auto& s, int val) { s.set_lfo_dest(index, val); } ),
-                 mod_slots() | std::views::transform([] (auto& e) { return get<0>(e); }) }
+                 mod_slots() | std::views::transform([] (auto& e) { return get<0>(e); }) },
+      slider{ mod }.range(0, 2)
     };
   };
   
@@ -239,7 +242,7 @@ auto make_view(PmSynth& state)
     hstack {
       left_panel, mod_matrix
     }.with_interspace(30).with_margin({30, 30})
-  };
+  }.background(rgb_f(colors::gray) * 0.35);
 }
 
 inline void run_app() {

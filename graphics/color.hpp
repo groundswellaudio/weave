@@ -186,6 +186,7 @@ struct monochrome {
 };
 
 using rgba_f = rgba<float>;
+using rgb_f = rgb<float>;
 using rgb_u8 = rgb<unsigned char>;
 using rgba_u8 = rgba<unsigned char>;
 using color  = rgba<float>;
