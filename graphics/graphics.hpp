@@ -370,6 +370,31 @@ struct painter : painter_state
     nvgText(ctx, pos.x, pos.y - this->text_vert_offset, v.data(), v.end());
   }
   
+  void text_bounded(vec2f pos, float width, std::string_view str) {
+    float bounds[4];
+    std::vector<NVGglyphPosition> positions;
+    positions.resize(str.size());
+    nvgTextGlyphPositions( ctx, pos.x, pos.y, str.begin(), str.end(), positions.data(), (int)(positions.size()) );
+    
+    if (positions.back().maxx > pos.x + width) {
+      // Look at the space needed to display ... 
+      NVGglyphPosition ellipsisPos[3];
+      nvgTextGlyphPositions(ctx, 0, 0, "...", nullptr, ellipsisPos, 3);
+      auto ellipsis_width = ellipsisPos[2].maxx;
+      
+      auto it = std::find_if( positions.rbegin(), positions.rend(), 
+        [&] (auto& e) { return e.maxx + ellipsis_width < pos.x + width; } );
+      
+      int index = it == positions.rend() ? 0 : (int) str.size() - (it - positions.rbegin());
+      
+      text( pos, std::string_view{str.begin(), str.begin() + index} );
+      text( vec2f{positions[index].minx, pos.y}, "..." );
+      return;
+    }
+    
+    text(pos, str);
+  }
+  
   void translate(vec2f delta) {
     nvgTranslate(ctx, delta.x, delta.y);
   }

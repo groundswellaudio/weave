@@ -40,7 +40,21 @@ include_directories(${miniaudio_SOURCE_DIR})
 include_directories(${dr_libs_SOURCE_DIR})
 include_directories(${stb_SOURCE_DIR})
 
-add_executable(Spiral main.cpp misc/mini_audio_impl.cpp graphics/graphics.cpp)
+if (CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
+  add_executable(Spiral main.cpp misc/mini_audio_impl.cpp graphics/graphics.cpp)
+else()
+  add_library(Spiral STATIC misc/mini_audio_impl.cpp graphics/graphics.cpp)
+endif()
+
+target_include_directories(Spiral PUBLIC 
+  ./deps/glad/include
+  ${SDL2_SOURCE_DIR}/include 
+  ${nanovg_SOURCE_DIR}/src
+  ${nfd_SOURCE_DIR}/include
+  ${miniaudio_SOURCE_DIR}
+  ${dr_libs_SOURCE_DIR}
+  ${stb_SOURCE_DIR})
+
 target_sources(Spiral PRIVATE ./deps/glad/src/glad.c)
 target_sources(Spiral PRIVATE ${nanovg_SOURCE_DIR}/src/nanovg.c)
 

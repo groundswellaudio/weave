@@ -66,6 +66,12 @@ struct PmSynth : audio_renderer<PmSynth>, app_state
         for (int k = 0; k < num_osc; ++k)
           acc += osc[k] * mod_matrix[OscIndex][k].modulated();
         o = std::sin( osc_phase[OscIndex] * 2 * std::numbers::pi + acc );
+        o = (o > fold_thres[OscIndex]) 
+          ? fold_thres[OscIndex] - o 
+          : (o < -fold_thres[OscIndex]) 
+          ? -fold_thres[OscIndex] - o
+          : o;
+        
         res += o * osc_vol[OscIndex].modulated();
         osc_phase[OscIndex] += dt * freq_ratio[OscIndex].modulated() * 440;
         if (osc_phase[OscIndex] >= 1)
@@ -89,6 +95,7 @@ struct PmSynth : audio_renderer<PmSynth>, app_state
   modulable<float> osc_vol[num_osc] = {1.0, 0.0};
   float osc_phase[num_osc] {0};
   float osc[num_osc] = {0.0};
+  float fold_thres[num_osc] = {1.f};
   
   struct ModDestination {
     modulable<float>* dest = nullptr;
@@ -194,10 +201,12 @@ auto make_view(PmSynth& state)
   auto osc_panel_row = [] (int row) {
     auto lens_freq = [row] (State& s) -> auto& { return s.freq_ratio[row]; };
     auto lens_vol = [row] (State& s) -> auto& { return s.osc_vol[row]; };
+    auto lens_fold = [row] (State& s) -> auto& { return s.fold_thres[row]; };
     
     return hstack {
       numeric_dial { lens_freq }.range(0, 100),
-      slider { lens_vol }
+      slider{ lens_vol }, 
+      slider{ lens_fold }
     };
   };
   

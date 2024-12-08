@@ -79,9 +79,10 @@ struct table_widget : widget_base {
     if (selected_row >= cells.size())
       return {};
     int k = 0;
-    auto it = properties.begin();
+    auto it  = properties.begin();
     ++it;
-    for (; it != properties.end(); ++it) {
+    for (;it != properties.end(); ++it)
+    {
       if (get<1>(*it) > pos.x)
         return vec2i{k, selected_row};
       ++k;
@@ -185,8 +186,13 @@ struct table_widget : widget_base {
     p.fill_style(colors::white);
     for (auto& c : cells) {
       int k = 0;
+      
       for (auto& prop : c.prop) {
-        p.text( {5 + properties[k++].m1, pos + row / 2}, prop );
+        float width = k == c.prop.size() - 1 
+          ? (size().x - properties[k].m1) 
+          : properties[k+1].m1 - properties[k].m1;
+        
+        p.text_bounded( {5 + properties[k++].m1, pos + row / 2}, width - 5 * 2, prop );
       }
       pos += row;
     }
