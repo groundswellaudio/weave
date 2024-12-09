@@ -8,8 +8,8 @@
 
 struct stack_data {
   float interspace = 8;
-  vec2f margin;
-  float align_ratio = 0;
+  vec2f margin {0, 0};
+  float align_ratio = 0.5;
   rgba_u8 background_col {0, 0, 0, 0};
 };
 
@@ -23,17 +23,17 @@ struct stack
     }, children);
   }
   
-  auto&& with_interspace(this auto&& self, float val) {
+  auto&& interspace(this auto&& self, float val) {
     self.info.interspace = val;
     return self;
   }
   
-  auto&& with_margin(this auto&& self, vec2f margin) {
+  auto&& margin(this auto&& self, vec2f margin) {
     self.info.margin = margin;
     return self;
   }
   
-  auto&& with_align(this auto&& self, float ratio) {
+  auto&& align(this auto&& self, float ratio) {
     self.info.align_ratio = ratio;
     return self;
   }
@@ -102,10 +102,10 @@ namespace impl {
         vec2f child_pos;
         child_pos[axis] = n.position()[axis];
         child_pos[1 - axis] = data.margin[1 - axis] 
-                              + data.align_ratio * (sz + data.margin[1 - axis] * 2) 
-                              - n.size()[1 - axis] / 2;
+                              + data.align_ratio * 
+                                (sz - n.size()[1-axis]); // we haven't added margin to sz yet, no need to substract it
         n.set_position(child_pos);
-      } 
+      }
     
     vec2f res;
     res[axis] = pos + data.margin[axis];

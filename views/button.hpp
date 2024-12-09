@@ -13,7 +13,7 @@ struct button_properties {
   rgba_u8 active_color = rgba_u8{colors::cyan}.with_alpha(255 * 0.5);
 };
 
-struct toggle_button_widget
+struct toggle_button_widget : widget_base
 {
   static constexpr float button_radius = 8;
   
@@ -30,9 +30,10 @@ struct toggle_button_widget
       ec.write(!ec.read());
   }
   
-  void paint(painter& p, bool flag, vec2f sz) 
+  void paint(painter& p, bool flag) 
   {
-    p.fill_style(rgba_f{1.f, 1.f, 0.f, 1.f});
+    auto sz = size();
+    p.fill_style(colors::white);
     
     p.stroke_style(rgba_f{colors::white}.with_alpha(0.5));
     p.stroke_rounded_rect({0, 0}, sz, 6, 1);
@@ -56,13 +57,13 @@ struct toggle_button_widget
 template <class Lens>
 struct toggle_button : view<toggle_button<Lens>> {
   
-  toggle_button(Lens l, std::string_view str) : lens{l} {
+  toggle_button(std::string_view str, Lens l) : lens{l} {
     properties.str = str;
   }
   
   template <class S>
   auto build(widget_builder b, S& s) {
-    return with_lens<S>(toggle_button_widget{properties}, lens);
+    return with_lens<S>(toggle_button_widget{{50, 20}, properties}, lens);
   }
   
   rebuild_result rebuild(toggle_button<Lens>& Old, widget_ref w, ignore, ignore) 

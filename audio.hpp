@@ -5,6 +5,7 @@
 #include <string_view>
 #include <vector>
 #include <cassert>
+#include <util/optional.hpp>
 
 struct audio_buffer_format {
   int sample_rate = 44100;
@@ -16,7 +17,7 @@ struct audio_buffer : std::vector<float> {
   int num_channels; 
 };
 
-audio_buffer load_audio_file(const std::string& path);
+optional<audio_buffer> read_audio_file(const std::string& path);
 
 struct audio_device_handle {
   
