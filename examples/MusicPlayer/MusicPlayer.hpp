@@ -4,6 +4,8 @@
 
 #include <taglib/tag.h>
 #include <taglib/fileref.h>
+#include <taglib/tpropertymap.h>
+
 #include <ghc/filesystem.hpp>
 #include <atomic>
 
@@ -63,12 +65,19 @@ struct State : app_state {
       pause();
     if (buffer_track_id != current_track)
     {
-      auto buf = read_audio_file(table.cells[*current_track].file_path);
+      auto id = *current_track;
+      auto& path = table.cells[id].file_path;
+      auto buf = read_audio_file(path);
       if (!buf)
         return;
       player.buffer = *buf;
       player.head = 0;
       buffer_track_id = *current_track;
+      auto cover = read_file_cover(path);
+      if (cover) {
+        current_cover = std::move(*cover);
+        current_cover_updated = true;
+      }
     }
     
     player.start_audio_render();
@@ -85,8 +94,22 @@ struct State : app_state {
     play();
   }
   
+  static optional<image<rgba<unsigned char>>> read_file_cover(const std::string& path) {
+    TagLib::FileRef f{path.c_str()};
+    if (!f.tag())
+      return {};
+    auto pic_infos = f.complexProperties("PICTURE");
+    if (pic_infos.begin() == pic_infos.end())
+      return {};
+    auto& pic = *pic_infos.begin();
+    auto data_it = pic.find("data");
+    if (data_it == pic.end())
+      return {};
+    auto&& data_vec = data_it->second.toByteVector();
+    return decode_image({(unsigned char*)data_vec.data(), data_vec.size()});
+  }
+  
   void load_track(const std::string& path) {
-    //auto buf = load_audio_file(path);
     TagLib::FileRef f{path.c_str()};
     if (!f.tag())
       return;
@@ -116,6 +139,9 @@ struct State : app_state {
   bool is_playing = false;
   
   bool table_mutated = false;
+  
+  image<rgba<unsigned char>> current_cover;
+  bool current_cover_updated = false;
 };
 
 auto make_view(State& state)
@@ -141,9 +167,16 @@ auto make_view(State& state)
     slider{ [] (auto& s) -> auto& { return s.player.volume; } }
   }.interspace(30);
   
+  bool update_cover = std::exchange(state.current_cover_updated, false);
+  
   return vstack{ top_panel,
-                 tablev,
-               }.align_center().margin({10, 10});
+                 hstack{tablev, 
+                        views::image{state.current_cover, update_cover}
+                        .fit({300, 300})
+                        }.align(1)
+               }.align_center()
+                .margin({10, 10})
+                .background( rgb_f(colors::gray) * 0.4 );
 }
 
 inline void run_app() {

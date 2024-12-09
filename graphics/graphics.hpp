@@ -130,6 +130,17 @@ image<Pixel> make_image_from_raw(const T* ptr, vec2<int> sz) {
   return res;
 }
 
+/// Decode a compressed image buffer
+inline std::optional<image<rgba<unsigned char>>> decode_image(std::span<const unsigned char> data) {
+  int w, h, n;
+  auto img_data = stbi_load_from_memory(data.data(), data.size(), &w, &h, &n, 4);
+  if (!img_data)
+    return {};
+  auto img = make_image_from_raw<rgba<unsigned char>>(img_data, {h, w});
+  stbi_image_free(img_data);
+  return img;
+}
+
 inline std::optional<image<rgba<unsigned char>>> load_image_from_file(const std::string& path) {
   int w, h, n;
   stbi_set_unpremultiply_on_load(1);

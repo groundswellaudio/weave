@@ -11,8 +11,8 @@ struct image_widget : widget_base {
       return;
     p.fill_style(*texture, -corner_offset, size());
     p.rectangle({0, 0}, size());
-    p.stroke_style(colors::white);
-    p.stroke_rect({0, 0}, size());
+    //p.stroke_style(colors::white);
+    //p.stroke_rect({0, 0}, size());
   }
   
   optional<texture_handle> texture;
