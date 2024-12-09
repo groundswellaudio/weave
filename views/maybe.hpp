@@ -3,9 +3,13 @@
 #include "views_core.hpp"
 
 #include "../util/variant.hpp"
+#include "../util/optional.hpp"
 
 template <class View>
 struct maybe : view_sequence_base {
+  
+  template <class F>
+  maybe(F f, View v) : flag{static_cast<bool>(f)}, view{v} {}
   
   maybe(bool flag, View v) : flag{flag}, view{v} {}
   
@@ -20,7 +24,7 @@ struct maybe : view_sequence_base {
   }
   
   template <class State>
-  rebuild_result seq_rebuild(Self& Old, auto&& seq_updater, widget_updater& up, State& s) 
+  rebuild_result seq_rebuild(Self& Old, auto&& seq_updater, const widget_updater& up, State& s) 
   {
     if (flag == Old.flag)
     {
@@ -36,8 +40,8 @@ struct maybe : view_sequence_base {
     else
     {
       Old.view.seq_destroy(seq_updater.destroy_fn());
-      return {};
     }
+    return {};
   }
   
   bool flag; 

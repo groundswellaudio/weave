@@ -36,9 +36,13 @@ struct mouse_scroll {
   vec2f delta;
 };
 
+struct file_drop_event {
+  std::string filename;
+};
+
 struct mouse_event {
   vec2f position;
-  variant<mouse_enter, mouse_exit, mouse_down, mouse_up, mouse_move, mouse_scroll> event; 
+  variant<mouse_enter, mouse_exit, mouse_down, mouse_up, mouse_move, mouse_scroll, file_drop_event> event; 
   
   template <class T>
   bool is() const { return holds_alternative<T>(event); } 
@@ -59,10 +63,9 @@ struct mouse_event {
   bool is_right_click() const { 
     return is<mouse_down>() && get_as<mouse_down>().button == mouse_button::left; 
   }
-};
-
-struct file_drop_event {
-  std::string filename;
+  
+  bool is_file_drop() const { return is<file_drop_event>(); }
+  auto& dropped_file() const { return get_as<file_drop_event>().filename; }
 };
 
 template <class T, class... Ts>

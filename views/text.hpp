@@ -32,16 +32,25 @@ struct text : view<text> {
   
   text(std::string_view str) : prop{str} {}
   
+  vec2f bounds(graphics_context& gctx) {
+    return prop.text.size() == 0 ? vec2f{0, prop.font_size} : gctx.text_bounds(prop.text, prop.font_size);
+  }
+  
   auto build(auto&& b, ignore) {
     auto& gctx = b.context().graphics_context();
-    auto bounds = gctx.text_bounds(prop.text, prop.font_size);
-    return text_widget{{bounds}, prop};
+    return text_widget{{bounds(gctx)}, prop};
   }
   
   rebuild_result rebuild(text Old, widget_ref w, auto& up, ignore) {
-    if (prop != Old.prop)
-      w.as<text_widget>().prop = prop;
-    return {};
+    auto& wb = w.as<text_widget>();
+    rebuild_result res {};
+    if (prop.text != wb.prop.text) {
+      auto new_bounds = bounds(up.context().graphics_context());
+      wb.set_size(new_bounds);
+      wb.prop.text = prop.text;
+      res |= rebuild_result::size_change;
+    }
+    return res;
   }
   
   void destroy(widget_ref w) {}

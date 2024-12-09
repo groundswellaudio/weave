@@ -96,7 +96,21 @@ class sdl_backend
       case SDL_TEXTEDITING :
       case SDL_TEXTINPUT :
       {
+        break;
       }
+      
+      case SDL_DROPFILE: 
+      {
+        std::string file = e.drop.file;
+        SDL_free(e.drop.file);
+        vis( mouse_event{vec2f{0, 0}, file_drop_event(std::move(file))} );
+        break;
+      }
+      
+      case SDL_DROPTEXT:
+      case SDL_DROPBEGIN:
+      case SDL_DROPCOMPLETE: 
+        break;
       
       case SDL_KEYDOWN :
       case SDL_KEYUP :
