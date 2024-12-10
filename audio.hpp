@@ -14,7 +14,7 @@ struct audio_buffer_format {
 };
 
 struct audio_buffer : std::vector<float> {
-  int num_channels; 
+  int num_channels;
 };
 
 optional<audio_buffer> read_audio_file(const std::string& path);
@@ -104,6 +104,7 @@ struct audio_output_stream
 		const int n_channels;
 	};
 	
+	auto sample_size() const { return n_samples; }
 	auto begin() { return sample_iterator{ptr, n_channels};                            }
 	auto end()   { return sample_iterator_sentinel{ptr + n_channels * n_samples};      }
 	

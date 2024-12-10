@@ -15,6 +15,7 @@
 #include <initializer_list>
 
 #include "util/iota.hpp"
+#include "util/util.hpp"
 
 namespace impl
 {
@@ -278,6 +279,11 @@ struct painter : painter_state
     nvgBeginFrame(ctx, size.x, size.y, ratio);
   }
   
+  void end_frame(){
+    nvgEndFrame(ctx);
+    glDisable(GL_STENCIL_TEST);
+  }
+  
   void scissor(vec2f pos, vec2f size){
     nvgScissor(ctx, pos.x, pos.y, size.x, size.y);
   }
@@ -290,25 +296,28 @@ struct painter : painter_state
     nvgResetScissor(ctx);
   }
   
-  void begin_path() {
+  auto& begin_path() {
     nvgBeginPath(ctx);
+    return *this;
   }
-
-  void close_path() {
+  
+  auto& close_path() {
     nvgClosePath(ctx);
+    return *this;
   }
   
-  void end_frame(){
-    nvgEndFrame(ctx);
-    glDisable(GL_STENCIL_TEST);
-  }
-  
-  void move_to(vec2f p) {
+  auto& move_to(vec2f p) {
     nvgMoveTo(ctx, p.x, p.y);
+    return *this;
   }
 
-  void line_to(vec2f p) {
+  auto& line_to(vec2f p) {
     nvgLineTo(ctx, p.x, p.y);
+    return *this;
+  }
+  
+  void fill_path() {
+    nvgFill(ctx);
   }
   
   void line(vec2f a, vec2f b, float thick = 3) {
@@ -364,6 +373,10 @@ struct painter : painter_state
     nvgFill(ctx);
   }
   
+  void triangle(vec2f a, vec2f b, vec2f c) {
+    begin_path().move_to(a).line_to(b).line_to(c).close_path().fill_path();
+  }
+  
   void stroke_circle(vec2f pos, float rad, float thick){
     nvgBeginPath(ctx);
     nvgCircle(ctx, pos.x, pos.y, rad);
@@ -382,6 +395,8 @@ struct painter : painter_state
   }
   
   void text_bounded(vec2f pos, float width, std::string_view str) {
+    if (str == "")
+      return;
     float bounds[4];
     std::vector<NVGglyphPosition> positions;
     positions.resize(str.size());
@@ -406,8 +421,17 @@ struct painter : painter_state
     text(pos, str);
   }
   
-  void translate(vec2f delta) {
+  struct translation_raii {
+    painter& self;
+    vec2f delta;
+    ~translation_raii() {
+      nvgTranslate(self.ctx, -delta.x, -delta.y);
+    }
+  };
+  
+  [[nodiscard]] translation_raii translate(vec2f delta) {
     nvgTranslate(ctx, delta.x, delta.y);
+    return translation_raii{*this, delta}; 
   }
 };
 

@@ -13,6 +13,8 @@ struct button_properties {
   rgba_u8 active_color = rgba_u8{colors::cyan}.with_alpha(255 * 0.5);
 };
 
+static constexpr rgba_u8 button_overlay_color = rgba_u8{colors::white}.with_alpha(75);
+
 struct toggle_button_widget : widget_base
 {
   static constexpr float button_radius = 8;
@@ -54,6 +56,8 @@ struct toggle_button_widget : widget_base
   }
 };
 
+namespace views {
+
 template <class Lens>
 struct toggle_button : view<toggle_button<Lens>> {
   
@@ -74,6 +78,8 @@ struct toggle_button : view<toggle_button<Lens>> {
   Lens lens;
   button_properties properties;
 };
+
+} // views
 
 static constexpr float button_margin = 5;
 
@@ -112,7 +118,7 @@ struct trigger_button_widget : widget_base {
     p.stroke_rounded_rect({0, 0}, size(), 6, 1);
     
     if (hovered) {
-      p.fill_style(rgba_u8{colors::white}.with_alpha(75));
+      p.fill_style(button_overlay_color);
       p.fill_rounded_rect({0, 0}, size(), 6);
     }
     
@@ -122,6 +128,8 @@ struct trigger_button_widget : widget_base {
     p.text( {button_margin, sz.y / 2.f}, str ); 
   }
 };
+
+namespace views {
 
 template <class Fn>
 struct trigger_button : view<trigger_button<Fn>> {
@@ -161,3 +169,126 @@ struct trigger_button : view<trigger_button<Fn>> {
 
 template <class T, class Fn>
 trigger_button(T, Fn) -> trigger_button<Fn>; 
+
+} // views
+
+namespace widgets
+{
+
+template <class PaintFn>
+struct graphic_toggle_button : widget_base {
+  
+  PaintFn paint_fn;
+  std::function<bool(event_context_t<void>&, bool)> write;
+  bool flag;
+  bool hovered = false;
+  
+  void on(mouse_event e, event_context_t<void>& ec) {
+    if (e.is_mouse_enter())
+      hovered = true;
+    else if (e.is_mouse_exit())
+      hovered = false;
+    else if (e.is_mouse_down())
+      flag = write(ec, !flag);
+  }
+  
+  void paint(painter& p) {
+    std::invoke(paint_fn, p, flag, size());
+    if (hovered) {
+      p.fill_style(button_overlay_color);
+      p.rounded_rectangle({0, 0}, size(), 6);
+    }
+  }
+};
+
+template <class PaintFn>
+struct graphic_trigger_button : widget_base {
+  
+  PaintFn paint_fn;
+  std::function<void(event_context_t<void>&)> on_click;
+  bool hovered = false;
+  
+  void on(mouse_event e, event_context_t<void>& ec) {
+    if (e.is_mouse_enter())
+      hovered = true;
+    else if (e.is_mouse_exit())
+      hovered = false;
+    else if (e.is_mouse_down())
+      on_click(ec);
+  }
+  
+  void paint(painter& p) {
+    std::invoke(paint_fn, p, size());
+    if (hovered) {
+      p.fill_style(button_overlay_color);
+      p.rounded_rectangle({0, 0}, size(), 6);
+    }
+  }
+};
+
+} // widgets
+
+namespace views 
+{
+  template <class PaintFn, class WriteFn>
+  struct graphic_toggle_button : view<graphic_toggle_button<PaintFn, WriteFn>> {
+    
+    graphic_toggle_button (PaintFn P, bool val, WriteFn W) 
+    : val{val}, paint_fn{P}, write_fn{W} {}
+    
+    template <class S>
+    auto build(const widget_builder& b, S& state) {
+      widgets::graphic_toggle_button<PaintFn> res {{size_v}, paint_fn, {}, val};
+      res.write = [w = write_fn] (event_context_t<void>& ec, bool v) -> bool {
+        return std::invoke(w, *static_cast<S*>(ec.state()), v);
+      };
+      res.flag = val;
+      return res;
+    }
+    
+    rebuild_result rebuild(auto& Old, widget_ref w, ignore, ignore) {
+      auto& wb = w.as<widgets::graphic_toggle_button<PaintFn>>();
+      wb.flag = val;
+      return {};
+    }
+    
+    auto& size(vec2f sz) {
+      size_v = sz;
+      return *this;
+    }
+    
+    bool val;
+    vec2f size_v = {20, 20};
+    PaintFn paint_fn;
+    WriteFn write_fn;
+  };
+  
+  template <class PaintFn, class Payload>
+  struct graphic_trigger_button : view<graphic_trigger_button<PaintFn, Payload>> {
+    
+    graphic_trigger_button (PaintFn P, Payload W) 
+    : paint_fn{P}, payload{W} {}
+    
+    template <class S>
+    auto build(const widget_builder& b, S& state) {
+      widgets::graphic_trigger_button<PaintFn> res {{size_v}, paint_fn, {}};
+      res.on_click = [w = payload] (event_context_t<void>& ec) {
+        std::invoke(w, *static_cast<S*>(ec.state()));
+      };
+      return res;
+    }
+    
+    rebuild_result rebuild(ignore Old, widget_ref w, ignore, ignore) {
+      return {};
+    }
+    
+    auto& size(vec2f sz) {
+      size_v = sz;
+      return *this;
+    }
+    
+    vec2f size_v = {20, 20};
+    PaintFn paint_fn;
+    Payload payload;
+  };
+}

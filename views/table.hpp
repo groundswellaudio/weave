@@ -89,15 +89,18 @@ struct table_widget : widget_base {
     else {
       if (focused_cell == cell) {
       // Clicking on a single item again : edit the field
-        auto lens = [this, cell] (ignore) -> auto& { return cells[cell->y].prop[cell->x]; };
-        auto dl = dyn_lens<std::string>(make_lens(lens), tag<void*>{});
         auto field_width = (col == properties.size() - 1) 
           ? size().x - get<1>(properties[col])
           : get<1>(properties[col + 1]) - get<1>(properties[col]);
         vec2f field_size {field_width, row_height};
-        edited_field.emplace( with_lens_t<text_field_widget>{{field_size}, std::move(dl)} );
+        edited_field.emplace( text_field_widget{{field_size}} );
         edited_field->set_position( {get<1>(properties[col]), first_row + row * row_height} );
         edited_field->editing = true;
+        edited_field->value_str = cells[cell->y].prop[cell->x];
+        edited_field->write = [this, cell] (event_context_t<void>& Ec, const std::string& str) { 
+          cells[cell->y].prop[cell->x] = str;
+          edited_field.reset(); 
+        };
         Ec.with_parent(this).grab_mouse_focus(&*edited_field);
         Ec.with_parent(this).grab_keyboard_focus(&*edited_field);
       }
@@ -193,7 +196,7 @@ struct table_widget : widget_base {
   std::vector<tuple<std::string, float>> properties;
   std::vector<cell> cells;
   std::optional<vec2i> focused_cell;
-  std::optional<with_lens_t<text_field_widget>> edited_field;
+  std::optional<text_field_widget> edited_field;
   int dragging = -1;
   std::function<void(event_context_t<void>& ec, vec2i, const std::string&)> on_field_edit;
   std::function<void(event_context_t<void>& ec, int cell)> cell_double_click;

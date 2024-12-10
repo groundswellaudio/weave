@@ -404,18 +404,17 @@ struct application
       // p.stroke_style(colors::red);
       // p.stroke_rect(new_scissor_pos, new_scissor_sz);
       //p.scissor(new_scissor_pos, new_scissor_sz);
-      p.translate(pos);
+      auto traii = p.translate(pos);
       w.paint(p, &state);
       for (auto& w : w.children())
         self(w, new_scissor_pos - pos, new_scissor_sz);
-      p.translate(-pos);
     };
     
     fn(impl.root.borrow(), {0, 0}, impl.win.size());
     
     if (impl.modal_menu) {
       auto abs_pos = impl.med.focused_absolute_position();
-      p.translate(abs_pos);
+      auto traii = p.translate(abs_pos);
       impl.modal_menu.paint(p, &state);
     }
     

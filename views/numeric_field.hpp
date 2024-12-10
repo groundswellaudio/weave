@@ -10,7 +10,9 @@
 struct text_field_widget : widget_base {
   
   using Self = text_field_widget;
-  using value_type = std::string;
+  using value_type = void;
+  
+  std::function<void(event_context_t<void>&, const std::string& str)> write;
   
   std::string value_str;
   bool editing = false;
@@ -39,7 +41,7 @@ struct text_field_widget : widget_base {
       case keycode::enter: 
         Ec.release_keyboard_focus();
         editing = false;
-        Ec.write(value_str);
+        write(Ec, value_str);
         break;
       
       default: 
@@ -72,13 +74,14 @@ struct text_field : view<text_field<Lens>> {
   auto build(const widget_builder&, S& state) {
     auto init_val = lens.read(state);
     auto res = text_field_widget{{50, 15}, init_val};
-    return with_lens<S>(std::move(res), lens);
+    res.write = [l = lens] (auto& ctx, auto& str) { l(*static_cast<S*>(ctx.state()), str); };
+    return res;
   }
   
   rebuild_result rebuild(text_field<Lens>& old, widget_ref elem, const widget_updater& up, auto& state) {
     auto& w = elem.as<text_field_widget>();
     auto val = lens.read(state);
-    if (!up.context().has_keyboard_focus(elem)) 
+    if (!up.context().has_keyboard_focus(elem))
       w.value_str = val;
     return {};
   }
