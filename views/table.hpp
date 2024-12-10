@@ -101,6 +101,7 @@ struct table : widget_base {
         edited_field->value_str = cells[cell->y].prop[cell->x];
         edited_field->write = [this, cell] (event_context_t<void>& Ec, const std::string& str) { 
           cells[cell->y].prop[cell->x] = str;
+          on_field_edit(Ec, *cell, str);
           edited_field.reset(); 
         };
         Ec.with_parent(this).grab_mouse_focus(&*edited_field);
