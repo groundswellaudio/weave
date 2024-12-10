@@ -174,7 +174,9 @@ struct stack_base : view<stack_base<T, Ts...>>, stack<Ts...> {
   void destroy(widget_ref wb) {}
 };
 
-struct vstack_widget : widget_base
+namespace widgets {
+
+struct vstack : widget_base
 {
   using value_type = void;
   
@@ -182,7 +184,7 @@ struct vstack_widget : widget_base
   
   std::vector<widget_box> children_vec;
   
-  vstack_widget(stack_data d) : data{d} {}
+  vstack(stack_data d) : data{d} {}
   
   void paint(painter& p) {
     p.fill_style(data.background_col);
@@ -202,21 +204,14 @@ struct vstack_widget : widget_base
   }
 };
 
-template <class... Ts>
-  //requires (is_view_sequence<Ts> && ...)
-struct vstack : stack_base<vstack_widget, Ts...>
-{ 
-  vstack(Ts... ts) : stack_base<vstack_widget, Ts...>{ts...} {}
-};
-
-struct hstack_widget : widget_base
+struct hstack : widget_base
 {
   using value_type = void;
   
   stack_data data;
   std::vector<widget_box> children_vec;
   
-  hstack_widget(stack_data d) : data{d} {}
+  hstack(stack_data d) : data{d} {}
   
   bool traverse_children(auto&& fn) {
     return std::all_of(children_vec.begin(), children_vec.end(), fn);
@@ -237,9 +232,23 @@ struct hstack_widget : widget_base
   }
 };
 
+} // widgets
+
+namespace views 
+{
+
 template <class... Ts>
   requires (is_view_sequence<Ts> && ...)
-struct hstack : stack_base<hstack_widget, Ts...>
-{
-  hstack(Ts... ts) : stack_base<hstack_widget, Ts...>{ts...} {}
+struct vstack : stack_base<widgets::vstack, Ts...>
+{ 
+  vstack(Ts... ts) : stack_base<widgets::vstack, Ts...>{ts...} {}
 };
+
+template <class... Ts>
+  requires (is_view_sequence<Ts> && ...)
+struct hstack : stack_base<widgets::hstack, Ts...>
+{
+  hstack(Ts... ts) : stack_base<widgets::hstack, Ts...>{ts...} {}
+};
+
+} // views

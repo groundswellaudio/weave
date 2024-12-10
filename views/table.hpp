@@ -5,12 +5,14 @@
 #include <functional>
 #include <ranges>
 
-struct table_widget : widget_base {
+namespace widgets {
+
+struct table : widget_base {
   
   using value_type = void; 
-  using Self = table_widget;
+  using Self = table;
   
-  table_widget(vec2f sz) : widget_base{sz} {}
+  table(vec2f sz) : widget_base{sz} {}
   
   struct cell {
     std::vector<std::string> prop;
@@ -112,7 +114,7 @@ struct table_widget : widget_base {
     }
   }
   
-  void on(mouse_event e, event_context<table_widget>& Ec) 
+  void on(mouse_event e, event_context<Self>& Ec) 
   {
     if (e.is_file_drop() && on_file_drop) {
       on_file_drop(Ec, e.dropped_file());
@@ -140,6 +142,7 @@ struct table_widget : widget_base {
                   - margin;
         posx = std::min(max, posx);
       }
+      return;
     }
     
     if (e.is_mouse_up())
@@ -203,27 +206,35 @@ struct table_widget : widget_base {
   std::function<void(event_context_t<void>& ec, const std::string& path)> on_file_drop;
 };
 
-namespace views {
+} // widgets
 
-template <class RT, class O, class... Args>
-using member_fn_ptr = RT (O::*)(Args...);
+/// The trait used to determine how to present a type 
+
+template <class T>
+struct table_model {
+};
+
+namespace views {
 
 template <class T>
 struct table : view<table<T>> {
   
   table(T& data, bool RebuildWhen) : data{data}, rebuild_when{RebuildWhen} {}
   
-  void set_cells(table_widget& w) {
-    for (auto&& e : data.cells) {
+  using widget_t = widgets::table;
+  using model_t = table_model<std::decay_t<T>>;
+  
+  void set_cells(widget_t& w) {
+    for (auto&& e : model_t{}.cells(data)) {
       w.cells.emplace_back();
-      for (auto& p : e.properties)
+      for (auto& p : model_t{}.cell_properties(e))
         w.cells.back().prop.push_back(p);
     }
   }
   
   auto build(auto&& builder, auto& state) {
-    table_widget res {{400, 400}};
-    res.set_properties(data.properties());
+    widget_t res {{400, 400}};
+    res.set_properties(model_t{}.properties(data));
     set_cells(res);
     res.cell_double_click = cell_double_click;
     res.on_file_drop = file_drop_fn;
@@ -232,8 +243,8 @@ struct table : view<table<T>> {
   
   rebuild_result rebuild(auto& old, widget_ref w, ignore, auto& state) {
     if (rebuild_when) {
-      auto& wb = w.as<table_widget>();
-      wb.update_properties(data.properties());
+      auto& wb = w.as<widget_t>();
+      wb.update_properties(model_t{}.properties(data));
       wb.cells.clear();
       set_cells(wb);
     }
@@ -270,4 +281,4 @@ struct table : view<table<T>> {
   bool rebuild_when = false;
 };
 
-}
+} // views

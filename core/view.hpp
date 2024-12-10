@@ -68,6 +68,8 @@ struct view : view_sequence_base {
   void seq_destroy(this T& self, auto GetForDestroy) {
     self.destroy( GetForDestroy() );
   }
+  
+  void destroy(widget_ref w) {}
 };
 
 template <class T>
