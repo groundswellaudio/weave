@@ -113,11 +113,11 @@ struct lens_readwrite {
 template <class Fn>
 struct invocable_lens {
 
-  decltype(auto) read(auto& s) {
+  decltype(auto) read(auto& s) const {
     return apply_read(s, fn);
   }
   
-  void write(auto& s, auto&& val) {
+  void write(auto& s, auto&& val) const {
     auto f = [this, &val] (auto& s) { fn(s) = (decltype(val)&&)val; };
     return apply_write(s, f);
   }

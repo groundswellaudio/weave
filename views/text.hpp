@@ -3,7 +3,9 @@
 #include "views_core.hpp"
 #include <string_view>
 
-struct text_widget : widget_base
+namespace widgets {
+
+struct text : widget_base
 {
   struct properties {
     bool operator==(const properties& o) const = default;
@@ -28,6 +30,10 @@ struct text_widget : widget_base
   }
 };
 
+} // widgets
+
+namespace views {
+
 struct text : view<text> {
   
   text(std::string_view str) : prop{str} {}
@@ -36,13 +42,15 @@ struct text : view<text> {
     return prop.text.size() == 0 ? vec2f{0, prop.font_size} : gctx.text_bounds(prop.text, prop.font_size);
   }
   
+  using widget_t = widgets::text;
+  
   auto build(auto&& b, ignore) {
     auto& gctx = b.context().graphics_context();
-    return text_widget{{bounds(gctx)}, prop};
+    return widget_t{{bounds(gctx)}, prop};
   }
   
   rebuild_result rebuild(text Old, widget_ref w, auto& up, ignore) {
-    auto& wb = w.as<text_widget>();
+    auto& wb = w.as<widget_t>();
     rebuild_result res {};
     if (prop.text != wb.prop.text) {
       auto new_bounds = bounds(up.context().graphics_context());
@@ -55,5 +63,7 @@ struct text : view<text> {
   
   void destroy(widget_ref w) {}
   
-  text_widget::properties prop;
+  widget_t::properties prop;
 };
+
+} // views

@@ -2,7 +2,9 @@
 
 #include "../util/optional.hpp"
 
-struct image_widget : widget_base {
+namespace widgets {
+
+struct image : widget_base {
   
   void on(ignore, ignore) {}
   
@@ -19,6 +21,8 @@ struct image_widget : widget_base {
   vec2i corner_offset;
 };
 
+} // widgets
+
 namespace views {
 
 static constexpr auto default_image_proj = [] (auto&& pix) { return pix; };
@@ -26,7 +30,8 @@ static constexpr auto default_image_proj = [] (auto&& pix) { return pix; };
 template <class ImgT, class Proj = decltype(default_image_proj)>
 struct image : view<image<ImgT, Proj>> {
   
-  //using ImgT = ::image<rgba<unsigned char>>;
+  using widget_t = widgets::image;
+  
   image(const ImgT& data, bool RefreshWhen, Proj proj = {}) 
   : img{data}, refresh{RefreshWhen}, image_proj{proj} 
   {
@@ -64,11 +69,11 @@ struct image : view<image<ImgT, Proj>> {
     if (!img.empty() && refresh)
       texture = make_texture(b.context());
     auto wsize = get_display_size();
-    return image_widget{{wsize}, texture, corner_offset};
+    return widget_t{{wsize}, texture, corner_offset};
   }
   
   rebuild_result rebuild(image& old, widget_ref elem, const widget_updater& up, ignore) {
-    auto& w = elem.as<image_widget>();
+    auto& w = elem.as<widget_t>();
     if (!w.texture) {
       if (!img.empty())
         w.texture = make_texture(up.context());

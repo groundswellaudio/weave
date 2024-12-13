@@ -7,24 +7,24 @@
 #include <cstdlib> // strtod
 #include <format>
 
-struct text_field_widget : widget_base {
+namespace widgets {
+
+struct text_field : widget_base {
   
-  using Self = text_field_widget;
-  using value_type = void;
+  using Self = text_field;
   
-  std::function<void(event_context_t<void>&, const std::string& str)> write;
-  
+  write_fn<std::string_view> write;
   std::string value_str;
   bool editing = false;
   
-  void on(mouse_event e, event_context<Self>& Ec) { 
+  void on(mouse_event e, event_context& Ec) { 
     if (e.is_double_click()) {
       Ec.grab_keyboard_focus(this);
       editing = true;
     }
   }
   
-  void on(keyboard_event e, event_context<Self>& Ec) {
+  void on(keyboard_event e, event_context& Ec) {
     if (e.is_key_up())
       return;
     
@@ -49,7 +49,7 @@ struct text_field_widget : widget_base {
     }
   }
   
-  void paint(painter& p, ignore) {
+  void paint(painter& p) {
     p.fill_style(colors::black);
     p.rectangle({0, 0}, size());
     p.fill_style(colors::white);
@@ -65,21 +65,27 @@ struct text_field_widget : widget_base {
   }
 };
 
+} // widgets
+
+namespace views {
+
 template <class Lens>
 struct text_field : view<text_field<Lens>> {
   
   text_field(auto lens) : lens{make_lens(lens)} {}
   
+  using widget_t = widgets::text_field;
+  
   template <class S>
   auto build(const widget_builder&, S& state) {
     auto init_val = lens.read(state);
-    auto res = text_field_widget{{50, 15}, init_val};
-    res.write = [l = lens] (auto& ctx, auto& str) { l(*static_cast<S*>(ctx.state()), str); };
+    auto res = widget_t{{50, 15}, init_val};
+    res.write = to_widget_write(lens); 
     return res;
   }
   
   rebuild_result rebuild(text_field<Lens>& old, widget_ref elem, const widget_updater& up, auto& state) {
-    auto& w = elem.as<text_field_widget>();
+    auto& w = elem.as<widget_t>();
     auto val = lens.read(state);
     if (!up.context().has_keyboard_focus(elem))
       w.value_str = val;
@@ -92,21 +98,25 @@ struct text_field : view<text_field<Lens>> {
 template <class Lens>
 text_field(Lens) -> text_field<make_lens_result<Lens>>;
 
+} // views
+
 struct numeric_field_properties {
   double min = 0, max = std::numeric_limits<double>::max();
 };
 
-struct numeric_field_widget : widget_base {
+namespace widgets {
+
+struct numeric_field : widget_base {
   
-  using Self = numeric_field_widget;
-  using value_type = double;
+  using Self = numeric_field;
   
   numeric_field_properties prop;
   double value;
   std::string value_str;
   bool accept_decimal;
+  write_fn<double> write;
   
-  void on(mouse_event e, event_context<Self>& Ec) {
+  void on(mouse_event e, event_context& Ec) {
     if (e.is_double_click()) {
       Ec.grab_keyboard_focus(this);
     }
@@ -123,7 +133,7 @@ struct numeric_field_widget : widget_base {
     value_str = std::format("{}", value);
   }
   
-  void on(keyboard_event e, event_context<Self>& Ec) {
+  void on(keyboard_event e, event_context& Ec) {
     if (e.is_key_up())
       return;
     
@@ -146,7 +156,7 @@ struct numeric_field_widget : widget_base {
       case keycode::enter: 
         update_from_str();
         Ec.release_keyboard_focus();
-        Ec.write(value);
+        write(Ec, value);
         break;
       
       default: 
@@ -154,7 +164,7 @@ struct numeric_field_widget : widget_base {
     }
   }
   
-  void paint(painter& p, double) {
+  void paint(painter& p) {
     p.fill_style(colors::black);
     p.rectangle({0, 0}, size());
     p.fill_style(colors::white);
@@ -165,22 +175,29 @@ struct numeric_field_widget : widget_base {
   }
 };
 
+} // widgets
+
+namespace views {
+
 template <class Lens>
 struct numeric_field : view<numeric_field<Lens>> {
+  
+  using widget_t = widgets::numeric_field;
   
   numeric_field(auto lens) : lens{make_lens(lens)} {}
   
   template <class S>
   auto build(const widget_builder&, S& state) {
     auto init_val = lens.read(state);
-    auto res = numeric_field_widget{{50, 15}, prop, (double)init_val};
+    auto res = widget_t{{50, 15}, prop, (double)init_val};
     res.update_str();
     res.accept_decimal = is_floating_point(type_of(^init_val));
-    return with_lens<S>(std::move(res), lens);
+    res.write = adadpt_lens_write_for_widget(lens); 
+    return res;
   }
   
   rebuild_result rebuild(numeric_field<Lens>& old, widget_ref elem, const widget_updater& up, auto& state) {
-    auto& w = elem.as<numeric_field_widget>();
+    auto& w = elem.as<widget_t>();
     auto val = lens.read(state);
     if (!up.context().has_keyboard_focus(elem))
     {
@@ -203,30 +220,34 @@ struct numeric_field : view<numeric_field<Lens>> {
 template <class Lens>
 numeric_field(Lens) -> numeric_field<make_lens_result<Lens>>;
 
-struct numeric_dial_widget : widget_base 
+} // views
+
+namespace widgets {
+
+struct numeric_dial : widget_base 
 {
   using prop_t = numeric_field_properties;
   
-  numeric_dial_widget(prop_t prop) : prop{prop} {}
+  numeric_dial(prop_t prop) : prop{prop} {}
   
   numeric_field_properties prop;
   float mult_mod;
+  float value;
+  write_fn<float> write;
   
-  using Self = numeric_dial_widget;
-  using value_type = float;
-  
-  void on(mouse_event e, event_context<Self>& ec) {
+  void on(mouse_event e, event_context& ec) {
     if (e.is_mouse_down())
       mult_mod = (1.f - 3 * e.position.x / size().x);
     else if (e.is_mouse_drag())
     {
       auto delta = - std::pow(10, mult_mod) * e.mouse_drag_delta().y;
-      auto NewVal = std::clamp<float>( ec.read() + delta, prop.min, prop.max );
-      ec.write( NewVal );
+      auto NewVal = std::clamp<float>( value + delta, prop.min, prop.max );
+      write(ec, NewVal);
+      value = NewVal;
     }
   }
   
-  void paint(painter& p, float value) {
+  void paint(painter& p) {
     p.stroke_style(colors::white);
     p.stroke_rounded_rect({0, 0}, size(), 6);
     p.font_size(13.f);
@@ -239,11 +260,15 @@ struct numeric_dial_widget : widget_base
   auto layout() const { return vec2f{50, 30}; }
 };
 
+} // widgets
+
+namespace views {
+
 template <class L>
-struct numeric_dial : simple_view_for<numeric_dial_widget, L, numeric_field_properties> {
+struct numeric_dial : simple_view_for<widgets::numeric_dial, L, numeric_field_properties> {
   
   numeric_dial(L lens, numeric_field_properties prop = {}) 
-    : simple_view_for<numeric_dial_widget, L, numeric_field_properties>{lens, prop} {} 
+    : simple_view_for<widgets::numeric_dial, L, numeric_field_properties>{lens, prop} {} 
     
   auto& range(double min, double max) {
     this->min = min; 
@@ -251,3 +276,5 @@ struct numeric_dial : simple_view_for<numeric_dial_widget, L, numeric_field_prop
     return *this;
   }
 };
+
+} // viwes

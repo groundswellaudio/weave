@@ -10,7 +10,7 @@ struct scrollable_widget : widget_base {
     
     using value_type = void;
     
-    void on(mouse_event e, event_context<scrollbar> ec) 
+    void on(mouse_event e, event_context& ec) 
     {
       if (e.is_mouse_drag()) 
         ec.parent().as<scrollable_widget>().scrollbar_move(e.mouse_drag_delta());
@@ -22,8 +22,6 @@ struct scrollable_widget : widget_base {
       p.fill_rounded_rect({0, 0}, size(), 6);
     }
   };
-
-  using value_type = void;
   
   static constexpr auto bar_width = 8;
   
@@ -32,7 +30,7 @@ struct scrollable_widget : widget_base {
   
   float scrollbar_ratio = 0, scrollbar_start = 0;
   
-  void on(mouse_event e, event_context<scrollable_widget> ec) {
+  void on(mouse_event e, event_context& ec) {
     bar.on(e, ec);
   }
   
@@ -65,7 +63,7 @@ struct scrollable_widget : widget_base {
     bar.set_position(bar.position().x, new_bar_pos); //scrollbar_start * child.size().y);
   }
   
-  void on_child_event(mouse_event e, event_context<scrollable_widget> ec, ignore) 
+  void on_child_event(mouse_event e, event_context& ec, ignore) 
   {
     if (e.is_mouse_scroll()) {
       scrollbar_move(-e.mouse_scroll_delta());

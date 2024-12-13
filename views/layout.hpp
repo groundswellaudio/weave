@@ -9,7 +9,7 @@
 struct stack_data {
   float interspace = 8;
   vec2f margin {0, 0};
-  float align_ratio = 0.5;
+  float align_ratio = 0;
   rgba_u8 background_col {0, 0, 0, 0};
 };
 

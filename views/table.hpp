@@ -9,7 +9,6 @@ namespace widgets {
 
 struct table : widget_base {
   
-  using value_type = void; 
   using Self = table;
   
   table(vec2f sz) : widget_base{sz} {}
@@ -73,7 +72,7 @@ struct table : widget_base {
     return vec2i{k, selected_row};
   }
   
-  void handle_mouse_down_body(mouse_event e, event_context<Self>& Ec) {
+  void handle_mouse_down_body(mouse_event e, event_context& Ec) {
     auto cell = find_cell_at(e.position);
     if (!cell)
       return;
@@ -95,11 +94,11 @@ struct table : widget_base {
           ? size().x - get<1>(properties[col])
           : get<1>(properties[col + 1]) - get<1>(properties[col]);
         vec2f field_size {field_width, row_height};
-        edited_field.emplace( text_field_widget{{field_size}} );
+        edited_field.emplace( text_field{{field_size}} );
         edited_field->set_position( {get<1>(properties[col]), first_row + row * row_height} );
         edited_field->editing = true;
         edited_field->value_str = cells[cell->y].prop[cell->x];
-        edited_field->write = [this, cell] (event_context_t<void>& Ec, const std::string& str) { 
+        edited_field->write = [this, cell] (event_context& Ec, auto&& str) { 
           cells[cell->y].prop[cell->x] = str;
           on_field_edit(Ec, *cell, str);
           edited_field.reset(); 
@@ -115,7 +114,7 @@ struct table : widget_base {
     }
   }
   
-  void on(mouse_event e, event_context<Self>& Ec) 
+  void on(mouse_event e, event_context& Ec) 
   {
     if (e.is_file_drop() && on_file_drop) {
       on_file_drop(Ec, e.dropped_file());
@@ -200,20 +199,18 @@ struct table : widget_base {
   std::vector<tuple<std::string, float>> properties;
   std::vector<cell> cells;
   std::optional<vec2i> focused_cell;
-  std::optional<text_field_widget> edited_field;
+  std::optional<text_field> edited_field;
   int dragging = -1;
-  std::function<void(event_context_t<void>& ec, vec2i, const std::string&)> on_field_edit;
-  std::function<void(event_context_t<void>& ec, int cell)> cell_double_click;
-  std::function<void(event_context_t<void>& ec, const std::string& path)> on_file_drop;
+  widget_action<vec2i, std::string_view> on_field_edit;
+  widget_action<int> cell_double_click;
+  widget_action<const std::string&> on_file_drop;
 };
 
 } // widgets
 
-/// The trait used to determine how to present a type 
-
+/// The trait used to determine how to present a type
 template <class T>
-struct table_model {
-};
+struct table_model {};
 
 namespace views {
 
@@ -254,31 +251,38 @@ struct table : view<table<T>> {
   
   template <class S, class RT, class... Args>
   auto& on_cell_double_click(member_fn_ptr<RT, S, Args...> fn) {
-    cell_double_click = [fn] (event_context_t<void>& ec, int cell) {
-      std::invoke(fn, *static_cast<S*>(ec.state()), cell);
+    cell_double_click = [fn] (event_context& ec, int cell) {
+      std::invoke(fn, ec.state<S>(), cell);
     };
     return *this;
   }
   
   template <class S, class M>
   auto& on_cell_double_click(auto fn) {
-    cell_double_click = [fn] (event_context_t<void>& ec, int cell) {
-      fn( *static_cast<S*>(ec.state()) );
+    cell_double_click = [fn] (event_context& ec, int cell) {
+      std::invoke(fn, ec.state<S>());
     };
     return *this;
   }
   
   template <class S, class RT, class... Args>
   auto& on_file_drop(member_fn_ptr<RT, S, Args...> fn) {
-    file_drop_fn = [fn] (event_context_t<void>& ec, const std::string& str) {
-      std::invoke(fn, *static_cast<S*>(ec.state()), str);
+    file_drop_fn = [fn] (event_context& ec, auto&& file) {
+      std::invoke(fn, ec.state<S>(), file);
+    };
+    return *this;
+  }
+  
+  auto& on_file_drop(auto fn) {
+    file_drop_fn = [fn] (event_context& ec, auto&& file) {
+      fn(ec, file);
     };
     return *this;
   }
   
   T& data;
-  std::function<void(event_context_t<void>& ec, int)> cell_double_click;
-  std::function<void(event_context_t<void>& ec, const std::string&)> file_drop_fn;
+  widget_action<int> cell_double_click;
+  widget_action<const std::string&> file_drop_fn;
   bool rebuild_when = false;
 };
 

@@ -12,27 +12,31 @@ float max_text_width(const std::vector<std::string>& vec, graphics_context& ctx)
   return res;
 }
 
+namespace widgets {
+
 struct basic_modal_menu : widget_base {
   
   using value_type = unsigned;
-  
+  using vec = std::vector<std::string>; 
   static constexpr float row_size = 15;
   
-  using vec = std::vector<std::string>; 
+  const vec& choices;
+  int hovered = -1;
+  widget_action<void(int)> on_select;
   
   basic_modal_menu(float width, vec2f pos, const vec& choices) 
   : widget_base{{width + 2 * 10, choices.size() * row_size}, pos}, 
     choices{choices} 
-  { 
+  {
   }
   
-  void on(mouse_event e, event_context<basic_modal_menu>& ec) 
+  void on(mouse_event e, event_context& ec) 
   {
     if (e.is_mouse_down())
     {
       if (hovered != -1) 
-        ec.write(hovered);
-      ec.close_modal_menu();
+        on_select(ec, hovered);
+      ec.pop_overlay();
     }
     else if (e.is_mouse_move()) 
     {
@@ -43,7 +47,7 @@ struct basic_modal_menu : widget_base {
     }
   }
   
-  void paint(painter& p, unsigned val) {
+  void paint(painter& p) {
     p.fill_style(rgb_f(colors::gray) * 0.35);
     p.fill_rounded_rect({0, 0}, size(), 6);
     p.stroke_style(colors::black);
@@ -62,25 +66,36 @@ struct basic_modal_menu : widget_base {
       p.rectangle({0, hovered * row_size}, {size().x, row_size});
     }
   }
-  
-  const std::vector<std::string>& choices;
-  int hovered = -1;
 };
 
-struct combo_box_widget : widget_base {
+struct combo_box : widget_base {
+
+  static constexpr float margin = 5;
   
-  using value_type = unsigned;
+  std::vector<std::string> choices;
+  write_fn<int> write;
+  int active = 0;
+  bool hovered = false;
   
-  void on(mouse_event e, event_context<combo_box_widget>& ec) {
+  void set_value(int x) {
+    active = x;
+  }
+  
+  void on(mouse_event e, event_context& ec) {
     hovered = e.is_mouse_enter() ? true : e.is_mouse_exit() ? false : hovered;
     if (!e.is_mouse_down())
       return;
     auto width = max_text_width(choices, ec.context().graphics_context());
     auto menu = basic_modal_menu{width, {0, size().y}, choices};
-    ec.open_modal_menu(with_lens_t{menu, ec.lens.clone()}, this);
+    menu.on_select = [this] (event_context& ec, int val) {
+      active = val;
+      write(ec, val);
+    };
+    
+    ec.push_overlay_relative(std::move(menu));
   }
   
-  void paint(painter& p, unsigned val) {
+  void paint(painter& p) {
     p.stroke_style(colors::white);
     p.stroke_rounded_rect({0, 0}, size(), 6);
     
@@ -92,43 +107,60 @@ struct combo_box_widget : widget_base {
     p.fill_style(colors::white);
     p.text_align(text_align::x::center, text_align::y::center);
     p.font_size(11);
-    p.text( size() / 2, choices[val] );
+    p.text( size() / 2, choices[active] );
   }
-  
-  std::vector<std::string> choices;
-  bool hovered = false;
 };
+
+} // widgets
 
 namespace views {
 
 template <class Lens, class Range = std::vector<std::string>>
 struct combo_box : view<combo_box<Lens, Range>> {
+  
   combo_box(auto l, Range choices) : lens{make_lens(l)}, choices{std::move(choices)} 
   {}
   
-  template <class S>
-  auto build(auto&& builder, S& state) {
-    auto size = vec2f{50, 20};
-    if constexpr (^Range == ^std::vector<std::string>) {
-      auto w = max_text_width(choices, builder.context().graphics_context());
-      return with_lens<S>(combo_box_widget{{w + 10, 20}, choices}, lens);
+  using widget_t = widgets::combo_box;
+  
+  using StringVec = std::vector<std::string>;
+  
+  decltype(auto) make_string_vec() {
+    using Res = StringVec;
+    if constexpr (^Range == ^Res) 
+      return (choices);
+    else if constexpr (^Range == ^audio_devices_range) {
+      Res vec;
+      for (auto h : choices)
+        vec.emplace_back(h.name());
+      return vec;
     }
-    else {
-      std::vector<std::string> vec;
-      if constexpr (^Range == ^audio_devices_range) {
-        for (auto h : choices)
-          vec.emplace_back(h.name());
-      }
-      else {
-        for (auto&& e : choices)
-          vec.emplace_back(e);
-      }
-      auto w = max_text_width(vec, builder.context().graphics_context());
-      return with_lens<S>(combo_box_widget{{w + 10, 20}, std::move(vec)}, lens);
-    }
+    else return Res{choices.begin(), choices.end()};
   }
   
-  rebuild_result rebuild(combo_box& Old, widget_ref w, ignore, ignore) {
+  template <class S>
+  auto build_impl(const widget_builder& builder, S& state) {
+    auto size = vec2f{50, 20};
+    auto&& vec = make_string_vec();
+    auto w = max_text_width(vec, builder.context().graphics_context());
+    return widget_t{{w + 2 * widget_t::margin, 20}, std::forward<StringVec>(vec)};
+  }
+  
+  template <class S>
+  auto build(const widget_builder& builder, S& state) {
+    auto res = build_impl(builder, state);
+    res.write = [f = lens] (event_context& ec, int val) {
+      f.write(ec.state<S>(), val);
+    };
+    res.set_value(lens.read(state));
+    return res;
+  }
+  
+  rebuild_result rebuild(combo_box& Old, widget_ref w, ignore, auto& state) {
+    auto& wb = w.as<widget_t>();
+    auto val = lens.read(state);
+    if (val != wb.active)
+      wb.set_value(val);
     return {};
   }
   

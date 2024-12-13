@@ -35,8 +35,43 @@ void paint_transport_button(painter& p, vec2f sz) {
   }
 }
 
-auto artist_discography(State& state) {
+auto top_panel(State& state)
+{
+  using namespace views;
+  
+  return hstack {
+    hstack {
+      graphic_trigger_button{&paint_transport_button<false>, &State::previous_track},
+      graphic_toggle_button{&paint_play_button, state.is_playing, &State::set_play}.size({20, 20}),
+      graphic_trigger_button{&paint_transport_button<true>, &State::next_track}
+    },
+    text{state.current_track_name()},
+    slider{ [] (auto& s) -> auto& { return s.player.volume; } }
+  }.interspace(30);
+}
 
+void on_file_drop(event_context& ec, const std::string& path_str) {
+  auto path = fs::path(path_str);
+  if (!is_directory(path)) {
+    ec.state<State>().load_track(path);
+    return;
+  }
+  
+  auto yes = [path] (event_context& ec) { ec.state<State>().load_directory(path); ec.pop_overlay(); };
+  
+  using namespace views;
+  
+  auto dialog = vstack{ 
+    text{"Import all audio files from directory?"},
+    hstack{
+      trigger_button{"Yes", yes},
+      trigger_button{"Cancel", [] (event_context& ec) {ec.pop_overlay();}},
+    }
+  }.background(rgb_f(colors::gray) * 0.3);
+  
+  auto w = ec.build_view<State>(dialog);
+  w.set_position(ec.context().window().size() / 2 - w.size() / 2);
+  ec.push_overlay(std::move(w));
 }
 
 auto make_view(State& state)
@@ -62,16 +97,6 @@ auto make_view(State& state)
   
   state.check_done_reading();
   
-  auto top_panel = hstack {
-    hstack {
-      graphic_trigger_button{&paint_transport_button<false>, &State::previous_track},
-      graphic_toggle_button{&paint_play_button, state.is_playing, &State::set_play}.size({20, 20}),
-      graphic_trigger_button{&paint_transport_button<true>, &State::next_track}
-    },
-    text{state.current_track_name()},
-    slider{ [] (auto& s) -> auto& { return s.player.volume; } }
-  }.interspace(30);
-  
   bool update_cover = std::exchange(state.current_cover_updated, false);
   
   auto side_panel = list{{"Songs", "Artists", "Albums"}, false}
@@ -81,17 +106,17 @@ auto make_view(State& state)
   
   auto songs_table = table{ state.database.tracks, update_table }
                       .on_cell_double_click( &State::play_track )
-                      .on_file_drop( &State::load_track );
+                      .on_file_drop(&on_file_drop);
   
   auto center_view = either {
     state.presentation_kind,
     songs_table,
-    list{ state.artists(), false }.on_select_cell(&State::set_current_artist), 
-    //maybe{ state.current_artist, artist_discography(state) }
+    list{ state.artists(), false }.on_select_cell(&State::set_current_artist)
+    // maybe{ state.current_artist, artist_discography(state) }
     //list{ state.albums(), false }.on_select_cell(&State::set_current_album)
   };
   
-  return vstack{ top_panel,
+  return vstack{ top_panel(state),
                  hstack{ 
                         hstack{
                           side_panel,

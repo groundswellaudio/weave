@@ -35,7 +35,7 @@ namespace impl {
         parents.push_back(w);
         if (find_in_children(*c, abs_pos + c->position())) 
           return true;
-        self.set_focused(*c, abs_pos + c->position());
+        self.set_focused(*c);
         return true;
       }
       
@@ -48,7 +48,7 @@ namespace impl {
           if (find_in_children(w, abs_pos)) {
             return true;
           }
-          self.set_focused(w, abs_pos);
+          self.set_focused(w);
           return true;
        }
        else {
@@ -56,7 +56,7 @@ namespace impl {
           // It's important that we call set_focused here as the event may lay outside 
           // of the root widget, but we still want to make it focused if no other widget can
           // (otherwise we'll end up focusing a child widget with an empty parent stack)
-          self.set_focused(w, abs_pos);
+          self.set_focused(w);
           return true;
         }
         auto p = parents.back(); 
@@ -66,26 +66,30 @@ namespace impl {
       }
     };
     
-    void set_focused(widget_ref w, vec2f abs_pos) {
-      set_focused(w, abs_pos, parents);
+    void set_focused(widget_ref w) {
+      set_focused(w, parents);
     }
     
     public : 
     
     mouse_event_dispatcher(widget_ref root) {
-      set_focused(root, {0, 0});
+      set_focused(root, {});
     }
     
-    void set_focused(widget_ref w, vec2f absolute_pos, const event_context_parent_stack& new_parents) {
+    void set_focused(widget_ref w, const event_context_parent_stack& new_parents) {
       if (w == focused)
         return;
       
-      if (parents.size() == 0) {
-        // It's possible that the absolute pos is not zero here if the focused widget or 
-        // one of the parent changed its position
-        absolute_pos = vec2f{0, 0};
-        // assert( (absolute_pos == vec2f{0, 0}) && "root is focused but offset is not 0" );
-      }
+      // often the case
+      if (&parents != &new_parents)
+        parents = new_parents;
+      
+      // Note : In a lot of cases we don't have to recompute the position entirely from the root
+      // but it's good to recompute it once in a while
+      vec2f absolute_pos = {0, 0};
+      for (auto p : parents)
+        absolute_pos += p.position();
+      absolute_pos += w.position();
       
       focused = w;
       focused_absolute_pos = absolute_pos;
@@ -98,12 +102,13 @@ namespace impl {
     
     void reset_focus(widget_ref root) {
       parents.clear();
-      set_focused(root, {0, 0});
+      set_focused(root, {});
     }
     
     void on(mouse_event e, void* state, application_context& ctx)
     {
-      auto ecd = event_context_data{ctx, parents, state};
+      // FIXME : avoid the copy of the parents vector here
+      auto ec = event_context{ctx, parents, state};
       
       if (!is_modal && e.is_mouse_move() && !e.is_mouse_drag())
       {
@@ -112,42 +117,24 @@ namespace impl {
         find_new_focused{*this, e, parents}.find_from(focused, focused_absolute_pos);
         if (old_focus != focused) 
         {
-          old_focus.on(mouse_event{e.position - old_pos, mouse_exit{}}, ecd);
-          focused.on(mouse_event{e.position - focused_absolute_pos, mouse_enter{}}, ecd);
+          old_focus.on(mouse_event{e.position - old_pos, mouse_exit{}}, ec);
+          focused.on(mouse_event{e.position - focused_absolute_pos, mouse_enter{}}, ec);
         }
       }
       
       e.position -= focused_absolute_pos;
-      focused.on(e, ecd);
+      focused.on(e, ec);
       
       if (top_parent_listener) {
         e.position += focused.position();
         for (auto p : std::ranges::views::reverse(parents)) 
         {
-          p.on_child_event(e, ecd, focused);
+          p.on_child_event(e, ec, focused);
           e.position += p.position();
           if (top_parent_listener == p)
             break;
         }
       }
-    }
-    
-    void open_modal_menu(widget_ref r, event_context_parent_stack parents_stack) {
-      vec2f new_abs_pos = r.position();
-      for (auto& p : parents_stack)
-        new_abs_pos += p.position();
-      focused = r;
-      focused_absolute_pos = new_abs_pos;
-      parents = std::move(parents_stack);
-      is_modal = true;
-    }
-    
-    void close_modal_menu() {
-      assert( is_modal && "close_modal_menu called outside of modal mode" );
-      focused_absolute_pos -= focused.position();
-      focused = parents.back();
-      parents.pop_back();
-      is_modal = false;
     }
     
     vec2f focused_absolute_position() const {
@@ -188,8 +175,8 @@ namespace impl {
     
     void on(keyboard_event e, void* state, application_context& ctx) {
       if (focused) {
-        auto ecd = event_context_data{ctx, parents, state};
-        focused->on(e, ecd);
+        auto ec = event_context{ctx, parents, state};
+        focused->on(e, ec);
       }
     }
     
@@ -247,23 +234,20 @@ struct application_context {
     root.layout();
   }
   
-  void grab_mouse_focus(widget_ref new_focused, event_context_parent_stack parents) {
-    vec2f abs_pos = new_focused.position();
-    for (auto p : parents)
-      abs_pos += p.position();
-    med.set_focused(new_focused, abs_pos, parents);
+  void grab_mouse_focus(widget_ref new_focused, const event_context_parent_stack& parents) {
+    med.set_focused(new_focused, parents);
   }
   
-  void open_modal_menu(widget_box menu, widget_ref parent, event_context_parent_stack stack) 
+  widget_ref push_overlay(widget_box menu) 
   {
-    stack.push_back(parent);
     modal_menu = std::move(menu);
-    med.open_modal_menu(modal_menu.borrow(), std::move(stack));
+    med.set_focused(modal_menu.borrow(), {});
+    return modal_menu.borrow();
   }
   
-  void close_modal_menu() 
+  void pop_overlay()
   {
-    med.close_modal_menu();
+    med.set_focused(root.borrow(), {});
     modal_menu.reset();
   }
   
@@ -309,42 +293,41 @@ struct application_context {
   impl::keyboard_event_dispatcher keyboard;
 };
 
-template <class W, class P>
-void event_context_base::open_modal_menu(this auto& self, W&& widget, P* parent) {
-  vec2f abs_pos {0, 0};
-  abs_pos += widget.position();
-  abs_pos += parent->position();
-  for (auto p : self.parents)
-    abs_pos += p.position();
-  auto winsz = self.ctx.window().size();
-  auto new_pos = widget.position();
-  new_pos -= max(abs_pos + widget.size() - winsz, vec2f{0, 0});
-  widget.set_position(new_pos);
-  self.ctx.open_modal_menu((W&&)widget, parent, self.parents);
+void event_context::push_overlay(widget_box widget) {
+  ctx.push_overlay(std::move(widget));
 }
 
-void event_context_base::close_modal_menu() {
-  ctx.close_modal_menu();
+void event_context::pop_overlay() {
+  ctx.pop_overlay();
 }
 
-void event_context_base::grab_mouse_focus(this auto&& self, widget_ref focused) {
-  self.ctx.grab_mouse_focus(focused, self.parents);
+void event_context::grab_mouse_focus(widget_ref focused) {
+  ctx.grab_mouse_focus(focused, parents);
 }
 
-void event_context_base::grab_keyboard_focus(this auto&& self, widget_ref focused) {
-  self.ctx.grab_keyboard_focus(focused, self.parents);
+void event_context::grab_keyboard_focus(widget_ref focused) {
+  ctx.grab_keyboard_focus(focused, parents);
 }
 
-void event_context_base::release_keyboard_focus() {
+void event_context::release_keyboard_focus() {
   ctx.release_keyboard_focus();
 }
 
-widget_ref event_context_base::current_mouse_focus() {
+widget_ref event_context::current_mouse_focus() {
   return ctx.current_mouse_focus();
 }
-  
-void event_context_base::reset_mouse_focus() {
+
+void event_context::reset_mouse_focus() {
   ctx.reset_mouse_focus();
+}
+
+void event_context::push_overlay_relative(widget_box widget) {
+  auto abs_pos = absolute_position() + widget.position();
+  auto winsz = ctx.window().size();
+  auto new_pos = abs_pos;
+  new_pos -= max(new_pos + widget.size() - winsz, vec2f{0, 0});
+  widget.set_position(new_pos);
+  push_overlay(std::move(widget));
 }
 
 template <class ViewCtor, class View, class State>
@@ -361,6 +344,7 @@ struct application
     impl{ "spiral", {600, 400}, 
           [&, this] { return app_view->build(widget_builder{impl}, s); } }
   {
+    impl.root.debug_dump(3);
   }
   
   void run(State& state)
@@ -413,9 +397,7 @@ struct application
     fn(impl.root.borrow(), {0, 0}, impl.win.size());
     
     if (impl.modal_menu) {
-      auto abs_pos = impl.med.focused_absolute_position();
-      auto traii = p.translate(abs_pos);
-      impl.modal_menu.paint(p, &state);
+      fn(impl.modal_menu.borrow(), {0, 0}, impl.modal_menu.size());
     }
     
     p.end_frame();

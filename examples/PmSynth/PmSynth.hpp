@@ -188,7 +188,7 @@ auto make_view(PmSynth& state)
           return slider{ lens };
         }
       }
-    }.with_interspace(10);
+    }.interspace(10);
   };
   
   auto mod_matrix = vstack{ 
@@ -196,7 +196,7 @@ auto make_view(PmSynth& state)
       iota(state.num_osc),
       slider_row
     }
-  }.with_interspace(10);
+  }.interspace(10);
   
   auto osc_panel_row = [] (int row) {
     auto lens_freq = [row] (State& s) -> auto& { return s.freq_ratio[row]; };
@@ -238,7 +238,7 @@ auto make_view(PmSynth& state)
       osc_panel_row
     }, 
     lfo_panel
-  }.with_interspace(10);
+  }.interspace(10);
   
   auto top_panel = combo_box {
     readwrite( [] (auto& s) { return s.current_device_index(); },
@@ -250,7 +250,7 @@ auto make_view(PmSynth& state)
     std::move(top_panel),
     hstack {
       left_panel, mod_matrix
-    }.with_interspace(30).with_margin({30, 30})
+    }.interspace(30).margin({30, 30})
   }.background(rgb_f(colors::gray) * 0.35);
 }
 

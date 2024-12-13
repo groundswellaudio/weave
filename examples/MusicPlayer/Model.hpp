@@ -109,6 +109,14 @@ struct table_model<std::vector<Database::Track>> {
 };
 
 
+namespace fs = ghc::filesystem; 
+
+inline bool is_audio_file(fs::path path) {
+  auto ext = path.extension().string();
+  return ext == ".wav" || ext == ".WAV" || ext == ".mp3" || ext == ".aiff" || ext == ".aif"
+        || ext == ".flac" || ext == ".FLAC";
+}
+
 struct State : app_state {
   
   bool set_play(bool Play) {
@@ -195,6 +203,12 @@ struct State : app_state {
   
   auto&& songs() {
     return database.tracks;
+  }
+  
+  void load_directory(ghc::filesystem::path p) {
+    for (auto&& f : fs::recursive_directory_iterator(p))
+      if (!is_directory(f) && is_audio_file(f.path()))
+        load_track(f.path().string());
   }
   
   void set_current_artist(int index) {

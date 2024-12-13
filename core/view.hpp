@@ -102,22 +102,14 @@ struct simple_view_for : view<simple_view_for<Widget, Lens, Prop>>, Prop {
   
   template <class State>
   auto build(const auto& builder, State& state) {
-    if constexpr (^Lens == ^empty_lens)
+    if constexpr (^Prop != ^ignore)
+      return Widget{(Prop&)*this};
+    else
       return Widget{};
-    else {
-      if constexpr (^Prop != ^ignore)
-        return with_lens<State>( Widget{(Prop&)*this}, make_lens(lens) );
-      else
-        return with_lens<State>( Widget{}, make_lens(lens) );
-    }
   }
   
   rebuild_result rebuild(auto&& New, widget_ref w, const auto& updater, auto& state) {
     return {};
-    /* if (New.prop == prop)
-      return;
-    w.template as<Widget>.set_properties(New.prop);
-    prop = New.prop; */ 
   }
   
   Lens lens;

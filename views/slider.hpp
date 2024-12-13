@@ -12,19 +12,26 @@ struct slider_properties {
   rgba_u8 text_color = colors::white;
 };
 
-struct slider_x_widget : widget_base
+namespace widgets 
+{
+
+struct slider : widget_base
 {
   slider_properties prop;
+  float value;
   std::string value_str;
+  write_fn<float> write;
+  
   using value_type = float;
   
-  using EvCtx = event_context<slider_x_widget>;
+  using EvCtx = event_context;
   
   void on_value_change(float new_val) {
+    value = new_val;
     value_str = std::format("{:.5}", new_val);
   }
   
-  void on(mouse_event e, EvCtx ec) 
+  void on(mouse_event e, EvCtx& ec) 
   {
     if (!e.is_mouse_drag() && !e.is_mouse_down())
       return;
@@ -34,18 +41,17 @@ struct slider_x_widget : widget_base
     ratio = std::max(0.f, ratio);
     
     auto new_val = prop.min + ratio * (prop.max - prop.min); 
-    ec.write(new_val);
+    write(ec, new_val);
     on_value_change(new_val);
-    //ec.repaint_request();
   }
   
-  void paint(painter& p, float pc) 
+  void paint(painter& p) 
   {
     auto sz = size();
     p.fill_style(prop.background_color);
     p.fill_rounded_rect({0, 0}, sz, 6);
     p.fill_style(prop.active_color);
-    auto e = (pc - prop.min) / (prop.max - prop.min);
+    auto e = (value - prop.min) / (prop.max - prop.min);
     p.rectangle({0, 0}, {e * sz.x, sz.y});
     
     static constexpr auto outline_col = rgba_f{colors::white}.with_alpha(0.5);
@@ -59,23 +65,30 @@ struct slider_x_widget : widget_base
   }
 };
 
+} // widgets
+
+namespace views {
+
 template <class Lens>
 struct slider : view<slider<Lens>> {
   
   template <class L>
   slider(L lens) : lens{make_lens(lens)} {}
   
+  using widget_t = widgets::slider;
+  
   template <class S>
   auto build(const widget_builder& b, S& state) {
     val = lens.read(state);
-    auto res = slider_x_widget{{size}, properties};
+    auto res = widget_t{{size}, properties};
+    res.write = [l = lens] (event_context& c, float val) { l.write(c.state<S>(), val); };
     res.on_value_change(val);
-    return with_lens<S>(std::move(res), lens);
+    return res;
   }
   
   template <class S>
   rebuild_result rebuild(slider<Lens>& Old, widget_ref wb, widget_updater up, S& state) {
-    auto& w = wb.as<slider_x_widget>();
+    auto& w = wb.as<widget_t>();
     val = lens.read(state);
     if (properties != Old.properties) {
       w.prop = properties;
@@ -105,4 +118,6 @@ struct slider : view<slider<Lens>> {
 };
 
 template <class Lens>
-slider(Lens) -> slider<make_lens_result<Lens>>;  
+slider(Lens) -> slider<make_lens_result<Lens>>;
+
+} // views

@@ -7,7 +7,7 @@
 #include "for_each.hpp"
 #include "maybe.hpp"
 #include "scrollable.hpp"
-#include "numeric_field.hpp"
+#include "fields.hpp"
 #include "combo_box.hpp"
 #include "image.hpp"
 #include "progress_bar.hpp"

@@ -2,6 +2,7 @@
 
 #include <string_view>
 #include <functional>
+#include <concepts>
 
 #include "views_core.hpp"
 #include "../cursor.hpp"
@@ -14,25 +15,30 @@ struct button_properties {
 };
 
 static constexpr rgba_u8 button_overlay_color = rgba_u8{colors::white}.with_alpha(75);
+static constexpr float button_margin = 5;
 
-struct toggle_button_widget : widget_base
+namespace widgets {
+
+struct toggle_button : widget_base
 {
   static constexpr float button_radius = 8;
   
   button_properties prop;
+  write_fn<bool> write;
+  bool value;
   
-  using value_type = bool;
-  
-  void on(mouse_event e, event_context<toggle_button_widget> ec) {
+  void on(mouse_event e, event_context& ec) {
     if (e.is_mouse_enter())
       set_mouse_cursor(mouse_cursor::hand);
     else if (e.is_mouse_exit())
       set_mouse_cursor(mouse_cursor::arrow);
-    else if (e.is_mouse_down())
-      ec.write(!ec.read());
+    else if (e.is_mouse_down()) {
+      write(ec, !value);
+      value = !value;
+    }
   }
   
-  void paint(painter& p, bool flag) 
+  void paint(painter& p) 
   {
     auto sz = size();
     p.fill_style(colors::white);
@@ -42,7 +48,7 @@ struct toggle_button_widget : widget_base
     
     // p.circle({button_radius, button_radius}, button_radius);
     
-    if (flag)
+    if (value)
     {
       p.fill_style(prop.active_color);
       p.fill_rounded_rect({0, 0}, sz, 6);
@@ -56,45 +62,15 @@ struct toggle_button_widget : widget_base
   }
 };
 
-namespace views {
-
-template <class Lens>
-struct toggle_button : view<toggle_button<Lens>> {
+struct trigger_button : widget_base {
   
-  toggle_button(std::string_view str, Lens l) : lens{l} {
-    properties.str = str;
-  }
-  
-  template <class S>
-  auto build(widget_builder b, S& s) {
-    return with_lens<S>(toggle_button_widget{{50, 20}, properties}, lens);
-  }
-  
-  rebuild_result rebuild(toggle_button<Lens>& Old, widget_ref w, ignore, ignore) 
-  {
-    return {};
-  }
-  
-  Lens lens;
-  button_properties properties;
-};
-
-} // views
-
-static constexpr float button_margin = 5;
-
-template <class State, class Callback>
-struct trigger_button_widget : widget_base {
-  
-  using value_type = void;
-  
-  Callback callback;
   std::string_view str;
   float font_size;
+  widget_action<void()> on_click;
   bool disabled = false;
   bool hovered = false;
   
-  void on(mouse_event e, event_context<trigger_button_widget<State, Callback>> ec) {
+  void on(mouse_event e, event_context& ec) {
     if (disabled)
       return;
     if (e.is_mouse_enter())
@@ -103,7 +79,7 @@ struct trigger_button_widget : widget_base {
       hovered = false;
     if (!e.is_mouse_down())
       return;
-    std::invoke( callback, *static_cast<State*>(ec.state()) );
+    on_click(ec);
   }
   
   void set_disabled(bool new_disabled) {
@@ -129,10 +105,37 @@ struct trigger_button_widget : widget_base {
   }
 };
 
+} // widgets
+
 namespace views {
+
+template <class Lens>
+struct toggle_button : view<toggle_button<Lens>> {
+  
+  using widget_t = widgets::toggle_button;
+  
+  toggle_button(std::string_view str, Lens l) : lens{l} {
+    properties.str = str;
+  }
+  
+  template <class S>
+  auto build(widget_builder b, S& s) {
+    auto value = lens.read(s);
+    return widget_t{{50, 20}, properties, lens_write_for_widget(lens), value};
+  }
+  
+  rebuild_result rebuild(toggle_button<Lens>& Old, widget_ref w, ignore, ignore) {
+    return {};
+  }
+  
+  Lens lens;
+  button_properties properties;
+};
 
 template <class Fn>
 struct trigger_button : view<trigger_button<Fn>> {
+  
+  using widget_t = widgets::trigger_button;
   
   template <class T>
   trigger_button(T str, Fn fn) : str{str}, fn{fn} {} 
@@ -144,12 +147,26 @@ struct trigger_button : view<trigger_button<Fn>> {
   template <class State>
   auto build(const widget_builder& b, State& s) {
     auto sz = text_bounds(b.context());
-    return trigger_button_widget<State, Fn>{ {sz + vec2f{button_margin, button_margin} * 2}, fn, str, font_size, disabled};
+    decltype(widget_t::on_click) action;
+    if constexpr ( requires (event_context& ec) { std::invoke(fn, ec); } )
+      action = [f = fn] (auto& ec) { std::invoke(f, ec); };
+    else {
+      action = [f = fn] (auto& ec) { std::invoke(f, ec.template state<State>()); };
+      //using t = decltype(fn(std::declval<event_context&>()));
+      //static_assert( requires (event_context& ec) { std::invoke(fn, ec); } );
+    }
+    auto size = sz + vec2f{button_margin, button_margin} * 2;
+    auto res = widget_t{{size}};
+    res.str = str;
+    res.on_click = std::move(action);
+    res.font_size = font_size;
+    res.disabled = disabled;
+    return res;
   }
   
   template <class State>
   rebuild_result rebuild(trigger_button<Fn>& Old, widget_ref w, auto&& up, State& s) {
-    auto& b = w.as<trigger_button_widget<State, Fn>>();
+    auto& b = w.as<widget_t>();
     b.set_disabled(disabled);
     b.str = str;
     b.font_size = font_size;
@@ -179,17 +196,19 @@ template <class PaintFn>
 struct graphic_toggle_button : widget_base {
   
   PaintFn paint_fn;
-  std::function<bool(event_context_t<void>&, bool)> write;
+  write_fn<bool> write;
   bool flag;
   bool hovered = false;
   
-  void on(mouse_event e, event_context_t<void>& ec) {
+  void on(mouse_event e, event_context& ec) {
     if (e.is_mouse_enter())
       hovered = true;
     else if (e.is_mouse_exit())
       hovered = false;
-    else if (e.is_mouse_down())
-      flag = write(ec, !flag);
+    else if (e.is_mouse_down()) {
+      flag = !flag;
+      write(ec, flag);
+    }
   }
   
   void paint(painter& p) {
@@ -205,10 +224,11 @@ template <class PaintFn>
 struct graphic_trigger_button : widget_base {
   
   PaintFn paint_fn;
-  std::function<void(event_context_t<void>&)> on_click;
+  widget_action<void()> on_click;
+  
   bool hovered = false;
   
-  void on(mouse_event e, event_context_t<void>& ec) {
+  void on(mouse_event e, event_context& ec) {
     if (e.is_mouse_enter())
       hovered = true;
     else if (e.is_mouse_exit())
@@ -239,8 +259,8 @@ namespace views
     template <class S>
     auto build(const widget_builder& b, S& state) {
       widgets::graphic_toggle_button<PaintFn> res {{size_v}, paint_fn, {}, val};
-      res.write = [w = write_fn] (event_context_t<void>& ec, bool v) -> bool {
-        return std::invoke(w, *static_cast<S*>(ec.state()), v);
+      res.write = [w = write_fn] (event_context& ec, bool v) -> bool {
+        return std::invoke(w, ec.state<S>(), v);
       };
       res.flag = val;
       return res;
@@ -272,8 +292,8 @@ namespace views
     template <class S>
     auto build(const widget_builder& b, S& state) {
       widgets::graphic_trigger_button<PaintFn> res {{size_v}, paint_fn, {}};
-      res.on_click = [w = payload] (event_context_t<void>& ec) {
-        std::invoke(w, *static_cast<S*>(ec.state()));
+      res.on_click = [w = payload] (event_context& ec) {
+        std::invoke(w, ec.state<S>());
       };
       return res;
     }
@@ -291,4 +311,4 @@ namespace views
     PaintFn paint_fn;
     Payload payload;
   };
-}
+} // views
