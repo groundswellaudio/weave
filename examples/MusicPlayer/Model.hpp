@@ -65,6 +65,11 @@ struct Database {
   Database(const Database&) = delete;
   
   struct Track {
+    
+    auto& title() { return properties[0]; }
+    auto& artist() { return properties[1]; }
+    auto& album() { return properties[2]; }
+    
     std::string file_path;
     std::string properties[3];
   };
@@ -74,9 +79,43 @@ struct Database {
     std::vector<int> tracks;
   };
   
-  struct Album {
-    image<rgb_u8> cover;
+  struct Album { 
+    
+    // Name and artist
+    using Key = tuple<std::string_view, std::string_view>;
+    
+    bool less(Key o) const {
+      auto [name2, artist_name2] = o;
+      if (name < name2)
+        return true;
+      if (name2 > name)
+        return false;
+      if (artist_name < artist_name2)  
+        return true;
+      return false;
+    }
+    
+    bool operator<(const Album& o) const {  
+      return less({o.name, o.artist_name});
+    }
+    
+    bool operator<(tuple<std::string_view, std::string_view> o) const {
+      return less(o);
+    }
+    
+    bool operator==(const Album& o) const {
+      return name == o.name && artist_name == o.artist_name;
+    }
+    
+    bool operator==(Key k) const {
+      return name == get<0>(k) && artist_name == get<1>(k);
+    }
+    
+    bool operator!=(auto& o) const { return not ((*this) == o); }
+    
     std::string name;
+    std::string artist_name;
+    image<rgb_u8> cover;
     std::vector<int> tracks;
   };
   
@@ -87,7 +126,7 @@ struct Database {
   std::vector<Track> tracks;
   std::set<std::string> artists; // We want artists ordered by default
   std::vector<Playlist> playlists_v;
-  std::vector<Album> albums;
+  std::deque<Album> albums;
   
   bool add_track_from_file(const std::string& path) {
     TagLib::FileRef f{path.c_str()};
@@ -101,6 +140,7 @@ struct Database {
       Title = ghc::filesystem::path(path).stem();
     tracks.push_back( {path, {Title, Artist, Album}} );
     try_add_artist(Artist);
+    try_add_album(tracks.back(), tracks.size() - 1);
     return true;
   }
   
@@ -146,6 +186,15 @@ struct Database {
     if (str == "")
       return;
     artists.insert(str);
+  }
+  
+  void try_add_album(Track& track, int track_id) {
+    auto key = tuple{std::string_view{track.album()}, std::string_view{track.artist()}};
+    auto it = std::lower_bound(albums.begin(), albums.end(), tuple{std::string_view{track.album()}, std::string_view{track.artist()}});
+    if (it == albums.end() || *it != key) {
+      it = albums.insert(it, Album{std::string(key.m0), std::string(key.m1)});
+    }
+    it->tracks.push_back(track_id);
   }
 };
 
@@ -263,13 +312,6 @@ struct State : app_state {
   
   void add_playlist() { database.add_playlist(); }
   
-  void set_current_artist(int index) {
-    
-  }
-  
-  void set_presentation(int index) {
-    presentation_kind = index;
-  }
   
   TrackPlayer player;
   std::optional<int> current_track;
@@ -277,7 +319,6 @@ struct State : app_state {
   bool is_playing = false;
   
   Database database;
-  unsigned presentation_kind = 0;
   bool table_mutated = false;
   
   image<rgba<unsigned char>> current_cover;

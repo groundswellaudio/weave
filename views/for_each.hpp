@@ -10,7 +10,7 @@ struct for_each : view_sequence_base {
   using element = decltype( std::declval<ViewCtor>()(std::declval<Range>().front()) );
    
   void seq_build(auto Consumer, const widget_builder& b,  auto& state) {
-    for (auto elem : range) {
+    for (auto&& elem : range) {
       elements.push_back(view_ctor(elem));
       Consumer( elements.back().build(b, state) );
     }
@@ -18,7 +18,7 @@ struct for_each : view_sequence_base {
   
   rebuild_result seq_rebuild(for_each& Old, auto&& seq_updater, const widget_updater& up, auto& state) 
   {
-    for (auto e : range) {
+    for (auto&& e : range) {
       elements.push_back(view_ctor(e));
     }
     
