@@ -210,11 +210,12 @@ struct table : widget_base {
 
 /// The trait used to determine how to present a type
 template <class T>
-struct table_model {};
+struct table_model;
 
 namespace views {
 
 template <class T>
+  requires complete_type<table_model<T>>
 struct table : view<table<T>> {
   
   table(T& data, bool RebuildWhen) : data{data}, rebuild_when{RebuildWhen} {}

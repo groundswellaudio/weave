@@ -76,10 +76,28 @@ namespace impl {
       return variant<Ts...>{ in_place_index<I>, %(^(vs...)[I]) };
     });
   }
+  
+  template <class... Ts>
+  struct overloaded : Ts... {
+    using Ts::operator()...;
+  };
+  
+  template <class... Ts>
+  overloaded(Ts...) -> overloaded<Ts...>;
+
+  template <class... Ts, class... Fns>
+  variant<Ts...> map_variant(auto&& var, Fns... fns) {
+    return visit( [&fns...] (auto&& v) { return variant<Ts...>{overloaded{fns...}(v)}; }, var );
+  }
 }
 
 template <class... Ts>
 struct either : view_sequence_base {
+  
+  template <class... Vs>
+  either(variant<Vs...> v, auto... fn) : body{impl::map_variant<Ts...>(v, fn...)} 
+  {
+  }
   
   either(unsigned index, Ts... vs) : body{impl::make_variant<Ts...>(index, (Ts&&)vs...)} 
   {
@@ -119,3 +137,6 @@ struct either : view_sequence_base {
 
 template <class... Ts>
 either(int index, Ts... ts) -> either<Ts...>;
+
+template <class... Vs, class... Fn>
+either(variant<Vs...>, Fn... fns) -> either<std::invoke_result_t<Fn, Vs>...>;

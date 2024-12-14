@@ -13,3 +13,4 @@
 #include "progress_bar.hpp"
 #include "table.hpp"
 #include "list.hpp"
+#include "selectable.hpp"

@@ -113,13 +113,16 @@ namespace impl {
     return res;
   }
   
-}
+} // impl
 
 template <class T, class... Ts>
 struct stack_base : view<stack_base<T, Ts...>>, stack<Ts...> {
   
   template <class... Vs>
-  constexpr stack_base(Vs&&... ts) : stack<Ts...>{{(Vs&&)(ts)...}} {} 
+  constexpr stack_base(Vs&&... ts) : stack<Ts...>{ {(Vs&&)(ts)...} } {} 
+  
+  stack_base(stack_base&& o) : stack<Ts...>{std::move(o)} {}
+  stack_base(const stack_base&) = default;
   
   template <class S>
   auto build(const widget_builder& b, S& state) 
@@ -241,14 +244,30 @@ template <class... Ts>
   requires (is_view_sequence<Ts> && ...)
 struct vstack : stack_base<widgets::vstack, Ts...>
 { 
-  vstack(Ts... ts) : stack_base<widgets::vstack, Ts...>{ts...} {}
-};
+  template <class... Vs>
+  vstack(Vs&&... ts) : stack_base<widgets::vstack, Ts...>{(Vs&&)ts...} {}
+  vstack(vstack&&) = default;
+  vstack(const vstack&) = default;
+  vstack& operator=(vstack&&) = default;
+  vstack& operator=(const vstack&) = default;
+}; 
+
+template <class... Ts>
+vstack(Ts...) -> vstack<Ts...>;
 
 template <class... Ts>
   requires (is_view_sequence<Ts> && ...)
 struct hstack : stack_base<widgets::hstack, Ts...>
-{
-  hstack(Ts... ts) : stack_base<widgets::hstack, Ts...>{ts...} {}
+{ 
+  template <class... Vs>
+  hstack(Vs&&... ts) : stack_base<widgets::hstack, Ts...>{(Vs&&)ts...} {}
+  hstack(hstack&&) = default;
+  hstack(const hstack&) = default;
+  hstack& operator=(hstack&&) = default;
+  hstack& operator=(const hstack&) = default;
 };
+
+template <class... Ts>
+hstack(Ts...) -> hstack<Ts...>;
 
 } // views

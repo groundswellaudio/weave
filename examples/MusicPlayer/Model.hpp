@@ -60,9 +60,18 @@ static optional<image<rgba<unsigned char>>> read_file_cover(const std::string& p
 struct Database {
   
   struct Track {
-    
     std::string file_path;
     std::string properties[3];
+  };
+  
+  struct Playlist {
+    std::string name;
+    std::vector<int> tracks;
+  };
+  
+  struct Album {
+    std::string_view name;
+    std::vector<int> tracks;
   };
   
   static constexpr const char* properties_v[] = {
@@ -71,6 +80,8 @@ struct Database {
   
   std::vector<Track> tracks;
   std::set<std::string> artists; // We want artists ordered by default
+  std::vector<Playlist> playlists_v;
+  std::vector<Album> albums;
   
   bool add_track_from_file(const std::string& path) {
     TagLib::FileRef f{path.c_str()};
@@ -91,6 +102,19 @@ struct Database {
   auto num_tracks() const { return tracks.size(); }
   
   auto& track(int index) { return tracks[index]; }
+  
+  /// Accessor
+  auto& playlists() const { 
+    return playlists_v; 
+  }
+  
+  void add_playlist() {
+    playlists_v.push_back({"Playlist1"});
+  }
+  
+  auto& playlist(int id) {
+    return playlists()[id];
+  }
   
   private : 
   
@@ -197,19 +221,17 @@ struct State : app_state {
     }
   }
   
-  auto&& artists() {
-    return database.artists;
-  }
-  
-  auto&& songs() {
-    return database.tracks;
-  }
+  auto&& artists() { return database.artists; }
+  auto&& songs() { return database.tracks; }
+  auto& playlists() const { return database.playlists(); }
   
   void load_directory(ghc::filesystem::path p) {
     for (auto&& f : fs::recursive_directory_iterator(p))
       if (!is_directory(f) && is_audio_file(f.path()))
         load_track(f.path().string());
   }
+  
+  void add_playlist() { database.add_playlist(); }
   
   void set_current_artist(int index) {
     

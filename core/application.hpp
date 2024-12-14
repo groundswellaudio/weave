@@ -358,7 +358,7 @@ struct application
           impl.med.on(e, &state, impl);
       });
       
-      auto old_view = *app_view;
+      auto old_view = std::move(*app_view);
       app_view.emplace( view_ctor(state) );
       auto upd = widget_updater{impl};
       app_view->rebuild(old_view, impl.root.borrow(), upd, state);

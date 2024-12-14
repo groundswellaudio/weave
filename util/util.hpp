@@ -25,3 +25,6 @@ on_exit(Fn) -> on_exit<Fn>;
 
 template <class RT, class O, class... Args>
 using member_fn_ptr = RT (O::*)(Args...);
+
+template <class T>
+concept complete_type = requires { sizeof(T); };

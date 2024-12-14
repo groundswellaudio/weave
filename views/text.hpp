@@ -37,6 +37,8 @@ namespace views {
 struct text : view<text> {
   
   text(std::string_view str) : prop{str} {}
+  text(text&&) = default;
+  text(const text&) = default;
   
   vec2f bounds(graphics_context& gctx) {
     return prop.text.size() == 0 ? vec2f{0, prop.font_size} : gctx.text_bounds(prop.text, prop.font_size);

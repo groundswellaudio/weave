@@ -140,6 +140,8 @@ struct trigger_button : view<trigger_button<Fn>> {
   template <class T>
   trigger_button(T str, Fn fn) : str{str}, fn{fn} {} 
   
+  trigger_button(const trigger_button&) = default;
+  
   auto text_bounds(application_context& ctx) {
     return ctx.graphics_context().text_bounds(str, font_size);
   }
@@ -186,6 +188,9 @@ struct trigger_button : view<trigger_button<Fn>> {
 
 template <class T, class Fn>
 trigger_button(T, Fn) -> trigger_button<Fn>; 
+
+template <class Fn>
+using button = trigger_button<Fn>;
 
 } // views
 

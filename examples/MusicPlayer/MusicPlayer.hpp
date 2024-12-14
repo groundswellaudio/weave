@@ -35,21 +35,6 @@ void paint_transport_button(painter& p, vec2f sz) {
   }
 }
 
-auto top_panel(State& state)
-{
-  using namespace views;
-  
-  return hstack {
-    hstack {
-      graphic_trigger_button{&paint_transport_button<false>, &State::previous_track},
-      graphic_toggle_button{&paint_play_button, state.is_playing, &State::set_play}.size({20, 20}),
-      graphic_trigger_button{&paint_transport_button<true>, &State::next_track}
-    },
-    text{state.current_track_name()},
-    slider{ [] (auto& s) -> auto& { return s.player.volume; } }
-  }.interspace(30);
-}
-
 void on_file_drop(event_context& ec, const std::string& path_str) {
   auto path = fs::path(path_str);
   if (!is_directory(path)) {
@@ -65,7 +50,7 @@ void on_file_drop(event_context& ec, const std::string& path_str) {
     text{"Import all audio files from directory?"},
     hstack{
       trigger_button{"Yes", yes},
-      trigger_button{"Cancel", [] (event_context& ec) {ec.pop_overlay();}},
+      trigger_button{"Cancel", &event_context::pop_overlay}    
     }
   }.background(rgb_f(colors::gray) * 0.3);
   
@@ -74,54 +59,159 @@ void on_file_drop(event_context& ec, const std::string& path_str) {
   ec.push_overlay(std::move(w));
 }
 
-auto make_view(State& state)
+auto top_panel(State& state)
 {
   using namespace views;
   
-  /* 
-  auto on_file_drop = [] (event_context_t<void>& ec, const std::string& path) {
-    if (is_directory(ghc::path{path})
-      std::cout << "got directory" << std::endl;
-    ec.state<State>().load_track()
-  }; */ 
+  return hstack {
+    hstack {
+      graphic_trigger_button{&paint_transport_button<false>, &State::previous_track},
+      graphic_toggle_button{&paint_play_button, state.is_playing, &State::set_play}.size({20, 20}),
+      graphic_trigger_button{&paint_transport_button<true>, &State::next_track}
+    },
+    text{state.current_track_name()},
+    slider{ [] (auto& s) -> auto& { return s.player.volume; } }
+  }.interspace(30);
+}
+
+template <class T>
+using view_state = std::unique_ptr<T>;
+
+/* 
+template <>
+struct table_model<Database::Playlist> {
   
-  /* selection_panel {
+}; */ 
+
+struct LibraryView {
+  
+  struct songs_t {};
+  struct artists_t {};
+  struct albums_t {};
+  struct artist_id { int value; };
+  struct playlist_id { int value; };
+  
+  struct ViewState {
+    selection_value<variant<songs_t, artists_t, albums_t, playlist_id>> selection;
+    int artist = -1;
+  };
+  
+  using view_state = std::unique_ptr<ViewState>;
+  
+  // view_state<ViewState> self;
+  
+  auto init_state() {
+    return view_state( new ViewState{songs_t{}} );
+  }
+  
+  auto left_panel(State& state, view_state& self) {
+    using namespace views;
     
-  vstack{
-    text{"Songs"}, 
-    text{"Artists"},
-    text{"Album"},
-    spacer{}
+    auto setter = [p = self.get()] (auto v) { return p->selection.setter(v); };
     
+    return vstack {
+      text{"Library"},
+      selectable{ text{"Songs"}, setter(songs_t{}) },
+      selectable{ text{"Artists"}, setter(artists_t{}) },
+      selectable{ text{"Albums"}, setter(albums_t{}) },
+      text{"Playlists"}, 
+      for_each(state.playlists(), [this, p = 0, setter] (auto& playlist) mutable {
+        return selectable{ text{playlist.name}, setter(playlist_id{p++}) };
+      }),
+      button{ "Create playlist", &State::add_playlist }
+      /* 
+      text{"Tags"},
+      for_each(state.tags(), [] (auto& p) {
+        return selectable{ text{p.name()}, group };
+      }); */ 
+    };
+  }
+  
+  /* 
+  auto artist_list(State& state) {
+    return list{ state.artists(), false }.on_select_cell(&State::set_current_artist);
   } */ 
+  
+  auto body(State& state, view_state& self) {
+    using namespace views;
+    
+    bool update_table = std::exchange(state.table_mutated, false);
+  
+    auto songs_table = table{ state.database.tracks, update_table }
+                        .on_cell_double_click( &State::play_track )
+                        .on_file_drop(&on_file_drop);
+    
+    auto center_view = either {
+      self->selection.value, 
+      [&] (songs_t) {
+        return table{ state.database.tracks, update_table }
+                      .on_cell_double_click( &State::play_track )
+                      .on_file_drop(&on_file_drop);
+      },
+      [&] (artists_t) {
+        return list{state.artists(), false};
+      },
+      [&] (albums_t) {
+        return list{state.database.albums | std::views::transform([] (auto& e) { return e.name;}), false};
+      },
+      [&] (playlist_id id) {
+        return text{"todo"};
+        /* 
+        return table{ state.database.playlist(id.value), false }
+               .on_cell_double_click( &State::play_track ); */ 
+      }
+    };
+    
+    return hstack{left_panel(state, self), center_view};
+  }
+};
+
+/// A composite view is a composition of a view state and a body() function 
+/// which is a product of both this view state and the global state.
+template <class T, class State>
+struct composite_view : view<composite_view<T, State>> {
+  
+  using view_state_t = typename T::view_state;
+  
+  using body_t = decltype(std::declval<T&>().body(std::declval<State&>(), std::declval<view_state_t&>()));
+  
+  composite_view(auto&&... args) : definition{args...} {}
+  composite_view(composite_view&&) = default;
+  
+  auto build(const widget_builder& ctx, State& state) {
+    view_state = definition.init_state();
+    definition_body.reset(new optional<body_t>{definition.body(state, view_state)});
+    return (**definition_body).build(ctx, state);
+  }
+  
+  auto rebuild(auto& old, widget_ref r, auto&& up, auto& state) {
+    // Move the value
+    auto old_body = std::move(**old.definition_body);
+    // Move the pointer
+    definition_body = std::move(old.definition_body);
+    view_state = std::move(old.view_state);
+    definition_body->emplace(definition.body(state, view_state));
+    return (**definition_body).rebuild(old_body, r, up, state);
+  }
+  
+  T definition;
+  view_state_t view_state;
+  std::unique_ptr<optional<body_t>> definition_body;
+};
+
+using library_view = composite_view<LibraryView, State>;
+
+auto make_view(State& state)
+{
+  using namespace views;
   
   state.check_done_reading();
   
   bool update_cover = std::exchange(state.current_cover_updated, false);
   
-  auto side_panel = list{{"Songs", "Artists", "Albums"}, false}
-                     .on_select_cell( &State::set_presentation );
-  
-  bool update_table = std::exchange(state.table_mutated, false);
-  
-  auto songs_table = table{ state.database.tracks, update_table }
-                      .on_cell_double_click( &State::play_track )
-                      .on_file_drop(&on_file_drop);
-  
-  auto center_view = either {
-    state.presentation_kind,
-    songs_table,
-    list{ state.artists(), false }.on_select_cell(&State::set_current_artist)
-    // maybe{ state.current_artist, artist_discography(state) }
-    //list{ state.albums(), false }.on_select_cell(&State::set_current_album)
-  };
-  
   return vstack{ top_panel(state),
                  hstack{ 
-                        hstack{
-                          side_panel,
-                          center_view
-                        }.align(0),
+                        library_view{}, 
                         views::image{state.current_cover, update_cover}
                         .fit({300, 300})
                         }.align(1)
