@@ -35,7 +35,7 @@ optional<audio_buffer> read_audio_file(const std::string& path)
   }
   else if (path.ends_with(".flac"))
   {
-    
+    return {};
   }
   else // Default ot wav if all else fails 
   {

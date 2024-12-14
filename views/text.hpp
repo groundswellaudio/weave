@@ -9,11 +9,11 @@ struct text : widget_base
 {
   struct properties {
     bool operator==(const properties& o) const = default;
-    std::string_view text;
     rgba_u8 color = colors::white;
     float font_size = 11;
   };
   
+  std::string str;
   properties prop;
   
   using value_type = void;
@@ -26,7 +26,7 @@ struct text : widget_base
     p.font_size(prop.font_size);
     p.fill_style(prop.color);
     p.text_align(text_align::x::left, text_align::y::center);
-    p.text({0, size().y / 2}, prop.text);
+    p.text({0, size().y / 2}, str);
   }
 };
 
@@ -36,28 +36,29 @@ namespace views {
 
 struct text : view<text> {
   
-  text(std::string_view str) : prop{str} {}
+  text(std::string_view str) : str{str} {}
+  
   text(text&&) = default;
   text(const text&) = default;
   
   vec2f bounds(graphics_context& gctx) {
-    return prop.text.size() == 0 ? vec2f{0, prop.font_size} : gctx.text_bounds(prop.text, prop.font_size);
+    return str.size() == 0 ? vec2f{0, prop.font_size} : gctx.text_bounds(str, prop.font_size);
   }
   
   using widget_t = widgets::text;
   
   auto build(auto&& b, ignore) {
     auto& gctx = b.context().graphics_context();
-    return widget_t{{bounds(gctx)}, prop};
+    return widget_t{{bounds(gctx)}, std::string(str), prop};
   }
   
   rebuild_result rebuild(text Old, widget_ref w, auto& up, ignore) {
     auto& wb = w.as<widget_t>();
     rebuild_result res {};
-    if (prop.text != wb.prop.text) {
+    if (str != wb.str) {
       auto new_bounds = bounds(up.context().graphics_context());
       wb.set_size(new_bounds);
-      wb.prop.text = prop.text;
+      wb.str = str;
       res |= rebuild_result::size_change;
     }
     return res;
@@ -66,6 +67,7 @@ struct text : view<text> {
   void destroy(widget_ref w) {}
   
   widget_t::properties prop;
+  std::string_view str;
 };
 
 } // views

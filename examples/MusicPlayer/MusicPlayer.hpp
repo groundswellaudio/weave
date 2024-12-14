@@ -98,8 +98,6 @@ struct LibraryView {
   
   using view_state = std::unique_ptr<ViewState>;
   
-  // view_state<ViewState> self;
-  
   auto init_state() {
     return view_state( new ViewState{songs_t{}} );
   }
@@ -109,14 +107,18 @@ struct LibraryView {
     
     auto setter = [p = self.get()] (auto v) { return p->selection.setter(v); };
     
+    auto panel_item = [setter] (auto&& str, auto id) {
+      return selectable{text{str}, setter(id)};
+    };
+    
     return vstack {
       text{"Library"},
-      selectable{ text{"Songs"}, setter(songs_t{}) },
-      selectable{ text{"Artists"}, setter(artists_t{}) },
-      selectable{ text{"Albums"}, setter(albums_t{}) },
+      panel_item("Songs", songs_t{}),
+      panel_item("Artists", artists_t{}),
+      panel_item("Albums", albums_t{}),
       text{"Playlists"}, 
-      for_each(state.playlists(), [this, p = 0, setter] (auto& playlist) mutable {
-        return selectable{ text{playlist.name}, setter(playlist_id{p++}) };
+      for_each(state.playlists(), [this, p = 0, panel_item] (auto& playlist) mutable {
+        return panel_item(playlist.name, playlist_id{p++});
       }),
       button{ "Create playlist", &State::add_playlist }
       /* 
