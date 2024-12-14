@@ -2,28 +2,15 @@
 
 #include "views_core.hpp"
 #include <functional>
-#include <memory>
-
-struct selectable_group {
-  
-  void change(auto* new_selected) {
-    if (on_change)
-      on_change();
-    on_change = [new_selected] () {
-      new_selected->unselect();
-    };
-  }
-  
-  std::function<void()> on_change;
-};
 
 template <class T>
 struct selection_value {
   
   auto setter(T val) { 
     return [this, val] (auto next_on_change) { 
-      value = val; 
-      on_change();
+      value = val;
+      if (on_change)
+        on_change();
       on_change = next_on_change;
     };
   }
