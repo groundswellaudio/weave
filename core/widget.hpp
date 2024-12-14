@@ -21,7 +21,13 @@ struct widget_builder;
 struct widget_updater;
 struct event_context;
 
-using input_event = variant<mouse_event, keyboard_event>;
+struct input_event : variant<mouse_event, keyboard_event> {
+  using variant<mouse_event, keyboard_event>::variant;
+  bool is_mouse_event() const { return index() == 0; }
+  auto& mouse() { return get<0>(); }
+  bool is_keyboard_event() const { return index() == 1; }
+  auto& keyboard() { return get<1>(); }
+};
 
 consteval std::meta::expr to_str(std::meta::type t) {
   std::meta::ostream os;

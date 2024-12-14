@@ -6,6 +6,7 @@
 #include "button.hpp"
 #include "for_each.hpp"
 #include "maybe.hpp"
+#include "modifiers.hpp"
 #include "scrollable.hpp"
 #include "fields.hpp"
 #include "combo_box.hpp"

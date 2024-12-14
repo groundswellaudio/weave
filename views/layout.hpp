@@ -5,6 +5,7 @@
 #include "../util/util.hpp"
 #include <span>
 #include <algorithm>
+#include <concepts>
 
 struct stack_data {
   float interspace = 8;
@@ -245,6 +246,7 @@ template <class... Ts>
 struct vstack : stack_base<widgets::vstack, Ts...>
 { 
   template <class... Vs>
+    requires (std::constructible_from<Ts, Vs&&> && ...)
   vstack(Vs&&... ts) : stack_base<widgets::vstack, Ts...>{(Vs&&)ts...} {}
   vstack(vstack&&) = default;
   vstack(const vstack&) = default;
@@ -260,6 +262,7 @@ template <class... Ts>
 struct hstack : stack_base<widgets::hstack, Ts...>
 { 
   template <class... Vs>
+    requires (std::constructible_from<Ts, Vs&&> && ...)
   hstack(Vs&&... ts) : stack_base<widgets::hstack, Ts...>{(Vs&&)ts...} {}
   hstack(hstack&&) = default;
   hstack(const hstack&) = default;

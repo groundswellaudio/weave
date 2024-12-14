@@ -149,14 +149,7 @@ struct trigger_button : view<trigger_button<Fn>> {
   template <class State>
   auto build(const widget_builder& b, State& s) {
     auto sz = text_bounds(b.context());
-    decltype(widget_t::on_click) action;
-    if constexpr ( requires (event_context& ec) { std::invoke(fn, ec); } )
-      action = [f = fn] (auto& ec) { std::invoke(f, ec); };
-    else {
-      action = [f = fn] (auto& ec) { std::invoke(f, ec.template state<State>()); };
-      //using t = decltype(fn(std::declval<event_context&>()));
-      //static_assert( requires (event_context& ec) { std::invoke(fn, ec); } );
-    }
+    decltype(widget_t::on_click) action = [f = fn] (auto& ec) { context_invoke<State>(f, ec); };
     auto size = sz + vec2f{button_margin, button_margin} * 2;
     auto res = widget_t{{size}};
     res.str = str;

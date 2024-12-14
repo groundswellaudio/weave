@@ -90,9 +90,10 @@ struct LibraryView {
   struct albums_t {};
   struct artist_id { int value; };
   struct playlist_id { int value; };
+  struct album_id {int value;};
   
   struct ViewState {
-    selection_value<variant<songs_t, artists_t, albums_t, playlist_id>> selection;
+    selection_value<variant<songs_t, artists_t, albums_t, playlist_id, album_id>> selection;
     int artist = -1;
   };
   
@@ -138,10 +139,6 @@ struct LibraryView {
     using namespace views;
     
     bool update_table = std::exchange(state.table_mutated, false);
-  
-    auto songs_table = table{ state.database.tracks, update_table }
-                        .on_cell_double_click( &State::play_track )
-                        .on_file_drop(&on_file_drop);
     
     auto center_view = either {
       self->selection.value, 
@@ -154,13 +151,28 @@ struct LibraryView {
         return list{state.artists(), false};
       },
       [&] (albums_t) {
-        return list{state.database.albums | std::views::transform([] (auto& e) { return e.name;}), false};
+        return vstack{
+          for_each(state.database.albums, [p = self.get(), k = 0] (auto& a) mutable {
+            auto setter = p->selection.setter(album_id{k++});
+            return vstack {
+              on_click{views::image{a.cover, false}, [setter] { setter([](){}); }}, 
+              text{a.name}
+            };
+          })
+        };
       },
       [&] (playlist_id id) {
         return text{"todo"};
         /* 
         return table{ state.database.playlist(id.value), false }
                .on_cell_double_click( &State::play_track ); */ 
+      },
+      [&] (album_id id) {
+        return vstack {
+          views::image{state.database.album(id.value).cover, false},
+          text{state.database.album(id.value).name},
+          table{state.database.album_tracks(id.value), false}.on_cell_double_click(&State::play_track)
+        };
       }
     };
     

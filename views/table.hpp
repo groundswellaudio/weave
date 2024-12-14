@@ -218,7 +218,7 @@ template <class T>
   requires complete_type<table_model<T>>
 struct table : view<table<T>> {
   
-  table(T& data, bool RebuildWhen) : data{data}, rebuild_when{RebuildWhen} {}
+  table(T data, bool RebuildWhen) : data{data}, rebuild_when{RebuildWhen} {}
   
   using widget_t = widgets::table;
   using model_t = table_model<std::decay_t<T>>;
@@ -281,10 +281,16 @@ struct table : view<table<T>> {
     return *this;
   }
   
-  T& data;
+  T data;
   widget_action<int> cell_double_click;
   widget_action<const std::string&> file_drop_fn;
   bool rebuild_when = false;
 };
+
+template <class T>
+table(T&) -> table<T&>;
+
+template <class T>
+table(T&&) -> table<T>;
 
 } // views

@@ -9,6 +9,7 @@
 #include <ghc/filesystem.hpp>
 #include <atomic>
 #include <set>
+#include <ranges>
 
 struct TrackPlayer : audio_renderer<TrackPlayer>
 {
@@ -59,6 +60,10 @@ static optional<image<rgba<unsigned char>>> read_file_cover(const std::string& p
 
 struct Database {
   
+  using Self = Database;
+  Database() = default;
+  Database(const Database&) = delete;
+  
   struct Track {
     std::string file_path;
     std::string properties[3];
@@ -70,7 +75,8 @@ struct Database {
   };
   
   struct Album {
-    std::string_view name;
+    image<rgb_u8> cover;
+    std::string name;
     std::vector<int> tracks;
   };
   
@@ -116,6 +122,24 @@ struct Database {
     return playlists()[id];
   }
   
+  struct AlbumTracks {
+    
+    auto tracks() {
+      return std::views::transform(self.album(album_id).tracks, [s = &self] (auto id) -> auto& { return s->track(id); });
+    }
+    
+    Self& self;
+    int album_id;
+  };
+  
+  AlbumTracks album_tracks(int id) {
+    return {*this, id};
+  }
+  
+  Album& album(int id) {
+    return albums[id];
+  }
+  
   private : 
   
   void try_add_artist(const std::string& str) {
@@ -132,6 +156,12 @@ struct table_model<std::vector<Database::Track>> {
   auto& cell_properties(Database::Track& t) { return t.properties; }
 };
 
+template <>
+struct table_model<Database::AlbumTracks> {
+  auto&& properties(ignore) { return Database::properties_v; }
+  auto cells(auto& obj) { return obj.tracks(); }
+  auto& cell_properties(Database::Track& t) { return t.properties; }
+};
 
 namespace fs = ghc::filesystem; 
 

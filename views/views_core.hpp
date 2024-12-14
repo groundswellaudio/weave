@@ -28,3 +28,13 @@ using widget_action = typename impl::widget_action<Args...>::type;
 
 template <class T>
 using write_fn = widget_action<void(T)>;
+
+template <class State, class Fn>
+decltype(auto) context_invoke(Fn fn, event_context& ec) {
+  if constexpr ( requires { std::invoke(fn, ec); } )
+    return (std::invoke(fn, ec)); 
+  else if constexpr ( requires { std::invoke(fn, ec.template state<State>()); } )
+    return (std::invoke(fn, ec.template state<State>()));
+  else
+    return (std::invoke(fn));
+}

@@ -344,13 +344,13 @@ struct variant : variant_base
 };
 
 template <unsigned Index, class V>
-  requires (is_instance_of(remove_reference(^V), ^variant))
+  requires (is_derived_from(remove_reference(^V), ^variant_base))
 constexpr auto&& get(V&& var) {
   return var.data.%(cat("m", Index));
 }
 
 template <class T, class V>
-  requires (is_instance_of(remove_reference(^V), ^variant))
+  requires (is_derived_from(remove_reference(^V), ^variant_base))
 constexpr auto&& get(V&& var) {
   return var.template get<T>();
 }
