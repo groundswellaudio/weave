@@ -73,10 +73,10 @@ struct trigger_button : widget_base {
   void on(mouse_event e, event_context& ec) {
     if (disabled)
       return;
-    if (e.is_mouse_enter())
-      hovered = true;
+    if (e.is_mouse_enter()) 
+      (hovered = true, ec.request_repaint());
     else if (e.is_mouse_exit())
-      hovered = false;
+      (hovered = false, ec.request_repaint());
     if (!e.is_mouse_down())
       return;
     on_click(ec);
@@ -200,9 +200,9 @@ struct graphic_toggle_button : widget_base {
   
   void on(mouse_event e, event_context& ec) {
     if (e.is_mouse_enter())
-      hovered = true;
+      (hovered = true, ec.request_repaint());
     else if (e.is_mouse_exit())
-      hovered = false;
+      (hovered = false, ec.request_repaint());
     else if (e.is_mouse_down()) {
       flag = !flag;
       write(ec, flag);
@@ -228,9 +228,9 @@ struct graphic_trigger_button : widget_base {
   
   void on(mouse_event e, event_context& ec) {
     if (e.is_mouse_enter())
-      hovered = true;
+      (hovered = true, ec.request_repaint());
     else if (e.is_mouse_exit())
-      hovered = false;
+      (hovered = false, ec.request_repaint());
     else if (e.is_mouse_down())
       on_click(ec);
   }

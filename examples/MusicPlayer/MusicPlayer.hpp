@@ -124,7 +124,7 @@ struct LibraryView {
   struct artists_t {};
   struct albums_t {};
   struct artist_id { int value; };
-  struct playlist_id { int value; };
+  struct playlist_id { int value; };
   struct album_id {int value;};
   
   struct ViewState {

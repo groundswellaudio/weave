@@ -43,6 +43,7 @@ struct slider : widget_base
     auto new_val = prop.min + ratio * (prop.max - prop.min); 
     write(ec, new_val);
     on_value_change(new_val);
+    ec.request_repaint();
   }
   
   void paint(painter& p) 

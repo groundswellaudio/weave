@@ -27,7 +27,7 @@ struct table : widget_base {
     bool selected = false;
   };
   
-  selection_t selection;
+  selection_t selection {-1, -1};
   std::vector<tuple<std::string, float>> properties;
   std::vector<cell> cells;
   std::optional<vec2i> focused_cell;
@@ -156,6 +156,7 @@ struct table : widget_base {
         handle_mouse_down_header(e.position);
       else 
         handle_mouse_down_body(e, Ec);
+      Ec.request_repaint();
       return;
     }
     
@@ -172,6 +173,7 @@ struct table : widget_base {
                   - margin;
         posx = std::min(max, posx);
       }
+      Ec.request_repaint();
       return;
     }
     

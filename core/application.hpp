@@ -310,10 +310,12 @@ struct application_context {
 
 void event_context::push_overlay(widget_box widget) {
   ctx.push_overlay(std::move(widget));
+  request_repaint();
 }
 
 void event_context::pop_overlay() {
   ctx.pop_overlay();
+  request_repaint();
 }
 
 void event_context::grab_mouse_focus(widget_ref focused) {
@@ -364,11 +366,12 @@ struct application
     impl{ "spiral", {600, 400}, 
           [&, this] { return app_view->build(widget_builder{impl}, s); } }
   {
+    paint(s);
     impl.root.debug_dump(3);
   }
   
   void rebuild(State& state) {
-    debug_log("rebuilding top view");
+    debug_log("rebuilding");
     auto old_view = std::move(*app_view);
     app_view.emplace( view_ctor(state) );
     auto upd = widget_updater{impl};
@@ -388,16 +391,17 @@ struct application
           frame = impl.med.on(e, &state, impl);
       });
       
-      if (frame.rebuild_requested) {
+      if (frame.rebuild_requested) 
         rebuild(state);
-      }
       
-      paint(state);
+      if (frame.repaint_requested)
+        paint(state);
     }
   }
   
   void paint(State& state)
   {
+    debug_log("painting");
     painter p = impl.graphics_context().painter();
     p.set_font("default");
     p.begin_frame(impl.win.size(), 1);

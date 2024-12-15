@@ -118,6 +118,10 @@ struct audio_renderer
 {
   using Self    = audio_renderer<T>;
 
+  audio_renderer() {
+    device.pContext = nullptr;
+  }
+  
   void start_audio_render(audio_buffer_format fmt = {})
   {
     start_audio_device(fmt, 1);
@@ -143,8 +147,10 @@ struct audio_renderer
   }
 
   ~audio_renderer() {
-    stop_audio_render();
-    ma_device_uninit(&device);
+    if (device.pContext != nullptr) {
+      stop_audio_render();
+      ma_device_uninit(&device);
+    }
   }
 
   private :

@@ -29,9 +29,10 @@ struct selectable : W {
   auto& base() { return (W&)*this; }
   
   void on(mouse_event e, event_context& ec) {
-    if (e.is_mouse_down())
+    if (e.is_mouse_down() && !is_selected)
     {
       is_selected = true;
+      ec.request_repaint();
       on_select(ec, [this] () { this->unselect(); });
       //group_ptr->on_select(key, [this] () {unselect();});
     }
