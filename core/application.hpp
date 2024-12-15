@@ -169,7 +169,6 @@ namespace impl {
     vec2f focused_absolute_pos = {0, 0};
     event_context_parent_stack parents;
     optional<widget_ref> top_parent_listener = {};
-    bool is_modal = false;
   };
   
   struct keyboard_event_dispatcher {
@@ -241,9 +240,10 @@ struct application_context {
   
   template <class RootCtor>
   application_context(const char* win_name, vec2f win_size, RootCtor Ctor)
-  : win{"spiral", win_size}, 
+  : backend{this},
+    win{"spiral", win_size}, 
     root{Ctor()}, 
-    modal_menu{nullptr},
+    overlay{nullptr},
     med{root.borrow()}
   {
     root.layout();
@@ -255,15 +255,15 @@ struct application_context {
   
   widget_ref push_overlay(widget_box menu) 
   {
-    modal_menu = std::move(menu);
-    med.set_focused(modal_menu.borrow(), {});
-    return modal_menu.borrow();
+    overlay = std::move(menu);
+    med.set_focused(overlay.borrow(), {});
+    return overlay.borrow();
   }
   
   void pop_overlay()
   {
     med.set_focused(root.borrow(), {});
-    modal_menu.reset();
+    overlay.reset();
   }
   
   void grab_keyboard_focus(widget_ref r, const event_context_parent_stack& stack) {
@@ -298,12 +298,53 @@ struct application_context {
     return win;
   }
   
+  /// Implementation only.
+  void paint() {
+    painter p = graphics_context().painter();
+    p.set_font("default");
+    p.begin_frame(win.size(), 1);
+    
+    auto fn = [this, &p] (this auto&& self, widget_ref w, vec2f scissor_pos, vec2f scissor_sz) -> void
+    {
+      auto pos = w.position();
+      auto sz = w.size();
+      
+      auto new_scissor_pos = max(scissor_pos, pos);
+      new_scissor_pos = min(scissor_pos + scissor_sz, new_scissor_pos);
+      
+      auto new_scissor_end = min(scissor_pos + scissor_sz, pos + sz);
+      auto new_scissor_sz = new_scissor_end - new_scissor_pos;
+      new_scissor_sz = max(new_scissor_sz, {0, 0});
+      
+      // p.stroke_style(colors::red);
+      // p.stroke_rect(new_scissor_pos, new_scissor_sz);
+      //p.scissor(new_scissor_pos, new_scissor_sz);
+      auto traii = p.translate(pos);
+      w.paint(p);
+      for (auto& w : w.children())
+        self(w, new_scissor_pos - pos, new_scissor_sz);
+    };
+    
+    fn(root.borrow(), {0, 0}, win.size());
+    
+    if (overlay) {
+      fn(overlay.borrow(), {0, 0}, overlay.size());
+    }
+    
+    p.end_frame();
+    win.swap_buffer();
+  }
+  
+  void on_window_resize() {
+    paint();
+  }
+  
   private : 
   
   sdl_backend backend;
   struct window win;
   struct graphics_context gctx;
-  widget_box root, modal_menu;
+  widget_box root, overlay;
   impl::mouse_event_dispatcher med;
   impl::keyboard_event_dispatcher keyboard;
 };
@@ -366,7 +407,7 @@ struct application
     impl{ "spiral", {600, 400}, 
           [&, this] { return app_view->build(widget_builder{impl}, s); } }
   {
-    paint(s);
+    impl.paint();
     impl.root.debug_dump(3);
   }
   
@@ -395,46 +436,8 @@ struct application
         rebuild(state);
       
       if (frame.repaint_requested)
-        paint(state);
+        impl.paint(); 
     }
-  }
-  
-  void paint(State& state)
-  {
-    debug_log("painting");
-    painter p = impl.graphics_context().painter();
-    p.set_font("default");
-    p.begin_frame(impl.win.size(), 1);
-    
-    auto fn = [this, &p, &state] (this auto&& self, widget_ref w, vec2f scissor_pos, vec2f scissor_sz) -> void
-    {
-      auto pos = w.position();
-      auto sz = w.size();
-      
-      auto new_scissor_pos = max(scissor_pos, pos);
-      new_scissor_pos = min(scissor_pos + scissor_sz, new_scissor_pos);
-      
-      auto new_scissor_end = min(scissor_pos + scissor_sz, pos + sz);
-      auto new_scissor_sz = new_scissor_end - new_scissor_pos;
-      new_scissor_sz = max(new_scissor_sz, {0, 0});
-      
-      // p.stroke_style(colors::red);
-      // p.stroke_rect(new_scissor_pos, new_scissor_sz);
-      //p.scissor(new_scissor_pos, new_scissor_sz);
-      auto traii = p.translate(pos);
-      w.paint(p, &state);
-      for (auto& w : w.children())
-        self(w, new_scissor_pos - pos, new_scissor_sz);
-    };
-    
-    fn(impl.root.borrow(), {0, 0}, impl.win.size());
-    
-    if (impl.modal_menu) {
-      fn(impl.modal_menu.borrow(), {0, 0}, impl.modal_menu.size());
-    }
-    
-    p.end_frame();
-    impl.win.swap_buffer();
   }
 };
 

@@ -98,7 +98,7 @@ namespace impl
     template <class T>
     using ptr = T*;
     
-    ptr<void(widget_base*, painter&, void* state)> paint;
+    ptr<void(widget_base*, painter&)> paint;
     ptr<vec2f(widget_base*)> layout;
     ptr<void(widget_base*, input_event, event_context&)> on;
     ptr<void(widget_base*, input_event, event_context&, widget_ref)> on_child_event;
@@ -172,8 +172,8 @@ class widget_ref {
     return vptr == &impl::widget_vtable_impl<std::remove_const_t<T>>::value;
   }
   
-  void paint(painter& p, void* state) const {
-    vptr->paint(data, p, state);
+  void paint(painter& p) const {
+    vptr->paint(data, p);
   }
 
   void on(input_event e, event_context& ec) {
@@ -372,12 +372,9 @@ namespace impl {
   struct widget_vtable_impl 
   {
     static constexpr widget_vtable value = {
-      +[] (widget_base* self, painter& p, void* state) {
+      +[] (widget_base* self, painter& p) {
         auto& obj = *static_cast<W*>(self);
-        if constexpr ( requires {obj.paint(p, state);} )
-          obj.paint(p, state);
-        else
-          obj.paint(p);
+        obj.paint(p);
       },
       +[] (widget_base* self) -> vec2f {
         auto& obj = *static_cast<W*>(self);

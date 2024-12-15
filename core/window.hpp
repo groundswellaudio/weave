@@ -7,8 +7,6 @@ struct window {
     init(name, size.x, size.y);
   }
   
-  //window() : win{nullptr}, gl_ctx{nullptr} {}
-  
   window(window&& w) noexcept {
     win    = std::exchange(w.win,  nullptr);
     gl_ctx = std::exchange(gl_ctx, nullptr);

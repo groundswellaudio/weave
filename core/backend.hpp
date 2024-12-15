@@ -12,13 +12,9 @@ class sdl_backend
 {
   bool mouse_is_dragging = false;
   int last_mouse_down = 0;
+  bool has_resized = false;
   
-  public :
-  
-  bool want_quit = false;
-  
-  sdl_backend()
-  {
+  void init() {
     if (SDL_Init(SDL_INIT_VIDEO) < 0)
     {
       fprintf(stderr, "failed to initialize SDL, aborting.");
@@ -33,6 +29,25 @@ class sdl_backend
     SDL_GL_SetAttribute( SDL_GL_STENCIL_SIZE, 1 );
     
     SDL_StartTextInput();
+  }
+  
+  public :
+  
+  bool want_quit = false;
+  
+  template <class Ctx>
+  static int on_window_resize(void* data, SDL_Event* event)
+  {
+    if (event->type == SDL_WINDOWEVENT && event->window.event == SDL_WINDOWEVENT_RESIZED)
+      ((Ctx*)data)->on_window_resize();
+    return 1;
+  }
+  
+  template <class Ctx>
+  sdl_backend(Ctx* ctx)
+  {
+    init();
+    SDL_AddEventWatch( &on_window_resize<Ctx>, ctx );
   }
   
   void load_opengl()
@@ -123,8 +138,10 @@ class sdl_backend
       }
     
       case SDL_WINDOWEVENT :
+      {
         break;
-    
+      }
+      
       case SDL_QUIT :
         want_quit = true;
         break;
