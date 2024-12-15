@@ -191,7 +191,7 @@ struct LibraryView {
           for_each(state.database.albums, [p = self.get(), k = 0] (auto& a) mutable {
             auto setter = p->selection.setter(album_id{k++});
             return vstack {
-              on_click{views::image{a.cover, false}, [setter] { setter([](){}); }}, 
+              on_click{views::image{a.cover, false}.fit({100, 100}), setter},
               text{a.name}
             };
           })
@@ -205,7 +205,7 @@ struct LibraryView {
       },
       [&] (album_id id) {
         return vstack {
-          views::image{state.database.album(id.value).cover, false},
+          views::image{state.database.album(id.value).cover, false}.fit({200, 200}),
           text{state.database.album(id.value).name},
           table{state.database.album_tracks(id.value), false}.on_cell_double_click(&State::play_track)
         };

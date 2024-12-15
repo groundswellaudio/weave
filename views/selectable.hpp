@@ -7,7 +7,7 @@ template <class T>
 struct selection_value {
   
   auto setter(T val) { 
-    return [this, val] (std::function<void()> next_on_change) { 
+    return [this, val] (std::function<void()> next_on_change = [] () {}) { 
       value = val;
       if (on_change)
         on_change();

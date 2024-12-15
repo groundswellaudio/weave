@@ -12,11 +12,13 @@ namespace widgets {
 struct table : widget_base {
   
   struct selection_t : vec2i {
-    auto traverse(auto&& fn) const {
+    void traverse(auto&& fn) const {
       if (x == -1)
         return;
-      if (y == -1)
+      if (y == -1) {
         fn(x);
+        return;
+      }
       for (auto i : iota(x, y))
         fn(i);
     }

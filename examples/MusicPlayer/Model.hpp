@@ -194,9 +194,14 @@ struct Database {
   
   void try_add_album(Track& track, int track_id) {
     auto key = tuple{std::string_view{track.album()}, std::string_view{track.artist()}};
-    auto it = std::lower_bound(albums.begin(), albums.end(), tuple{std::string_view{track.album()}, std::string_view{track.artist()}});
+    auto it = std::lower_bound(albums.begin(), albums.end(), key);
     if (it == albums.end() || *it != key) {
       it = albums.insert(it, Album{std::string(key.m0), std::string(key.m1)});
+    }
+    if (it->cover.empty()) {
+      auto c = read_file_cover(track.file_path);
+      if (c)
+        it->cover = c->to<rgb_u8>();
     }
     it->tracks.push_back(track_id);
   }

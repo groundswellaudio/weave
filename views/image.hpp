@@ -66,7 +66,7 @@ struct image : view<image<ImgT, Proj>> {
   
   auto build(auto&& b, ignore) {
     optional<texture_handle> texture;
-    if (!img.empty() && refresh)
+    if (!img.empty())
       texture = make_texture(b.context());
     auto wsize = get_display_size();
     return widget_t{{wsize}, texture, corner_offset};
