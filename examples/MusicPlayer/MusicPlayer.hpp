@@ -77,11 +77,46 @@ auto top_panel(State& state)
 template <class T>
 using view_state = std::unique_ptr<T>;
 
-/* 
-template <>
-struct table_model<Database::Playlist> {
+using track_selection = widgets::table::selection_t;
+
+auto track_info_menu(State& state, track_selection selected) {
+  return views::text{"todo"};
+  /* 
+  return vstack {
+    for_each( Database::track_properties(), [id, k = 0, selected] (auto key) mutable {
+      auto setter = [id, key, selected] (auto& s, auto&& str) {
+        traverse( selected, [&] (auto id) {
+          s.set_track_property(id, key, str);
+        });
+      };
+      return with_label{key.name(), text_field{p.value, setter}};
+    });
+  }; */ 
+}
+
+auto song_table_popup_menu(event_context& ec, track_selection selected) {
+  widgets::popup_menu menu;
+  auto info = [selected] (event_context& ec) {
+    auto w = ec.build_view<State>(track_info_menu(ec.state<State>(), selected));
+    ec.push_overlay(w);
+  };
+  auto add_to_playlist = [selected] (event_context& ec) {
+    widgets::popup_menu m;
+    int k = 0;
+    for (auto& p : ec.state<State>().playlists()) {
+      m.add_element(p.name, [pid = k++, selected] (event_context& ec) {
+        selected.traverse([&] (auto id) {
+          ec.state<State>().add_to_playlist(pid, id);
+        });
+      });
+    }
+    return m;
+  };
   
-}; */ 
+  menu.add_element("Info", info);
+  menu.add_element("Add to playlist", add_to_playlist);
+  return menu;
+}
 
 struct LibraryView {
   
@@ -143,9 +178,10 @@ struct LibraryView {
     auto center_view = either {
       self->selection.value, 
       [&] (songs_t) {
-        return table{ state.database.tracks, update_table }
-                      .on_cell_double_click( &State::play_track )
-                      .on_file_drop(&on_file_drop);
+        return table{state.database.tracks, update_table}
+                    .on_cell_double_click(&State::play_track)
+                    .on_file_drop(&on_file_drop)
+                    .popup_menu(&song_table_popup_menu);
       },
       [&] (artists_t) {
         return list{state.artists(), false};

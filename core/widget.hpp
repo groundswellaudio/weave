@@ -62,7 +62,7 @@ struct widget_base {
     pos = p;
   }
   
-  bool contains(vec2f pos) {
+  bool contains(vec2f pos) const {
     auto p = position();
     auto sz = size();
     return p.x <= pos.x && p.y <= pos.y && p.x + sz.x >= pos.x && p.y + sz.y >= pos.y;
@@ -293,7 +293,15 @@ struct widget_builder
   application_context& ctx;
 };
 
+struct event_frame_result {
+  bool rebuild_requested = false;
+  bool repaint_requested = false;
+};
+
 struct event_context {
+  
+  void request_rebuild() { frame_result.rebuild_requested = true; }
+  void request_repaint() { frame_result.repaint_requested = true; }
   
   widget_ref parent() const { return parents.back(); }
   
@@ -334,11 +342,12 @@ struct event_context {
   template <class S, class View>
   auto build_view(View&& v) {
     auto w = v.build( widget_builder{context()}, state<S>() );
-    w.set_size(w.layout());
+    widget_ref(&w).layout();
     return w;
   }
   
   application_context& ctx;
+  event_frame_result& frame_result;
   event_context_parent_stack parents;
   void* state_ptr;
 };

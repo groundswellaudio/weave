@@ -1,5 +1,7 @@
 #pragma once
 
+#include <iostream>
+
 struct ignore {
   template <class T>
   constexpr ignore(T&&){}
@@ -28,3 +30,8 @@ using member_fn_ptr = RT (O::*)(Args...);
 
 template <class T>
 concept complete_type = requires { sizeof(T); };
+
+template <class T>
+void debug_log(T val) {
+  std::cerr << val << std::endl;
+}

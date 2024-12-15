@@ -5,18 +5,42 @@
 #include <functional>
 #include <ranges>
 
+using table_selection = std::vector<int>;
+
 namespace widgets {
 
 struct table : widget_base {
   
-  using Self = table;
-  
-  table(vec2f sz) : widget_base{sz} {}
+  struct selection_t : vec2i {
+    auto traverse(auto&& fn) const {
+      if (x == -1)
+        return;
+      if (y == -1)
+        fn(x);
+      for (auto i : iota(x, y))
+        fn(i);
+    }
+  };
   
   struct cell {
     std::vector<std::string> prop;
     bool selected = false;
   };
+  
+  selection_t selection;
+  std::vector<tuple<std::string, float>> properties;
+  std::vector<cell> cells;
+  std::optional<vec2i> focused_cell;
+  std::optional<text_field> edited_field;
+  int dragging = -1;
+  widget_action<vec2i, std::string_view> on_field_edit;
+  widget_action<int> cell_double_click;
+  widget_action<const std::string&> on_file_drop;
+  widget_action<popup_menu(selection_t)> popup;
+  
+  using Self = table;
+  
+  table(vec2f sz) : widget_base{sz} {}
   
   void update_properties(auto&& range) {
     auto it = std::ranges::begin(range);
@@ -73,6 +97,12 @@ struct table : widget_base {
   }
   
   void handle_mouse_down_body(mouse_event e, event_context& Ec) {
+    if (e.is_right_click() && popup) {
+      auto w = popup(Ec, selection);
+      w.set_position(e.position + position() + Ec.absolute_position());
+      enter_popup_menu(Ec, std::move(w));
+      return;
+    }
     auto cell = find_cell_at(e.position);
     if (!cell)
       return;
@@ -154,8 +184,11 @@ struct table : widget_base {
   }
   
   void paint(painter& p) {
+    // background
+    auto background_col = rgb_f(colors::gray) * 0.3;
     constexpr float first_row = 22;
     constexpr auto row = 15.f;
+    
     p.font_size(13);
     p.fill_style(colors::white);
     p.text_align(text_align::x::left, text_align::y::center);
@@ -194,16 +227,6 @@ struct table : widget_base {
       pos += row;
     }
   }
-  
-  vec2i selection {-1, -1};
-  std::vector<tuple<std::string, float>> properties;
-  std::vector<cell> cells;
-  std::optional<vec2i> focused_cell;
-  std::optional<text_field> edited_field;
-  int dragging = -1;
-  widget_action<vec2i, std::string_view> on_field_edit;
-  widget_action<int> cell_double_click;
-  widget_action<const std::string&> on_file_drop;
 };
 
 } // widgets
@@ -237,6 +260,7 @@ struct table : view<table<T>> {
     set_cells(res);
     res.cell_double_click = cell_double_click;
     res.on_file_drop = file_drop_fn;
+    res.popup = popup_opener;
     return res;
   }
   
@@ -253,7 +277,7 @@ struct table : view<table<T>> {
   template <class S, class RT, class... Args>
   auto& on_cell_double_click(member_fn_ptr<RT, S, Args...> fn) {
     cell_double_click = [fn] (event_context& ec, int cell) {
-      std::invoke(fn, ec.state<S>(), cell);
+      context_invoke<S>(fn, ec, cell);
     };
     return *this;
   }
@@ -261,7 +285,7 @@ struct table : view<table<T>> {
   template <class S, class M>
   auto& on_cell_double_click(auto fn) {
     cell_double_click = [fn] (event_context& ec, int cell) {
-      std::invoke(fn, ec.state<S>());
+      context_invoke<S>(fn, ec, cell);
     };
     return *this;
   }
@@ -269,21 +293,28 @@ struct table : view<table<T>> {
   template <class S, class RT, class... Args>
   auto& on_file_drop(member_fn_ptr<RT, S, Args...> fn) {
     file_drop_fn = [fn] (event_context& ec, auto&& file) {
-      std::invoke(fn, ec.state<S>(), file);
+      context_invoke<S>(fn, ec, file);
     };
     return *this;
   }
   
   auto& on_file_drop(auto fn) {
     file_drop_fn = [fn] (event_context& ec, auto&& file) {
+      ec.request_rebuild();
       fn(ec, file);
     };
+    return *this;
+  }
+  
+  auto& popup_menu(auto fn) {
+    popup_opener = fn;
     return *this;
   }
   
   T data;
   widget_action<int> cell_double_click;
   widget_action<const std::string&> file_drop_fn;
+  widget_action<widgets::popup_menu(widgets::table::selection_t)> popup_opener;
   bool rebuild_when = false;
 };
 

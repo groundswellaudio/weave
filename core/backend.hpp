@@ -6,6 +6,7 @@
 
 #include "events/mouse_events.hpp"
 #include "events/keyboard.hpp"
+#include <iostream>
 
 class sdl_backend
 {

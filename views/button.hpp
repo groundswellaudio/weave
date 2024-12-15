@@ -258,7 +258,7 @@ namespace views
     auto build(const widget_builder& b, S& state) {
       widgets::graphic_toggle_button<PaintFn> res {{size_v}, paint_fn, {}, val};
       res.write = [w = write_fn] (event_context& ec, bool v) -> bool {
-        return std::invoke(w, ec.state<S>(), v);
+        return context_invoke<S>(w, ec, v);
       };
       res.flag = val;
       return res;
@@ -291,7 +291,7 @@ namespace views
     auto build(const widget_builder& b, S& state) {
       widgets::graphic_trigger_button<PaintFn> res {{size_v}, paint_fn, {}};
       res.on_click = [w = payload] (event_context& ec) {
-        std::invoke(w, ec.state<S>());
+        context_invoke<S>(w, ec);
       };
       return res;
     }

@@ -4,7 +4,7 @@
 #include <functional>
 
 template <class Range>
-float max_text_width(Range& range, graphics_context& ctx, int font_size = 11) {
+float max_text_width(Range& range, graphics_context& ctx, int font_size) {
   float res = 0;
   for (auto& s : range) 
     res = std::max( ctx.text_bounds(s, font_size).x, res );
@@ -29,12 +29,13 @@ using widget_action = typename impl::widget_action<Args...>::type;
 template <class T>
 using write_fn = widget_action<void(T)>;
 
-template <class State, class Fn>
-decltype(auto) context_invoke(Fn fn, event_context& ec) {
-  if constexpr ( requires { std::invoke(fn, ec); } )
-    return (std::invoke(fn, ec)); 
-  else if constexpr ( requires { std::invoke(fn, ec.template state<State>()); } )
-    return (std::invoke(fn, ec.template state<State>()));
+template <class State, class Fn, class... Args>
+decltype(auto) context_invoke(Fn fn, event_context& ec, Args&&... args) {
+  ec.request_rebuild();
+  if constexpr ( requires { std::invoke(fn, ec, (Args&&)args...); } )
+    return (std::invoke(fn, ec, (Args&&)args...)); 
+  else if constexpr ( requires { std::invoke(fn, ec.template state<State>(), (Args&&)args...); } )
+    return (std::invoke(fn, ec.template state<State>(), (Args&&)args...));
   else
-    return (std::invoke(fn));
+    return (std::invoke(fn, (Args&&)args...));
 }

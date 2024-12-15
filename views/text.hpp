@@ -30,6 +30,32 @@ struct text : widget_base
   }
 };
 
+template <class W>
+struct with_label : W {
+  
+  vec2f size() {
+    return W::size() + vec2f{text_size, 0};
+  }
+  
+  auto position() const {
+    return W::position() - vec2f{text_size, 0};
+  }
+  
+  void set_position(vec2f pos) {
+    W::set_position( pos + vec2f{text_size, 0} );
+  }
+  
+  void paint(painter& p) {
+    p.font_size(11);
+    p.fill_style(colors::white);
+    p.text_align(text_align::x::left, text_align::y::center);
+    p.text({0, W::size().y / 2}, text);
+  }
+  
+  std::string text;
+  float text_size;
+};
+
 } // widgets
 
 namespace views {
@@ -67,6 +93,17 @@ struct text : view<text> {
   void destroy(widget_ref w) {}
   
   widget_t::properties prop;
+  std::string_view str;
+};
+
+template <class V>
+struct with_label {
+  
+  auto build(auto&& b, auto& state) {
+    return widgets::with_label{view.build(b, state), str};
+  }
+  
+  V view;
   std::string_view str;
 };
 

@@ -364,17 +364,13 @@ struct Editor : widget_base {
   std::optional<tuple<vec2f, vec2f>> connecting;
 };
 
-static constexpr auto EditorLens = [] (auto& s) -> auto& { return s; };
-
-using EditorView = simple_view_for<Editor, decltype(EditorLens)>;
-
 auto make_view(SpringSimApp& state)
 { 
   auto WithLabel = [] (auto&& View, std::string_view str) {
     return hstack {
       text{str}, 
       (decltype(View)&&)(View)
-    }.with_align(0.5);
+    }.align(0.5);
   };
   
   auto MassMod = 
@@ -382,7 +378,7 @@ auto make_view(SpringSimApp& state)
       either {
         state.selection_is_anchor(), 
         slider{ readwrite(&SpringSimApp::get_selection_mass, &SpringSimApp::set_selection_mass) }
-        .with_range(1, 50),
+        .range(1, 50),
         text {"Inf"}
       },
       "Mass" );
@@ -418,12 +414,10 @@ auto make_view(SpringSimApp& state)
     }, 
     WithLabel( slider { &SpringSim::output_amp }.with_range(0.5, 10), "Amp" )
   //};
-  }.with_margin({30, 30}).with_interspace(10);
+  }.margin({30, 30}).interspace(10);
 
   return hstack {
-    EditorView {
-      EditorLens
-    },     
+    EditorView {},
     //slider { MLens(x0.particles.back().mass) }
     RightPanel
   };

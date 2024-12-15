@@ -13,6 +13,7 @@
 #include "../graphics/graphics.hpp"
 #include "../events/mouse_events.hpp"
 #include "../vec.hpp"
+#include "../util/util.hpp"
 
 #include "nfd.h"
 
@@ -105,23 +106,26 @@ namespace impl {
       set_focused(root, {});
     }
     
-    void on(mouse_event e, void* state, application_context& ctx)
+    event_frame_result on(mouse_event e, void* state, application_context& ctx)
     {
-      // FIXME : avoid the copy of the parents vector here
-      auto ec = event_context{ctx, parents, state};
+      event_frame_result res;
       
-      if (!is_modal && e.is_mouse_move() && !e.is_mouse_drag())
+      if (e.is_mouse_move() && !e.is_mouse_drag())
       {
         auto old_focus = focused;
         auto old_pos = focused_absolute_pos;
+        auto old_ctx = event_context{ctx, res, parents, state};
         find_new_focused{*this, e, parents}.find_from(focused, focused_absolute_pos);
         if (old_focus != focused) 
         {
-          old_focus.on(mouse_event{e.position - old_pos, mouse_exit{}}, ec);
+          old_focus.on(mouse_event{e.position - old_pos, mouse_exit{}}, old_ctx);
+          auto ec = event_context{ctx, res, parents, state};
           focused.on(mouse_event{e.position - focused_absolute_pos, mouse_enter{}}, ec);
         }
       }
       
+      // FIXME : avoid the copy of the parents vector here
+      auto ec = event_context{ctx, res, parents, state};
       e.position -= focused_absolute_pos;
       focused.on(e, ec);
       
@@ -135,6 +139,8 @@ namespace impl {
             break;
         }
       }
+      
+      return res;
     }
     
     vec2f focused_absolute_position() const {
@@ -149,6 +155,13 @@ namespace impl {
     }
     
     widget_ref current_focus() const { return focused; }
+    
+    void update_absolute_position() {
+      focused_absolute_pos = {0, 0};
+      for (auto& p : parents) 
+        focused_absolute_pos += p.position();
+      focused_absolute_pos += focused.position();
+    }
     
     private : 
     
@@ -173,11 +186,13 @@ namespace impl {
       parents.clear();
     }
     
-    void on(keyboard_event e, void* state, application_context& ctx) {
+    event_frame_result on(keyboard_event e, void* state, application_context& ctx) {
+      event_frame_result res;
       if (focused) {
-        auto ec = event_context{ctx, parents, state};
+        auto ec = event_context{ctx, res, parents, state};
         focused->on(e, ec);
       }
+      return res;
     }
     
     optional<widget_ref> focused;
@@ -302,7 +317,12 @@ void event_context::pop_overlay() {
 }
 
 void event_context::grab_mouse_focus(widget_ref focused) {
-  ctx.grab_mouse_focus(focused, parents);
+  // Truncate the parents state if this is a parent
+  auto it = std::find(parents.begin(), parents.end(), focused);
+  if (it != parents.end())
+    ctx.grab_mouse_focus(focused, event_context_parent_stack{parents.begin(), it});
+  else
+    ctx.grab_mouse_focus(focused, parents);
 }
 
 void event_context::grab_keyboard_focus(widget_ref focused) {
@@ -347,21 +367,30 @@ struct application
     impl.root.debug_dump(3);
   }
   
+  void rebuild(State& state) {
+    debug_log("rebuilding top view");
+    auto old_view = std::move(*app_view);
+    app_view.emplace( view_ctor(state) );
+    auto upd = widget_updater{impl};
+    app_view->rebuild(old_view, impl.root.borrow(), upd, state);
+    impl.med.update_absolute_position();
+  }
+  
   void run(State& state)
   {
     while(!impl.backend.want_quit)
     {
-      impl.backend.visit_event( [this, &state] (auto&& e) {
+      event_frame_result frame;
+      impl.backend.visit_event( [&, this] (auto&& e) {
         if constexpr ( remove_reference(type_of(^e)) == ^keyboard_event )
-          impl.keyboard.on(e, &state, impl);
+          frame = impl.keyboard.on(e, &state, impl);
         else
-          impl.med.on(e, &state, impl);
+          frame = impl.med.on(e, &state, impl);
       });
       
-      auto old_view = std::move(*app_view);
-      app_view.emplace( view_ctor(state) );
-      auto upd = widget_updater{impl};
-      app_view->rebuild(old_view, impl.root.borrow(), upd, state);
+      if (frame.rebuild_requested) {
+        rebuild(state);
+      }
       
       paint(state);
     }

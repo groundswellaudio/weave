@@ -180,6 +180,10 @@ struct Database {
     return albums[id];
   }
   
+  void add_to_playlist(int playlist_id, int track_id) {
+    playlists_v[playlist_id].tracks.push_back(track_id);
+  }
+  
   private : 
   
   void try_add_artist(const std::string& str) {
@@ -312,6 +316,9 @@ struct State : app_state {
   
   void add_playlist() { database.add_playlist(); }
   
+  void add_to_playlist(int playlist_id, int track_id) {
+    database.add_to_playlist(playlist_id, track_id);
+  }
   
   TrackPlayer player;
   std::optional<int> current_track;

@@ -61,7 +61,7 @@ struct mouse_event {
   bool is_mouse_down() const { return is<mouse_down>(); }
   bool is_mouse_up() const { return is<mouse_up>(); }
   bool is_right_click() const { 
-    return is<mouse_down>() && get_as<mouse_down>().button == mouse_button::left; 
+    return is<mouse_down>() && get_as<mouse_down>().button == mouse_button::right; 
   }
   
   bool is_file_drop() const { return is<file_drop_event>(); }
