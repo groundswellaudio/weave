@@ -159,9 +159,6 @@ constexpr T distance(vec<T, 2> a, vec<T, 2> b) {
 template <class T>
 using vec2 = vec<T, 2>;
 
-namespace gl_types
-{
-
 // generate glm like aliases
 % [] (namespace_builder& b) 
 {
@@ -179,5 +176,3 @@ namespace gl_types
     }
   }
 } ();
-
-}

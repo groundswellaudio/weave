@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../util/util.hpp"
+#include "../geometry/geometry.hpp"
 #include <functional>
 
 template <class Range>

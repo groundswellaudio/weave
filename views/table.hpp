@@ -1,15 +1,17 @@
 #pragma once
 
 #include "views_core.hpp"
+#include "scrollable.hpp"
 
 #include <functional>
 #include <ranges>
 
-using table_selection = std::vector<int>;
-
 namespace widgets {
 
-struct table : widget_base {
+struct table : widget_base, scrollable_base {
+  
+  static constexpr float first_row = 22;
+  static constexpr float row_height = 15;
   
   struct selection_t : vec2i {
     void traverse(auto&& fn) const {
@@ -24,6 +26,18 @@ struct table : widget_base {
     }
   };
   
+  rectangle scroll_zone() const {
+    return {{0, first_row}, {size().x, size().y - first_row}};
+  }
+  
+  void displace_scroll(float delta) {
+    scroll_offset += delta;
+  }
+  
+  float scroll_size() const {
+    return cells.size() * row_height;
+  }
+  
   struct cell {
     std::vector<std::string> prop;
     bool selected = false;
@@ -35,6 +49,7 @@ struct table : widget_base {
   std::optional<vec2i> focused_cell;
   std::optional<text_field> edited_field;
   int dragging = -1;
+  float scroll_offset = 0;
   widget_action<vec2i, std::string_view> on_field_edit;
   widget_action<int> cell_double_click;
   widget_action<const std::string&> on_file_drop;
@@ -63,9 +78,6 @@ struct table : widget_base {
       posx += 50;
     }
   }
-  
-  static constexpr float first_row = 22;
-  static constexpr float row_height = 15;
   
   void handle_mouse_down_header(vec2f p) {
     for (unsigned k = 1; k < properties.size(); ++k) 
@@ -148,6 +160,9 @@ struct table : widget_base {
   
   void on(mouse_event e, event_context& Ec) 
   {
+    if (scrollable_base::on(e, Ec))
+      return;
+    
     if (e.is_file_drop() && on_file_drop) {
       on_file_drop(Ec, e.dropped_file());
       return;
@@ -187,11 +202,50 @@ struct table : widget_base {
     return edited_field ? fn(*edited_field) : true;
   }
   
+  void paint_selection_overlay(painter& p) {
+    if (selection.x != -1) {
+      p.fill_style(rgba{colors::cyan}.with_alpha(70));
+      auto pos_y = selection.x * row + first_row;
+      if (selection.y != -1)
+        p.rectangle( {0, pos_y}, {size().x, (selection.y - selection.x + 1) * row} );
+      else
+        p.rectangle( {0, pos_y}, {size().x, row} );
+    }
+  }
+  
+  static constexpr auto row = 15.f;
+  static constexpr float margin = 5;
+  
+  void paint_body(painter& p, vec2f body_sz) {
+    p.fill_style(colors::white);
+    int cells_begin = scroll_offset / row;
+    int cells_end = (scroll_offset + scroll_zone().size.y) / row;
+    cells_end = std::min(cells_end, (int) cells.size());
+    
+    float pos = (int) -scroll_offset % (int) row;
+    
+    // test that we have to draw the one just above
+    /* if  (pos > 3 && cells_begin != 0) {
+      cells_begin -= 1;
+      pos -= row;
+    } */ 
+    for (int i = cells_begin; i < cells_end; ++i, pos += row) {
+      auto& c = cells[i];
+      int k = 0;
+      for (auto& prop : c.prop) {
+        float width = k == c.prop.size() - 1 
+          ? (size().x - properties[k].m1) 
+          : properties[k+1].m1 - properties[k].m1;
+        
+        p.text_bounded({margin + properties[k++].m1, pos + row / 2}, width - margin * 2, prop);
+      }
+    }
+  }
+  
   void paint(painter& p) {
     // background
     auto background_col = rgb_f(colors::gray) * 0.3;
     constexpr float first_row = 22;
-    constexpr auto row = 15.f;
     
     p.font_size(13);
     p.fill_style(colors::white);
@@ -206,30 +260,16 @@ struct table : widget_base {
     }
     p.stroke_rect({0, 0}, size(), 1);
     
-    // selection overlay
-    if (selection.x != -1) {
-      p.fill_style(rgba{colors::cyan}.with_alpha(70));
-      auto pos_y = selection.x * row + first_row;
-      if (selection.y != -1)
-        p.rectangle( {0, pos_y}, {size().x, (selection.y - selection.x + 1) * row} );
-      else
-        p.rectangle( {0, pos_y}, {size().x, row} );
+    paint_selection_overlay(p);
+    
+    {
+      auto _ = p.translate({0, first_row});
+      p.scissor({0, 0}, scroll_zone().size);
+      paint_body(p, size() - vec2f{0, first_row});
+      p.reset_scissor();
     }
     
-    float pos = first_row;
-    p.fill_style(colors::white);
-    for (auto& c : cells) {
-      int k = 0;
-      
-      for (auto& prop : c.prop) {
-        float width = k == c.prop.size() - 1 
-          ? (size().x - properties[k].m1) 
-          : properties[k+1].m1 - properties[k].m1;
-        
-        p.text_bounded( {5 + properties[k++].m1, pos + row / 2}, width - 5 * 2, prop );
-      }
-      pos += row;
-    }
+    scrollable_base::paint(p);
   }
 };
 

@@ -1,10 +1,15 @@
 #pragma once
 #include <SDL.h>
 
+struct window_properties {
+  std::string name;
+  vec2f size {600, 400};
+};
+
 struct window {
   
-  window(const char* name, vec2f size) {
-    init(name, size.x, size.y);
+  window(window_properties prop) {
+    init(prop.name.data(), prop.size.x, prop.size.y);
   }
   
   window(window&& w) noexcept {
@@ -39,14 +44,13 @@ struct window {
   
   vec2f position() const { return {0, 0}; }
   
-  /* 
-  void min_size(screen_pt sz) {
+  void set_min_size(vec2f sz) {
     SDL_SetWindowMinimumSize(win, sz.x, sz.y);
   }
   
-  void max_size(screen_pt sz) {
+  void set_max_size(vec2f sz) {
     SDL_SetWindowMaximumSize(win, sz.x, sz.y);
-  } */ 
+  }
   
   void swap_buffer() {
     SDL_GL_SwapWindow(win);

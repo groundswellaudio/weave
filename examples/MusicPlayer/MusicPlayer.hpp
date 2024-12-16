@@ -272,6 +272,9 @@ auto make_view(State& state)
 
 inline void run_app() {
   State state;
-  auto app = make_app(state, &make_view);
+  window_properties prop;
+  prop.name = "spinner";
+  prop.size = vec2f{600, 400};
+  auto app = make_app(state, &make_view, prop);
   app.run(state);
 }

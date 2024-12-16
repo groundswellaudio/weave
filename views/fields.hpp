@@ -240,7 +240,7 @@ struct numeric_dial : widget_base
       mult_mod = (1.f - 3 * e.position.x / size().x);
     else if (e.is_mouse_drag())
     {
-      auto delta = - std::pow(10, mult_mod) * e.mouse_drag_delta().y;
+      auto delta = - std::pow(10, mult_mod) * e.drag_delta().y;
       auto NewVal = std::clamp<float>( value + delta, prop.min, prop.max );
       write(ec, NewVal);
       value = NewVal;

@@ -2,7 +2,7 @@
 
 #include <limits>
 #include <cmath>
-#include "linalg/gen-operators.hpp"
+#include "util/gen-operators.hpp"
 
 enum class rgb_encoding {
   linear, 

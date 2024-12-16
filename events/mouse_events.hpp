@@ -1,6 +1,6 @@
 #pragma once
 
-#include "vec.hpp"
+#include "../util/vec.hpp"
 #include "../util/variant.hpp"
 #include <string>
 
@@ -51,12 +51,12 @@ struct mouse_event {
   auto& get_as(this auto&& self) { return get<T>(self.event); }
   
   bool is_double_click() const { return is_mouse_down() && get_as<mouse_down>().double_click; }
-  vec2f mouse_scroll_delta() const { return get_as<mouse_scroll>().delta; }
+  vec2f scroll_delta() const { return get_as<mouse_scroll>().delta; }
   bool is_mouse_scroll() const { return is<mouse_scroll>(); }
   bool is_mouse_enter() const { return is<mouse_enter>(); }
   bool is_mouse_exit() const { return is<mouse_exit>(); }
   bool is_mouse_move() const { return is<mouse_move>(); }
-  auto mouse_drag_delta() const { return get_as<mouse_move>().delta; }
+  auto drag_delta() const { return get_as<mouse_move>().delta; }
   bool is_mouse_drag() const { return is<mouse_move>() && get_as<mouse_move>().is_dragging; }
   bool is_mouse_down() const { return is<mouse_down>(); }
   bool is_mouse_up() const { return is<mouse_up>(); }

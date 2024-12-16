@@ -31,21 +31,26 @@ bool is_up_to_date(observe_token o, const observed<T>& obs) {
   return obs.token() == o;
 }
 
-struct State {
+struct State : audio_renderer, app_state {
+  
   void load_audio() {
+    stop_render();
     auto path = open_file_dialog();
     if (!path)
       return;
     audio = load_audio_file(*path);
-    audio.note_mutation();
+    start_render();
   }
   
-  observed<audio_buffer> audio;
+  void render_audio(audio_output_buffer& os) {
+    
+  }
+  
+  audio_buffer audio;
+  bool waveform_changed = false;
 };
 
-struct audio_buffer_widget : widget_base {
-  
-  using value_type = void; 
+struct waveform_widget : widget_base {
   
   std::vector<vec2f> data;
   

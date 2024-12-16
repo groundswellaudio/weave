@@ -6,8 +6,6 @@
 #include "stb_image.h"
 #include "stb_image_write.h"
 
-#include <vec.hpp>
-
 #include <cassert>
 #include <optional>
 #include <vector>
@@ -16,6 +14,7 @@
 
 #include "util/iota.hpp"
 #include "util/util.hpp"
+#include "util/vec.hpp"
 
 namespace impl
 {

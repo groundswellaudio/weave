@@ -12,7 +12,7 @@
 
 #include "../graphics/graphics.hpp"
 #include "../events/mouse_events.hpp"
-#include "../vec.hpp"
+#include "../util/vec.hpp"
 #include "../util/util.hpp"
 
 #include "nfd.h"
@@ -239,9 +239,9 @@ struct application_context {
   friend struct application;
   
   template <class RootCtor>
-  application_context(const char* win_name, vec2f win_size, RootCtor Ctor)
+  application_context(window_properties win_prop, RootCtor Ctor)
   : backend{this},
-    win{"spiral", win_size}, 
+    win{win_prop}, 
     root{Ctor()}, 
     overlay{nullptr},
     med{root.borrow()}
@@ -401,10 +401,10 @@ struct application
   std::optional<View> app_view;
   application_context impl;
   
-  application(State& s, ViewCtor ctor) 
+  application(State& s, ViewCtor ctor, window_properties prop) 
   : view_ctor{ctor}, 
     app_view{view_ctor(s)},
-    impl{ "spiral", {600, 400}, 
+    impl{ prop, 
           [&, this] { return app_view->build(widget_builder{impl}, s); } }
   {
     impl.paint();
@@ -443,7 +443,7 @@ struct application
 
 // Construct an application with a given State and view constructor.
 template <class State, class Ctor>
-auto make_app(State& state, Ctor view_ctor) {
+auto make_app(State& state, Ctor view_ctor, window_properties prop) {
   using ViewT = decltype(view_ctor(state));
-  return application<Ctor, ViewT, State>{state, view_ctor};
+  return application<Ctor, ViewT, State>{state, view_ctor, std::move(prop)};
 }
