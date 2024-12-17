@@ -32,6 +32,10 @@ struct table : widget_base, scrollable_base {
   
   void displace_scroll(float delta) {
     scroll_offset += delta;
+    scroll_offset = std::max(scroll_offset, 0.f);
+    if (edited_field)
+      edited_field->set_position(edited_field->position() - vec2f{0, delta});
+    //assert( scroll_offset >= 0 );
   }
   
   float scroll_size() const {
@@ -95,7 +99,7 @@ struct table : widget_base, scrollable_base {
   }
   
   std::optional<vec2i> find_cell_at(vec2f pos) const {
-    int selected_row = (pos.y - first_row) / row_height;
+    int selected_row = (scroll_offset + pos.y - first_row) / row_height;
     if (selected_row >= cells.size())
       return {};
     int k = 0;
@@ -144,7 +148,8 @@ struct table : widget_base, scrollable_base {
         edited_field->value_str = cells[cell->y].prop[cell->x];
         edited_field->write = [this, cell] (event_context& Ec, auto&& str) { 
           cells[cell->y].prop[cell->x] = str;
-          on_field_edit(Ec, *cell, str);
+          if (on_field_edit)
+            on_field_edit(Ec, *cell, str);
           edited_field.reset(); 
         };
         Ec.with_parent(this).grab_mouse_focus(&*edited_field);
@@ -183,12 +188,24 @@ struct table : widget_base, scrollable_base {
       auto& posx = properties[k].m1;
       posx = e.position.x;
       float min = properties[k-1].m1 + margin;
+      auto col_end = k == properties.size() - 1 ? size().x : properties[k + 1].m1;
       if (posx < min)
         posx = min;
       else {
-        auto max = (k == properties.size() - 1 ? size().x : properties[k + 1].m1)
-                  - margin;
+        auto max = col_end - margin;
         posx = std::min(max, posx);
+      }
+      if (edited_field) { 
+        auto p = edited_field->position();
+        if (focused_cell->x == dragging) {
+          edited_field->set_position({posx, p.y});
+          auto w = col_end - properties[dragging].m1;
+          edited_field->set_size({w, edited_field->size().y});
+        }
+        else if (focused_cell->x + 1 == dragging) {
+          auto w = properties[dragging].m1 - properties[focused_cell->x].m1; 
+          edited_field->set_size( {w, edited_field->size().y} );
+        }
       }
       Ec.request_repaint();
       return;
@@ -224,11 +241,7 @@ struct table : widget_base, scrollable_base {
     
     float pos = (int) -scroll_offset % (int) row;
     
-    // test that we have to draw the one just above
-    /* if  (pos > 3 && cells_begin != 0) {
-      cells_begin -= 1;
-      pos -= row;
-    } */ 
+    assert( cells_begin >= 0 );
     for (int i = cells_begin; i < cells_end; ++i, pos += row) {
       auto& c = cells[i];
       int k = 0;
@@ -239,6 +252,15 @@ struct table : widget_base, scrollable_base {
         
         p.text_bounded({margin + properties[k++].m1, pos + row / 2}, width - margin * 2, prop);
       }
+    }
+    
+    if (selection.x != -1 && selection.x >= cells_begin && selection.x < cells_end) {
+      p.fill_style(rgba{colors::cyan}.with_alpha(70));
+      auto pos_y = selection.x * row - scroll_offset;
+      if (selection.y != -1)
+        p.rectangle( {0, pos_y}, {size().x, (selection.y - selection.x + 1) * row} );
+      else
+        p.rectangle( {0, pos_y}, {size().x, row} );
     }
   }
   
@@ -259,8 +281,6 @@ struct table : widget_base, scrollable_base {
       p.text( {5 + posx, first_row / 2}, prop );
     }
     p.stroke_rect({0, 0}, size(), 1);
-    
-    paint_selection_overlay(p);
     
     {
       auto _ = p.translate({0, first_row});

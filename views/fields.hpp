@@ -31,12 +31,14 @@ struct text_field : widget_base {
     if (auto C = to_character(e.key))
     {
       value_str.push_back(C);
+      Ec.request_repaint();
       return;
     }
     
     switch(e.key) {
       case keycode::backspace:
         value_str.pop_back();
+        Ec.request_repaint();
         break;
       case keycode::enter: 
         Ec.release_keyboard_focus();
@@ -139,19 +141,23 @@ struct numeric_field : widget_base {
     
     if (is_number(e.key)) {
       value_str.push_back( to_character(e.key) );
+      Ec.request_repaint();
       return;
     }
     
     if (to_character(e.key) == '.' && accept_decimal)
     {
-      if (value_str.find('.') == std::string::npos)
+      if (value_str.find('.') == std::string::npos) {
         value_str.push_back('.');
+        Ec.request_repaint();
+      }
       return;
     }
     
     switch(e.key) {
       case keycode::backspace:
         value_str.pop_back();
+        Ec.request_repaint();
         break;
       case keycode::enter: 
         update_from_str();

@@ -12,46 +12,6 @@ enum class rgb_encoding {
 template <class T>
 struct rgba;
 
-consteval void color_operators(class_builder& b, type Elem) {
-  b << ^ [Elem] struct C {
-    
-    template <operator_kind Op>
-      requires (is_compound_assign(Op))
-    constexpr C& apply_op(const C& o) {
-      for (int k = 0; k < C::channels; ++k)
-        (%make_operator_expr(Op, ^((*this)[k]), ^(o[k])));
-      return *this;
-    }
-    
-    template <operator_kind Op>
-      requires (!is_compound_assign(Op))
-    constexpr C apply_op(const C& o) const {
-      C res {*this};
-      (%make_operator_expr(compound_equivalent(Op), ^(res), ^(o)));
-      return res;
-    }
-    
-     template <operator_kind Op>
-      requires (!is_compound_assign(Op))
-    constexpr C apply_op( %typename(Elem) o) const {
-      C res {*this};
-      (%make_operator_expr(compound_equivalent(Op), ^(res), ^(o)));
-      return res;
-    }
-    
-    template<operator_kind Op>
-      requires (is_compound_assign(Op))
-    constexpr C& apply_op( %typename(Elem) o ) {
-      for (int k = 0; k < C::channels; ++k)
-        (%make_operator_expr(Op, ^((*this)[k]), ^(o)));
-      return *this;
-    }
-    
-    %declare_arithmetic(^const C&);
-    %declare_arithmetic(Elem);
-  };
-}
-
 // RGB color in gamma 2.2
 template <class T>
 struct rgb {
@@ -81,7 +41,40 @@ struct rgb {
   template <class V>
   constexpr operator rgba<V> () const;
   
-  %color_operators(^T);
+  template <operator_kind Op>
+    requires (is_compound_assign(Op))
+  constexpr auto& apply_op(const rgb<T>& o) {
+    for (int k = 0; k < channels; ++k)
+      (%make_operator_expr(Op, ^((*this)[k]), ^(o[k])));
+    return *this;
+  }
+  
+  template <operator_kind Op>
+    requires (!is_compound_assign(Op))
+  constexpr auto apply_op(const rgb<T>& o) const {
+    auto res {*this};
+    (%make_operator_expr(compound_equivalent(Op), ^(res), ^(o)));
+    return res;
+  }
+  
+   template <operator_kind Op>
+    requires (!is_compound_assign(Op))
+  constexpr auto apply_op(T o) const {
+    auto res {*this};
+    (%make_operator_expr(compound_equivalent(Op), ^(res), ^(o)));
+    return res;
+  }
+  
+  template<operator_kind Op>
+    requires (is_compound_assign(Op))
+  constexpr auto& apply_op(T o) {
+    for (int k = 0; k < channels; ++k)
+      (%make_operator_expr(Op, ^((*this)[k]), ^(o)));
+    return *this;
+  }
+  
+  %declare_arithmetic(^const rgb<T>&);
+  %declare_arithmetic(^T);
   
   T data[3];
 };
@@ -145,10 +138,43 @@ struct rgba {
     return static_cast<rgba<V>>(*this).col;
   }
   
-  %color_operators(^T);
-  
   constexpr bool operator==(const rgba<T>& o) const = default;
 
+  template <operator_kind Op>
+    requires (is_compound_assign(Op))
+  constexpr auto& apply_op(const rgba<T>& o) {
+    for (int k = 0; k < channels; ++k)
+      (%make_operator_expr(Op, ^((*this)[k]), ^(o[k])));
+    return *this;
+  }
+  
+  template <operator_kind Op>
+    requires (!is_compound_assign(Op))
+  constexpr auto apply_op(const rgba<T>& o) const {
+    auto res {*this};
+    (%make_operator_expr(compound_equivalent(Op), ^(res), ^(o)));
+    return res;
+  }
+  
+   template <operator_kind Op>
+    requires (!is_compound_assign(Op))
+  constexpr auto apply_op(T o) const {
+    auto res {*this};
+    (%make_operator_expr(compound_equivalent(Op), ^(res), ^(o)));
+    return res;
+  }
+  
+  template<operator_kind Op>
+    requires (is_compound_assign(Op))
+  constexpr auto& apply_op(T o) {
+    for (int k = 0; k < channels; ++k)
+      (%make_operator_expr(Op, ^((*this)[k]), ^(o)));
+    return *this;
+  }
+  
+  %declare_arithmetic(^const rgba<T>&);
+  %declare_arithmetic(^T);
+  
   rgb<T> col;
   T alpha = norm();
 };
