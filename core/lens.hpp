@@ -100,7 +100,7 @@ struct lens_readwrite {
     return (apply_read(state, r));
   }
   
-  void write(auto& state, auto&& val) {
+  void write(auto& state, auto&& val) const {
     apply_write(state, [this, &val] (auto& s) {
       w(s, (decltype(val)&&) val);
     });

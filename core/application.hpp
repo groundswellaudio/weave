@@ -3,6 +3,7 @@
 #include <cassert>
 #include <ranges>
 #include <optional>
+#include <atomic>
 
 #include "backend.hpp"
 #include "view.hpp"
@@ -339,6 +340,12 @@ struct application_context {
     paint();
   }
   
+  void request_rebuild() {
+    rebuild_requested = true;
+  }
+  
+  std::atomic<bool> rebuild_requested = false;
+  
   private : 
   
   sdl_backend backend;
@@ -348,6 +355,12 @@ struct application_context {
   impl::mouse_event_dispatcher med;
   impl::keyboard_event_dispatcher keyboard;
 };
+
+auto event_context::lift_rebuild_request() {
+  return [p = &context()] {
+    p->rebuild_requested = true;
+  };
+}
 
 void event_context::push_overlay(widget_box widget) {
   ctx.push_overlay(std::move(widget));
@@ -360,7 +373,7 @@ void event_context::pop_overlay() {
 }
 
 void event_context::grab_mouse_focus(widget_ref focused) {
-  // Truncate the parents state if this is a parent
+  // Truncate the parents stack if this is a parent
   auto it = std::find(parents.begin(), parents.end(), focused);
   if (it != parents.end())
     ctx.grab_mouse_focus(focused, event_context_parent_stack{parents.begin(), it});
@@ -418,6 +431,7 @@ struct application
     auto upd = widget_updater{impl};
     app_view->rebuild(old_view, impl.root.borrow(), upd, state);
     impl.med.update_absolute_position();
+    impl.rebuild_requested = false;
   }
   
   void run(State& state)
@@ -432,8 +446,10 @@ struct application
           frame = impl.med.on(e, &state, impl);
       });
       
-      if (frame.rebuild_requested) 
+      if (frame.rebuild_requested || impl.rebuild_requested) {
         rebuild(state);
+        frame.repaint_requested = true;
+      }
       
       if (frame.repaint_requested)
         impl.paint(); 

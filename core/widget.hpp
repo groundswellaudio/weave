@@ -299,6 +299,9 @@ struct event_frame_result {
 };
 
 struct event_context {
+
+  /// Returns a thread safe callable that signal that a rebuild is needed
+  auto lift_rebuild_request();
   
   void request_rebuild() { frame_result.rebuild_requested = true; }
   void request_repaint() { frame_result.repaint_requested = true; }

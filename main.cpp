@@ -1,5 +1,5 @@
 #include "spiral.hpp"
-#include "examples/PmSynth/PmSynth.hpp"
+#include "examples/TextureSynthesis/TextureSynthesis.hpp"
 
 /* 
 struct AppState : audio_renderer<AppState> {

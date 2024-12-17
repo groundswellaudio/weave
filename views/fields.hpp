@@ -192,7 +192,10 @@ struct numeric_field : view<numeric_field<Lens>> {
     auto res = widget_t{{50, 15}, prop, (double)init_val};
     res.update_str();
     res.accept_decimal = is_floating_point(type_of(^init_val));
-    res.write = adadpt_lens_write_for_widget(lens); 
+    res.write = [a = lens] (event_context& ec, double value) {
+      ec.request_rebuild();
+      a.write(ec.state<S>(), value);
+    };
     return res;
   }
   

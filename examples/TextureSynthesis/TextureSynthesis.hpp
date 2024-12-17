@@ -6,10 +6,6 @@
 #include <random>
 #include <future>
 
-auto iota(int a, int b) {
-  return std::ranges::iota_view(a, b);
-}
-
 template <class T>
 struct padded_image {
   
@@ -376,29 +372,45 @@ template <class I>
 void histogram(const I& img, int channel, histogram_t& result, int NumBins = 256) {
   for_each_pixel(img, [&] (auto& pix, ignore) {
     auto val = pix[channel];
-    auto Bin = (val * num_bins) / I::pixel_type::norm();
+    auto Bin = (val * NumBins) / I::pixel_type::norm();
     ++result[Bin];
   });
 }
 
 template <class I>
 void cdf(const I& img, int channel, histogram_t& result, int NumBins = 256) {
+  result.resize(NumBins + 1);
   histogram(img, channel, result, NumBins);
-  auto acc = decltype(result.front()) {0};
+  histogram_t::value_type acc {0};
   for (auto& Bin : result) {
     acc += Bin;
     Bin = acc;
   }
+  for (auto& Bin : result)
+    Bin /= acc;
 }
 
 template <class I>
 void histogram_matching(const I& source, I& img, int numBins = 256) {
-  std::array<histogram_t, I::channels> cdf_source, cdf_img;
-  for (int k : iota(I::channels))
+  constexpr auto channels = I::pixel_type::channels;
+  std::array<histogram_t, channels> cdf_source, cdf_img, lookuptable;
+  for (int k : iota(channels))
     cdf(source, k, cdf_source[k], numBins);
-  for (int k : iota(I::channels))
+  for (int k : iota(channels))
     cdf(img, k, cdf_img[k], numBins);
-  while( )
+  for (int k : iota(channels)) {
+    lookuptable[k].resize(numBins + 1);
+    for (int b : iota(numBins)) {
+      auto p = cdf_img[k][b];
+      auto it = std::lower_bound(cdf_source[k].begin(), cdf_source[k].end(), p);
+      lookuptable[k][b] = (I::pixel_type::norm() * (it - cdf_source[k].begin())) / cdf_source[k].size();
+    }
+  }
+  for_each_pixel(img, [&] (auto& pix, ignore) {
+    for (int k : iota(channels)) {
+      pix[k] = lookuptable[k][(pix[k] * numBins) / I::pixel_type::norm()];
+    }
+  });
 }
 
 struct PatchMatchMap {
@@ -464,8 +476,8 @@ struct TextureSynthesis : app_state {
     reset_search_map(map, examplar.shape());
   }
   
-  void v1() {
-    auto fn = [this] {
+  void v1(std::function<void()> on_done) {
+    auto fn = [this, on_done] {
       patch_match_search(examplar, generated, map, patch_hs);
       if (!flip_propagation)
         patch_match_propagation<1>(examplar, generated, map, patch_hs);
@@ -473,9 +485,11 @@ struct TextureSynthesis : app_state {
         patch_match_propagation<-1>(examplar, generated, map, patch_hs);
       flip_propagation = !flip_propagation; 
       patch_match_synthesize(examplar, generated, map);
-      match_distribution(examplar, generated);
+      histogram_matching(examplar, generated);
       patch_match_update_distance(examplar, generated, map, patch_hs);
       refresh_display = true;
+      on_done();
+      progress = -1;
     };
     progress = 0;
     synth_task = std::async(fn);
@@ -548,7 +562,9 @@ auto make_view(TextureSynthesis& state)
     text{ "Texture Synthesis from examplar"},
     trigger_button { "Load texture", &State::load_image }
     .disable_if(state.is_working()),
-    trigger_button{ "Synthesize", &State::v2 }
+    trigger_button{ "Synthesize", [] (event_context& ec) { 
+      ec.state<State>().v1(ec.lift_rebuild_request());
+    }}
     .disable_if(state.is_working() || state.examplar.empty()),
     trigger_button{ "Save output", &TextureSynthesis::save_image }
     .disable_if(state.is_working()),
@@ -607,6 +623,8 @@ void test_image() {
 inline void run_app() {
   test_image();
   TextureSynthesis state;
-  auto app = make_app(state, &make_view);
+  window_properties prop;
+  prop.name = "TextureSynthesis";
+  auto app = make_app(state, &make_view, prop);
   app.run(state);
 }
