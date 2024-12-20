@@ -12,6 +12,7 @@ struct stack_data {
   vec2f margin {0, 0};
   float align_ratio = 0;
   rgba_u8 background_col {0, 0, 0, 0};
+  bool fill_cross_axis = false;
 };
 
 template <class... Ts>
@@ -46,6 +47,11 @@ struct stack
   
   auto&& background(this auto&& self, rgba_u8 col) {
     self.info.background_col = col;
+    return self;
+  }
+  
+  auto&& fill(this auto&& self) {
+    self.info.fill_cross_axis = true;
     return self;
   }
   
@@ -100,7 +106,18 @@ namespace impl {
       sz = std::max(sz, child_size[1 - axis]);
     }
     
-    // Align the elements
+    if (data.fill_cross_axis) {
+      layout_context ctx;
+      ctx.min[1 - axis] = std::max(sz, lc.min[1 - axis]);
+      // Unfortunately, we have to call layout here again
+      for (auto& n : children) {
+        ctx.max = n.size();
+        ctx.max[1 - axis] = ctx.min[1 - axis];
+        n.layout(ctx);
+      }
+    }
+    
+    // Cross axis alignment 
     if (data.align_ratio != 0) {
       for (auto& n : children) {
         vec2f child_pos;
@@ -115,6 +132,7 @@ namespace impl {
     vec2f res;
     res[axis] = pos + data.margin[axis];
     res[1 - axis] = sz + 2 * data.margin[1 - axis];
+    res = max(lc.min, res);
     return res;
   }
   
@@ -155,8 +173,8 @@ namespace impl {
       w.children_vec.erase(w.children_vec.begin() + i);
     
     if (seq_updater.mutated || (res & rebuild_result::size_change)) {
-      auto old_size = wb.size();
-      auto new_size = wb.layout({});
+      auto old_size = w.size();
+      auto new_size = w.do_layout(w.old_bc);
       if (old_size != new_size)
         return rebuild_result::size_change;
       return {};
@@ -180,7 +198,6 @@ struct stack_base : view<stack_base<T, Ts...>>, stack<Ts...> {
   auto build(const widget_builder& ctx, S& state) 
   {
     auto Res = impl::build_stack<T>(*this, ctx, state, this->info);
-    Res.do_layout({});
     return Res;
   }
   
@@ -194,12 +211,14 @@ struct stack_base : view<stack_base<T, Ts...>>, stack<Ts...> {
 
 namespace widgets {
 
-struct vstack : widget_base
+template <int Axis>
+struct stack : widget_base
 {
   stack_data data;
   std::vector<widget_box> children_vec;
+  layout_context old_bc;
   
-  vstack(stack_data d) : data{d} {}
+  stack(stack_data d) : data{d} {}
   
   void paint(painter& p) {
     p.fill_style(data.background_col);
@@ -215,39 +234,18 @@ struct vstack : widget_base
   }
   
   auto layout(layout_context ctx) {
-    return impl::do_stack_layout(children_vec, data, 1, ctx);
+    old_bc = ctx;
+    return impl::do_stack_layout(children_vec, data, Axis, ctx);
   }
 };
 
-struct hstack : widget_base
-{
-  stack_data data;
-  std::vector<widget_box> children_vec;
-  
-  hstack(stack_data d) : data{d} {}
-  
-  bool traverse_children(auto&& fn) {
-    return std::all_of(children_vec.begin(), children_vec.end(), fn);
-  }
-  
-  void paint(painter& p) {
-    p.fill_style(data.background_col);
-    p.rectangle({0, 0}, size());
-    // p.stroke_style(colors::green);
-    // p.stroke_rect({0, 0}, size(), 2);
-  }
-  
-  void on(input_event, ignore) {}
-  
-  auto layout(layout_context lc) 
-  {
-    return impl::do_stack_layout(children_vec, data, 0, lc);
-  }
-};
+using hstack = stack<0>;
+using vstack = stack<1>;
 
 struct flow : widget_base {
   
   vec2f layout(layout_context lc) {
+    old_bc = lc;
     
     vec2f pos = {0, 0};
     float row_h = 0;
@@ -267,7 +265,7 @@ struct flow : widget_base {
       }
     }
     
-    return {size().x, pos.y};
+    return {size().x, pos.y + row_h};
   }
   
   auto traverse_children(auto&& fn) {
@@ -278,6 +276,7 @@ struct flow : widget_base {
   void paint(painter&) {}
   
   std::vector<widget_box> children_vec;
+  layout_context old_bc;
 };
 
 } // widgets
@@ -287,7 +286,7 @@ namespace views
 
 template <class... Ts>
   requires (is_view_sequence<Ts> && ...)
-struct vstack : stack_base<widgets::vstack, Ts...>
+struct vstack : stack_base<widgets::stack<1>, Ts...>
 { 
   template <class... Vs>
     requires (std::constructible_from<Ts, Vs&&> && ...)
@@ -303,7 +302,7 @@ vstack(Ts...) -> vstack<Ts...>;
 
 template <class... Ts>
   requires (is_view_sequence<Ts> && ...)
-struct hstack : stack_base<widgets::hstack, Ts...>
+struct hstack : stack_base<widgets::stack<0>, Ts...>
 { 
   template <class... Vs>
     requires (std::constructible_from<Ts, Vs&&> && ...)
@@ -326,8 +325,7 @@ struct flow : view<flow<Ts...>> {
   : width{width}, children{(Vs&&)ts...} {}
   
   auto build(auto&& ctx, auto& state) {
-    auto res = impl::build_stack<widgets::flow>(*this, ctx, state, vec2f{width, 0} );
-    res.do_layout({});
+    auto res = impl::build_stack<widgets::flow>(*this, ctx, state, vec2f{width, 0});
     return res;
   }
   

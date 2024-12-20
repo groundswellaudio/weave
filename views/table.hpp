@@ -63,6 +63,10 @@ struct table : widget_base, scrollable_base {
   
   table(vec2f sz) : widget_base{sz} {}
   
+  vec2f size() const {
+    return {400, 400};
+  }
+  
   void update_properties(auto&& range) {
     auto it = std::ranges::begin(range);
     for (auto& p : properties)

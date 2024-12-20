@@ -240,7 +240,10 @@ struct application_context {
     overlay{nullptr},
     med{root.borrow()}
   {
-    root.layout({});
+    layout_context lc;
+    lc.min = win.size();
+    lc.max = lc.min;
+    root.layout(lc);
   }
   
   void grab_mouse_focus(widget_ref new_focused, const event_context_parent_stack& parents) {
@@ -330,6 +333,11 @@ struct application_context {
   }
   
   void on_window_resize() {
+    debug_log("window resize");
+    layout_context lc;
+    lc.min = win.size();
+    lc.max = lc.min;
+    root.layout(lc);
     paint();
   }
   

@@ -79,7 +79,7 @@ struct image : view<image<ImgT, Proj>> {
         w.texture = make_texture(up.context());
     }
     else if (refresh) {
-      std::cout << "refreshing image " << std::endl;
+      debug_log("refreshing image");
       auto& gctx = up.context().graphics_context();
       gctx.delete_texture(*w.texture);
       

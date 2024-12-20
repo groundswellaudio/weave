@@ -162,7 +162,7 @@ struct LibraryView {
       for_each(state.tags(), [] (auto& p) {
         return selectable{ text{p.name()}, group };
       }); */ 
-    };
+    }.fill();
   }
   
   /* 
@@ -213,7 +213,7 @@ struct LibraryView {
       }
     };
     
-    return hstack{left_panel(state, self), center_view};
+    return hstack{left_panel(state, self), center_view}.fill();
   }
 };
 
