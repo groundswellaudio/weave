@@ -148,13 +148,6 @@ namespace impl {
       return focused_absolute_pos;
     }
     
-    void layout_changed() {
-      vec2f new_pos = focused.position();
-      for (auto p : parents) 
-        new_pos += p.position();
-      focused_absolute_pos = new_pos;
-    }
-    
     widget_ref current_focus() const { return focused; }
     
     void update_absolute_position() {
@@ -247,7 +240,7 @@ struct application_context {
     overlay{nullptr},
     med{root.borrow()}
   {
-    root.layout();
+    root.layout({});
   }
   
   void grab_mouse_focus(widget_ref new_focused, const event_context_parent_stack& parents) {

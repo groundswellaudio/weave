@@ -83,26 +83,7 @@ struct scrollable : widget_base, scrollable_base {
     child.set_position(child.position() - vec2f{0, delta});
   }
   
-  T child;
-  
-  /* 
-  void scrollbar_move(vec2f drag_delta) {
-    // drag_delta / size.y = 1 -> child_drag_delta = child_sz
-    // child_drag_delta = child_sz * drag_delta / size
-    auto delta = child.size().y * drag_delta.y / size().y;
-    auto new_pos = child.position().y - delta;
-    new_pos = std::clamp(new_pos, -child.size().y + size().y, 0.f);
-    child.set_position({0, new_pos}); // -scrollbar_start * child.size().y);
-    auto new_bar_pos = bar.position().y + drag_delta.y;
-    new_bar_pos = std::clamp(new_bar_pos, 0.f, size().y - bar.size().y);
-    bar.set_position(bar.position().x, new_bar_pos); //scrollbar_start * child.size().y);
-  }
-  
-  void on_child_event(mouse_event e, event_context& ec, ignore) 
-  {
-    if (e.is_mouse_scroll()) 
-      scrollbar_move(-e.mouse_scroll_delta());
-  } */ 
+  T child; 
 };
 
 } // widgets

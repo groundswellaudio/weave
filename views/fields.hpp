@@ -62,8 +62,8 @@ struct text_field : widget_base {
       p.fill_style(colors::white);
     }
     p.stroke_rounded_rect({0, 0}, size(), 6);
-    p.text_align(text_align::x::center, text_align::y::center);
-    p.text(size() / 2, value_str);
+    p.text_align(text_align::x::left, text_align::y::center);
+    p.text(vec2f{5, size().y / 2}, value_str);
   }
 };
 

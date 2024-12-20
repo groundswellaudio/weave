@@ -84,21 +84,24 @@ struct stack_updater : view_sequence_updater<stack_updater> {
 
 namespace impl {
   
-  vec2f do_stack_layout(std::vector<widget_box>& children, stack_data data, int axis) {
+  vec2f do_stack_layout(std::vector<widget_box>& children, stack_data data, int axis, layout_context lc) {
+    layout_context child_ctx;
+    child_ctx.max = lc.max;
+    
     float pos = data.margin[axis];
     float sz = 0;
     for (auto& n : children) {
       auto child_pos = data.margin;
       child_pos[axis] = pos;
       n.set_position(child_pos);
-      auto child_size = n.layout();
+      auto child_size = n.layout(child_ctx);
       pos += child_size[axis] + data.interspace;
+      child_ctx.max[axis] -= child_size[axis] + data.interspace;
       sz = std::max(sz, child_size[1 - axis]);
     }
     
     // Align the elements
-    
-    if (data.align_ratio != 0)
+    if (data.align_ratio != 0) {
       for (auto& n : children) {
         vec2f child_pos;
         child_pos[axis] = n.position()[axis];
@@ -107,10 +110,58 @@ namespace impl {
                                 (sz - n.size()[1-axis]); // we haven't added margin to sz yet, no need to substract it
         n.set_position(child_pos);
       }
+    }
     
     vec2f res;
     res[axis] = pos + data.margin[axis];
     res[1 - axis] = sz + 2 * data.margin[1 - axis];
+    return res;
+  }
+  
+  template <class T, class V, class S>
+  auto build_stack(V& view, const widget_builder& ctx, S& state, auto&&... ctor_args) {
+    T Res { ctor_args... };
+    auto consumer = [&] (auto&&... args) { 
+      Res.children_vec.push_back( widget_box{(decltype(args)&&)(args)...} );
+    };
+    
+    tuple_for_each(view.children, [&] (auto& elem) -> void {
+      elem.seq_build(consumer, ctx, state);
+    });
+    return Res;
+  }
+  
+  template <class T, class V, class S>
+  rebuild_result rebuild_stack(V& New, V& Old, widget_ref wb, const widget_updater& up, S& state) {
+    auto& w = wb.as<T>();
+    int index = 0;
+    
+    stack_updater seq_updater {
+      {}, 
+      up.builder(), 
+      w.children_vec,
+      {}, 
+      index
+    };
+    
+    rebuild_result res; 
+    
+    tuple_for_each_with_index( New.children, [&] (auto& elem, auto elem_index) -> void 
+    { 
+      res |= elem.seq_rebuild(get<elem_index.value>(Old.children), seq_updater, up, state);
+    });
+    
+    for (auto i : seq_updater.to_erase)
+      w.children_vec.erase(w.children_vec.begin() + i);
+    
+    if (seq_updater.mutated || (res & rebuild_result::size_change)) {
+      auto old_size = wb.size();
+      auto new_size = wb.layout({});
+      if (old_size != new_size)
+        return rebuild_result::size_change;
+      return {};
+    }
+    
     return res;
   }
   
@@ -126,53 +177,16 @@ struct stack_base : view<stack_base<T, Ts...>>, stack<Ts...> {
   stack_base(const stack_base&) = default;
   
   template <class S>
-  auto build(const widget_builder& b, S& state) 
+  auto build(const widget_builder& ctx, S& state) 
   {
-    T Res { this->info };
-    auto consumer = [&] (auto&&... args) { 
-      Res.children_vec.push_back( widget_box{(decltype(args)&&)(args)...} );
-    };
-    
-    tuple_for_each(this->children, [&] (auto& elem) -> void {
-      elem.seq_build(consumer, b, state);
-    });
-    
+    auto Res = impl::build_stack<T>(*this, ctx, state, this->info);
+    Res.do_layout({});
     return Res;
   }
   
   template <class S>
-  rebuild_result rebuild(auto& Old, widget_ref wb, const widget_updater& up, S& state) 
-  {
-    auto& w = wb.as<T>();
-    int index = 0;
-    
-    stack_updater seq_updater {
-      {}, 
-      up.builder(), 
-      w.children_vec,
-      {}, 
-      index
-    };
-    
-    rebuild_result res; 
-    
-    tuple_for_each_with_index( this->children, [&] (auto& elem, auto elem_index) -> void 
-    { 
-      res |= elem.seq_rebuild(get<elem_index.value>(Old.children), seq_updater, up, state);
-    });
-    
-    for (auto i : seq_updater.to_erase)
-      w.children_vec.erase(w.children_vec.begin() + i);
-    
-    if (seq_updater.mutated || (res & rebuild_result::size_change)) {
-      auto old_size = wb.size();
-      auto new_size = wb.layout();
-      if (old_size != new_size)
-        return rebuild_result::size_change;
-      return {};
-    }
-    
-    return res;
+  rebuild_result rebuild(stack_base<T, Ts...>& Old, widget_ref wb, const widget_updater& ctx, S& state) {
+    return impl::rebuild_stack<T>(*this, Old, wb, ctx, state);
   }
   
   void destroy(widget_ref wb) {}
@@ -182,10 +196,7 @@ namespace widgets {
 
 struct vstack : widget_base
 {
-  using value_type = void;
-  
   stack_data data;
-  
   std::vector<widget_box> children_vec;
   
   vstack(stack_data d) : data{d} {}
@@ -203,15 +214,13 @@ struct vstack : widget_base
     return std::all_of(children_vec.begin(), children_vec.end(), fn);
   }
   
-  auto layout() {
-    return impl::do_stack_layout(children_vec, data, 1);
+  auto layout(layout_context ctx) {
+    return impl::do_stack_layout(children_vec, data, 1, ctx);
   }
 };
 
 struct hstack : widget_base
 {
-  using value_type = void;
-  
   stack_data data;
   std::vector<widget_box> children_vec;
   
@@ -230,10 +239,45 @@ struct hstack : widget_base
   
   void on(input_event, ignore) {}
   
-  auto layout() 
+  auto layout(layout_context lc) 
   {
-    return impl::do_stack_layout(children_vec, data, 0);
+    return impl::do_stack_layout(children_vec, data, 0, lc);
   }
+};
+
+struct flow : widget_base {
+  
+  vec2f layout(layout_context lc) {
+    
+    vec2f pos = {0, 0};
+    float row_h = 0;
+    
+    for (auto& c : children_vec) {
+      auto sz = c.layout(lc);
+      if (pos.x + sz.x > size().x) {
+        pos.x = 0;
+        pos.y += row_h;
+        row_h = sz.y;
+        c.set_position(pos);
+      }
+      else {
+        c.set_position(pos);
+        row_h = std::max(row_h, sz.y);
+        pos.x += sz.x;
+      }
+    }
+    
+    return {size().x, pos.y};
+  }
+  
+  auto traverse_children(auto&& fn) {
+    return std::all_of(children_vec.begin(), children_vec.end(), fn);
+  }
+  
+  void on(ignore, ignore) {}
+  void paint(painter&) {}
+  
+  std::vector<widget_box> children_vec;
 };
 
 } // widgets
@@ -252,7 +296,7 @@ struct vstack : stack_base<widgets::vstack, Ts...>
   vstack(const vstack&) = default;
   vstack& operator=(vstack&&) = default;
   vstack& operator=(const vstack&) = default;
-}; 
+};
 
 template <class... Ts>
 vstack(Ts...) -> vstack<Ts...>;
@@ -272,5 +316,30 @@ struct hstack : stack_base<widgets::hstack, Ts...>
 
 template <class... Ts>
 hstack(Ts...) -> hstack<Ts...>;
+
+template <class... Ts>
+struct flow : view<flow<Ts...>> {
+  
+  template <class... Vs>
+    requires (std::constructible_from<Ts, Vs&&> && ...)
+  flow(float width, Vs&&... ts) 
+  : width{width}, children{(Vs&&)ts...} {}
+  
+  auto build(auto&& ctx, auto& state) {
+    auto res = impl::build_stack<widgets::flow>(*this, ctx, state, vec2f{width, 0} );
+    res.do_layout({});
+    return res;
+  }
+  
+  auto rebuild(flow<Ts...>& Old, widget_ref w, auto&& ctx, auto& state) {
+    return impl::rebuild_stack<widgets::flow>(*this, Old, w, ctx, state);
+  }
+  
+  float width;
+  tuple<Ts...> children;
+};
+
+template <class... Ts>
+flow(float, Ts... ts) -> flow<Ts...>;  
 
 } // views

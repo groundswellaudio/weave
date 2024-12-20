@@ -59,10 +59,10 @@ struct view : view_sequence_base {
     Consumer(self.build(c, state));
   }
   
-  rebuild_result seq_rebuild(this T& self, T& New, auto&& seq_updater, 
+  rebuild_result seq_rebuild(this T& self, T& old, auto&& seq_updater, 
                    const widget_updater& up, auto& state) 
   {
-    return self.rebuild(New, seq_updater.next(), up, state);
+    return self.rebuild(old, seq_updater.next(), up, state);
   }
   
   void seq_destroy(this T& self, auto GetForDestroy) {

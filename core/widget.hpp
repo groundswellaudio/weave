@@ -29,6 +29,12 @@ struct input_event : variant<mouse_event, keyboard_event> {
   auto& keyboard() { return get<1>(); }
 };
 
+struct layout_context {
+  
+  vec2f min{0, 0};
+  vec2f max{1000000, 1000000};
+};
+
 consteval std::meta::expr to_str(std::meta::type t) {
   std::meta::ostream os;
   os << t;
@@ -68,6 +74,21 @@ struct widget_base {
     return p.x <= pos.x && p.y <= pos.y && p.x + sz.x >= pos.x && p.y + sz.y >= pos.y;
   }
   
+  vec2f do_layout(this auto& self, layout_context ctx) {
+    if constexpr (requires {self.layout(ctx);}) {
+      auto res = self.layout(ctx);
+      self.set_size(res);
+      return res;
+    }
+    else {
+      auto sz = self.size();
+      auto new_sz = vec2f{std::clamp(sz.x, ctx.min.x, ctx.max.x), 
+                          std::clamp(sz.y, ctx.min.y, ctx.max.y)};
+      self.set_size(new_sz);
+      return new_sz;
+    }
+  }
+  
   std::optional<widget_ref> find_child_at(this auto& self, vec2f pos);
   
   vec2f sz, pos = {0, 0};
@@ -99,7 +120,7 @@ namespace impl
     using ptr = T*;
     
     ptr<void(widget_base*, painter&)> paint;
-    ptr<vec2f(widget_base*)> layout;
+    ptr<vec2f(widget_base*, layout_context)> layout;
     ptr<void(widget_base*, input_event, event_context&)> on;
     ptr<void(widget_base*, input_event, event_context&, widget_ref)> on_child_event;
     ptr<optional<widget_ref>(widget_base*, vec2f)> find_child_at;
@@ -150,8 +171,8 @@ class widget_ref {
     return data == o.data;
   }
   
-  auto layout() {
-    return vptr->layout(data);
+  auto layout(layout_context lc) {
+    return vptr->layout(data, lc);
   }
 
   template <class T>
@@ -196,7 +217,7 @@ class widget_ref {
   void set_position(vec2f p) { data->set_position(p.x, p.y); }
   
   bool contains(vec2f pos) const { return data->contains(pos); }
-    
+  
   auto find_child_at(vec2f pos) const {
     return vptr->find_child_at(data, pos);
   }
@@ -345,7 +366,7 @@ struct event_context {
   template <class S, class View>
   auto build_view(View&& v) {
     auto w = v.build( widget_builder{context()}, state<S>() );
-    widget_ref(&w).layout();
+    widget_ref(&w).layout({});
     return w;
   }
   
@@ -379,16 +400,9 @@ namespace impl {
         auto& obj = *static_cast<W*>(self);
         obj.paint(p);
       },
-      +[] (widget_base* self) -> vec2f {
+      +[] (widget_base* self, layout_context lc) -> vec2f {
         auto& obj = *static_cast<W*>(self);
-        if constexpr ( requires {obj.layout();} ) {
-          auto sz = obj.layout();
-          assert( !std::isnan(sz.x) && !std::isnan(sz.y) && "nan size result from layout?" );
-          obj.set_size(sz);
-          return sz;
-        }
-        else
-          return obj.size();
+        return obj.do_layout(lc);
       },
       +[] (widget_base* self, input_event e, event_context& ctx) {
         auto& Obj = *static_cast<W*>(self);

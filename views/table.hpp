@@ -10,7 +10,7 @@ namespace widgets {
 
 struct table : widget_base, scrollable_base {
   
-  static constexpr float first_row = 22;
+  static constexpr float first_row = 30;
   static constexpr float row_height = 15;
   
   struct selection_t : vec2i {
@@ -143,7 +143,7 @@ struct table : widget_base, scrollable_base {
           : get<1>(properties[col + 1]) - get<1>(properties[col]);
         vec2f field_size {field_width, row_height};
         edited_field.emplace( text_field{{field_size}} );
-        edited_field->set_position( {get<1>(properties[col]), first_row + row * row_height} );
+        edited_field->set_position( {get<1>(properties[col]), first_row + row * row_height - scroll_offset} );
         edited_field->editing = true;
         edited_field->value_str = cells[cell->y].prop[cell->x];
         edited_field->write = [this, cell] (event_context& Ec, auto&& str) { 
@@ -165,6 +165,11 @@ struct table : widget_base, scrollable_base {
   
   void on(mouse_event e, event_context& Ec) 
   {
+    if (e.is_mouse_down() && edited_field) {
+      edited_field.reset();
+      Ec.request_repaint();
+    }
+    
     if (scrollable_base::on(e, Ec))
       return;
     
@@ -267,19 +272,22 @@ struct table : widget_base, scrollable_base {
   void paint(painter& p) {
     // background
     auto background_col = rgb_f(colors::gray) * 0.3;
-    constexpr float first_row = 22;
     
+    p.fill_style(rgba_f(colors::black) * 0.3);
+    p.rectangle({0, 0}, {size().x, first_row});
     p.font_size(13);
     p.fill_style(colors::white);
-    p.text_align(text_align::x::left, text_align::y::center);
     float pos_x = 0;
-    p.stroke_style(colors::white);
-    p.line( {0, first_row}, {size().x, first_row}, 1 );
+    p.stroke_style(colors::black);
+    //p.line( {0, first_row}, {size().x, first_row}, 1 );
     
+    p.text_align(text_align::x::left, text_align::y::center);
     for (auto& [prop, posx] : properties) {
-      p.line( {posx, 0}, {posx, size().y}, 1 );
+      p.line( {posx, 0}, {posx, first_row}, 1 );
       p.text( {5 + posx, first_row / 2}, prop );
     }
+    
+    p.stroke_style(rgba_f(colors::black) * 0.5);
     p.stroke_rect({0, 0}, size(), 1);
     
     {

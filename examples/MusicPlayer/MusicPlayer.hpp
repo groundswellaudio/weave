@@ -187,7 +187,8 @@ struct LibraryView {
         return list{state.artists(), false};
       },
       [&] (albums_t) {
-        return vstack{
+        return flow{ 
+          400,
           for_each(state.database.albums, [p = self.get(), k = 0] (auto& a) mutable {
             auto setter = p->selection.setter(album_id{k++});
             return vstack {
