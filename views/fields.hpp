@@ -9,6 +9,8 @@
 
 namespace widgets {
 
+static constexpr vec2f min_size_field = {50, 15};
+
 struct text_field : widget_base {
   
   using Self = text_field;
@@ -22,6 +24,12 @@ struct text_field : widget_base {
       Ec.grab_keyboard_focus(this);
       editing = true;
     }
+  }
+  
+  vec2f min_size() const { return min_size_field; }
+  
+  vec2f expand_factor() const {
+    return {1, 0};
   }
   
   void on(keyboard_event e, event_context& Ec) {
@@ -123,6 +131,9 @@ struct numeric_field : widget_base {
       Ec.grab_keyboard_focus(this);
     }
   }
+  
+  vec2f min_size() const { return min_size_field; }
+  vec2f expand_factor() const { return {1, 0}; }
   
   void update_from_str() {
     auto from_str = strtod(value_str.data(), nullptr);

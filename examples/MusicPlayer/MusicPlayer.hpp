@@ -162,7 +162,7 @@ struct LibraryView {
       for_each(state.tags(), [] (auto& p) {
         return selectable{ text{p.name()}, group };
       }); */ 
-    }.fill();
+    };
   }
   
   /* 
@@ -213,7 +213,7 @@ struct LibraryView {
       }
     };
     
-    return hstack{left_panel(state, self), center_view}.fill();
+    return hstack{left_panel(state, self), center_view};
   }
 };
 
@@ -265,7 +265,7 @@ auto make_view(State& state)
                         library_view{}, 
                         views::image{state.current_cover, update_cover}
                         .fit({300, 300})
-                        }.align(1)
+                        }.align(1).fill()
                }.align_center()
                 .margin({10, 10})
                 .background( rgb_f(colors::gray) * 0.4 );

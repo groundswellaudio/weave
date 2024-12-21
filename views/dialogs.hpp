@@ -19,9 +19,13 @@ struct popup_menu : widget_base {
     bool is_submenu_opener;
   };
   
+  private : 
+  
   std::vector<element> elements;
   int hovered = -1;
   bool has_child = false;
+  
+  public : 
   
   template <class Str, class Fn>
   void add_element(Str&& str, Fn fn) {
@@ -40,6 +44,9 @@ struct popup_menu : widget_base {
     };
     elements.push_back({std::string((Str&&)str), action, is_submenu_opener});
   }
+  
+  vec2f min_size() const { return size(); }
+  vec2f expand_factor() const { return {0, 0}; }
   
   void update_size(graphics_context& gctx) {
     auto r = std::views::transform(elements, [] (auto& e) -> auto& { return e.name; });
@@ -101,6 +108,9 @@ struct popup_menu : widget_base {
 };
 
 struct popup_menu_stack : widget_base {
+  
+  vec2f min_size() const { return size(); }
+  vec2f expand_factor() const { return {0, 0}; }
   
   void push(popup_menu&& m) {
     menus.push_back(std::move(m));

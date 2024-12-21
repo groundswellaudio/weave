@@ -6,6 +6,11 @@ namespace widgets {
 
 struct image : widget_base {
   
+  vec2f min_size() const { return {30, 30}; }
+  vec2f expand_factor() const {
+    return {1, 1};
+  }
+  
   void on(ignore, ignore) {}
   
   void paint(painter& p) {

@@ -63,8 +63,12 @@ struct table : widget_base, scrollable_base {
   
   table(vec2f sz) : widget_base{sz} {}
   
-  vec2f size() const {
-    return {400, 400};
+  vec2f min_size() const {
+    return {properties.size() * 30.f, first_row + row_height * 3};
+  }
+  
+  vec2f expand_factor() const {
+    return {1, 1};
   }
   
   void update_properties(auto&& range) {
@@ -74,7 +78,7 @@ struct table : widget_base, scrollable_base {
     auto pos_end = properties.back().m1;
     while (it != std::ranges::end(range))
     {
-      pos_end += 50;
+      pos_end += size().x / std::ranges::size(range);
       properties.push_back({*it++, pos_end});
     }
   }
@@ -83,7 +87,7 @@ struct table : widget_base, scrollable_base {
     float posx = 0;
     for (auto& e : range) {
       properties.push_back({std::string{e}, posx});
-      posx += 50;
+      posx += size().x / std::ranges::size(range);
     }
   }
   

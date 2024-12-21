@@ -15,8 +15,11 @@ struct text : widget_base
   
   std::string str;
   properties prop;
+  float text_width = 20;
   
-  using value_type = void;
+  vec2f min_size() const { return {20, prop.font_size + 2}; }
+  vec2f max_size() const { return {text_width, prop.font_size + 2}; }
+  vec2f expand_factor() const { return {1.f, 0}; }
   
   void on(ignore, ignore) 
   {
@@ -75,7 +78,8 @@ struct text : view<text> {
   
   auto build(auto&& b, ignore) {
     auto& gctx = b.context().graphics_context();
-    return widget_t{{bounds(gctx)}, std::string(str), prop};
+    auto box = bounds(gctx);
+    return widget_t{{box}, std::string(str), prop, box.x};
   }
   
   rebuild_result rebuild(text Old, widget_ref w, auto& up, ignore) {

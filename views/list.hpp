@@ -29,6 +29,8 @@ struct list : widget_base {
     }
   }
   
+  vec2f min_size() const { return {50, row_size * 3}; }
+  vec2f expand_factor() const { return {1, 1}; }
   void update_size(graphics_context& ctx) {
     auto w = max_text_width(cells, ctx, 11) + 2 * margin;
     w = std::max(w, 30.f);

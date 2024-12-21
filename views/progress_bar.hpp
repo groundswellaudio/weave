@@ -2,13 +2,16 @@
 
 #include "views_core.hpp"
 
-struct progress_bar_widget : widget_base
+namespace widgets {
+
+struct progress_bar : widget_base
 {
   float ratio;
   
-  void on(ignore, ignore) 
-  {
-  }
+  void on(ignore, ignore) {}
+  
+  vec2f min_size() const { return {80, 8}; }
+  vec2f expand_factor() const { return {1, 0}; }
   
   void paint(painter& p) {
     p.stroke_style(colors::white);
@@ -18,18 +21,22 @@ struct progress_bar_widget : widget_base
   }
 };
 
+} // widgets
+
 namespace views {
 
 struct progress_bar : view<progress_bar> {
   
+  using widget_t = widgets::progress_bar;
+  
   progress_bar(float ratio) : ratio{ratio} {}
   
   auto build(auto&& b, ignore) {
-    return progress_bar_widget{{200, 15}, ratio};
+    return widget_t{{200, 15}, ratio};
   }
   
   rebuild_result rebuild(progress_bar Old, widget_ref w, ignore, ignore) {
-    w.as<progress_bar_widget>().ratio = ratio;
+    w.as<widget_t>().ratio = ratio;
     return {};
   }
   
@@ -37,7 +44,5 @@ struct progress_bar : view<progress_bar> {
   
   float ratio;
 };
-
-static_assert( is_view_sequence<progress_bar> );
 
 }

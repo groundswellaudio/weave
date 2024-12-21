@@ -29,6 +29,11 @@ struct input_event : variant<mouse_event, keyboard_event> {
   auto& keyboard() { return get<1>(); }
 };
 
+struct widget_size_info {
+  vec2f min {0, 0};
+  vec2f expand_factor {1, 1};
+};
+
 struct layout_context {
   
   vec2f min{0, 0};
@@ -74,18 +79,19 @@ struct widget_base {
     return p.x <= pos.x && p.y <= pos.y && p.x + sz.x >= pos.x && p.y + sz.y >= pos.y;
   }
   
-  vec2f do_layout(this auto& self, layout_context ctx) {
-    if constexpr (requires {self.layout(ctx);}) {
-      auto res = self.layout(ctx);
-      self.set_size(res);
-      return res;
+  widget_size_info size_info(this auto& self) {
+    return {self.min_size(), self.expand_factor()};
+  }
+   
+  vec2f do_layout(this auto& self, vec2f sz) {
+    if constexpr (requires {self.layout(sz);}) {
+      auto res = self.layout(sz);
+      self.set_size(sz);
+      return sz;
     }
-    else {
-      auto sz = self.size();
-      auto new_sz = vec2f{std::clamp(sz.x, ctx.min.x, ctx.max.x), 
-                          std::clamp(sz.y, ctx.min.y, ctx.max.y)};
-      self.set_size(new_sz);
-      return new_sz;
+    else {  
+      self.set_size(sz);
+      return sz;
     }
   }
   
@@ -120,7 +126,8 @@ namespace impl
     using ptr = T*;
     
     ptr<void(widget_base*, painter&)> paint;
-    ptr<vec2f(widget_base*, layout_context)> layout;
+    ptr<vec2f(widget_base*, vec2f sz)> layout;
+    ptr<widget_size_info(const widget_base*)> size_info;
     ptr<void(widget_base*, input_event, event_context&)> on;
     ptr<void(widget_base*, input_event, event_context&, widget_ref)> on_child_event;
     ptr<optional<widget_ref>(widget_base*, vec2f)> find_child_at;
@@ -171,8 +178,8 @@ class widget_ref {
     return data == o.data;
   }
   
-  auto layout(layout_context lc) {
-    return vptr->layout(data, lc);
+  auto layout(vec2f sz) {
+    return vptr->layout(data, sz);
   }
 
   template <class T>
@@ -207,6 +214,8 @@ class widget_ref {
   }
   
   bool is_child_event_listener() const { return vptr->on_child_event; }
+  
+  widget_size_info size_info() const { return vptr->size_info(data); }
   
   vec2f size() const { return data->size(); }
   
@@ -400,9 +409,12 @@ namespace impl {
         auto& obj = *static_cast<W*>(self);
         obj.paint(p);
       },
-      +[] (widget_base* self, layout_context lc) -> vec2f {
+      +[] (widget_base* self, vec2f sz) -> vec2f {
         auto& obj = *static_cast<W*>(self);
-        return obj.do_layout(lc);
+        return obj.do_layout(sz);
+      },
+      +[] (const widget_base* self) -> widget_size_info {
+        return static_cast<const W*>(self)->size_info();
       },
       +[] (widget_base* self, input_event e, event_context& ctx) {
         auto& Obj = *static_cast<W*>(self);
@@ -430,7 +442,8 @@ namespace impl {
       +[] (widget_base* self, int indent) {
         for (int k = 0; k < indent; ++k)
           std::cerr << '\t';
-        std::cerr << %stringify(^W) << " " << self->position() << " " << self->size();
+        std::cerr << %stringify(^W) << " " << self->position() << " " << self->size() 
+                  << " expand-factor" << static_cast<W*>(self)->size_info().expand_factor;
         if constexpr ( widget_has_children<W> ) {
           static_cast<W*>(self)->traverse_children( [indent] (auto& elem) {
             std::cerr << '\n';

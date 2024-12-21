@@ -90,6 +90,7 @@ struct stack_updater : view_sequence_updater<stack_updater> {
 
 namespace impl {
   
+  /* 
   vec2f do_stack_layout(std::vector<widget_box>& children, stack_data data, int axis, layout_context lc) {
     layout_context child_ctx;
     child_ctx.max = lc.max;
@@ -134,6 +135,75 @@ namespace impl {
     res[1 - axis] = sz + 2 * data.margin[1 - axis];
     res = max(lc.min, res);
     return res;
+  } */ 
+  
+  void do_stack_layout(std::vector<widget_box>& children, stack_data data, int axis, 
+                        vec2f this_sz)
+  {
+    vec2f min {0, 0};
+    float axis_expand_norm = 0;
+    for (auto& e : children) {
+      auto size_info = e.size_info();
+      min[axis] += size_info.min[axis];
+      min[1 - axis] = std::max(min[1 - axis], size_info.min[1 - axis]);
+      axis_expand_norm += size_info.expand_factor[axis];
+    }
+
+    auto layout_children = [&] (auto sizer) {
+      float axis_pos = data.margin[axis];
+      for (auto& e : children) {
+        auto child_sz = sizer(e);
+        e.layout(child_sz);
+        vec2f child_pos;
+        child_pos[axis] = axis_pos;
+        child_pos[1 - axis] = data.margin[1 - axis];
+        e.set_position(child_pos);
+        axis_pos += child_sz[axis];
+        axis_pos += data.interspace;
+      }
+    };
+    
+    auto cross_axis_size = [&] (widget_size_info info) {
+      auto cross_axis_expand = info.expand_factor[1 - axis];
+      if (data.fill_cross_axis || cross_axis_expand)
+        return this_sz[1 - axis];
+      
+    };
+    
+    auto axis_leftover = this_sz[axis] - min[axis];
+    if (axis_expand_norm == 0 || axis_leftover == 0) {
+      layout_children( [&] (auto& e) {
+        auto info = e.size_info();
+        vec2f child_size = info.min;
+        child_size[1 - axis] = data.fill_cross_axis ? this_sz[1 - axis] : info.min[1 - axis];
+        return child_size;
+      });
+    }
+    else {
+      // Divide the difference between size[axis] and min[axis] according to their expand 
+      // factor
+      layout_children( [&] (auto& e) {
+        auto info = e.size_info();
+        vec2f child_size = info.min;
+        child_size[axis] += info.expand_factor[axis] * axis_leftover / axis_expand_norm;
+        auto cross_axis_expand = info.expand_factor[1 - axis];
+        if (data.fill_cross_axis || cross_axis_expand >= 1.f)
+          child_size[1 - axis] = this_sz[1 - axis];
+        return child_size;
+      });
+    }
+    
+    // Cross axis alignment 
+    if (data.align_ratio != 0) {
+      for (auto& n : children) {
+        vec2f child_pos;
+        child_pos[axis] = n.position()[axis];
+        child_pos[1 - axis] = data.margin[1 - axis] 
+                              + data.align_ratio * 
+                                (this_sz[1 - axis] - n.size()[1-axis] - 2 * data.margin[1 - axis]); 
+        n.set_position(child_pos);
+      }
+    }
   }
   
   template <class T, class V, class S>
@@ -173,10 +243,7 @@ namespace impl {
       w.children_vec.erase(w.children_vec.begin() + i);
     
     if (seq_updater.mutated || (res & rebuild_result::size_change)) {
-      auto old_size = w.size();
-      auto new_size = w.do_layout(w.old_bc);
-      if (old_size != new_size)
-        return rebuild_result::size_change;
+      w.do_layout(w.size());
       return {};
     }
     
@@ -227,15 +294,30 @@ struct stack : widget_base
     // p.stroke_rect({0, 0}, size(), 2);
   }
   
+  widget_size_info size_info() const {
+    vec2f min {0, 0};
+    vec2f factor {0, 0};
+    for (auto& e : children_vec) {
+      auto i = e.size_info();
+      min[Axis] += i.min[Axis];
+      min[Axis] += data.interspace;
+      min[1 - Axis] = std::max(min[1 - Axis], i.min[1 - Axis]);
+      factor[Axis] += i.expand_factor[Axis];
+      factor[1 - Axis] = std::max(i.expand_factor[1 - Axis], factor[1 - Axis]);
+    }
+    min[Axis] -= data.interspace;
+    return {min, factor};
+  }
+  
   void on(ignore, ignore) {}
   
   bool traverse_children(auto&& fn) {
     return std::all_of(children_vec.begin(), children_vec.end(), fn);
   }
   
-  auto layout(layout_context ctx) {
-    old_bc = ctx;
-    return impl::do_stack_layout(children_vec, data, Axis, ctx);
+  auto layout(vec2f sz) {
+    impl::do_stack_layout(children_vec, data, Axis, sz);
+    return sz;
   }
 };
 
@@ -244,12 +326,20 @@ using vstack = stack<1>;
 
 struct flow : widget_base {
   
-  vec2f layout(layout_context lc) {
-    old_bc = lc;
-    
+  vec2f min_size() const {
+    //auto first = children_vec.front().size_info();
+    return {200, 200};
+  }
+  
+  vec2f expand_factor() const {
+    return {1, 1};
+  }
+  
+  vec2f layout(vec2f sz) {
     vec2f pos = {0, 0};
     float row_h = 0;
     
+    /* 
     for (auto& c : children_vec) {
       auto sz = c.layout(lc);
       if (pos.x + sz.x > size().x) {
@@ -265,7 +355,8 @@ struct flow : widget_base {
       }
     }
     
-    return {size().x, pos.y + row_h};
+    return {size().x, pos.y + row_h}; */ 
+    return sz;
   }
   
   auto traverse_children(auto&& fn) {
@@ -276,7 +367,6 @@ struct flow : widget_base {
   void paint(painter&) {}
   
   std::vector<widget_box> children_vec;
-  layout_context old_bc;
 };
 
 } // widgets

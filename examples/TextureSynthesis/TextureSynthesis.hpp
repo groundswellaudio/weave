@@ -275,7 +275,6 @@ void patch_match_synthesize(I& source, I& generated, search_map& map)
     pix = source(map(idx).m0);
   });
   
-  /* 
   for_point_in( iota(1, generated.shape()[0] - 1), iota(1, generated.shape()[1] - 1), 
                 [&] (vec2i idx) {
                   auto acc = [&] (vec2i delta) {
@@ -291,7 +290,7 @@ void patch_match_synthesize(I& source, I& generated, search_map& map)
                   acc({-1, 0});
                   acc({-1, -1});
                   generated(idx) /= 10;
-                }); */ 
+                });
 }
 
 /// Patch match resynthesis with completeness constraints

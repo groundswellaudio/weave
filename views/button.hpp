@@ -38,6 +38,8 @@ struct toggle_button : widget_base
     }
   }
   
+  vec2f expand_factor() const { return {1, 0}; }
+  
   void paint(painter& p) 
   {
     auto sz = size();
@@ -69,6 +71,13 @@ struct trigger_button : widget_base {
   widget_action<void()> on_click;
   bool disabled = false;
   bool hovered = false;
+  float text_width = 20;
+  
+  vec2f min_size() const {
+    return {30, 20};
+  }
+  
+  vec2f expand_factor() const { return {size().x < text_width ? 1.f : 0.f, 0.f}; }
   
   void on(mouse_event e, event_context& ec) {
     if (disabled)
@@ -152,6 +161,7 @@ struct trigger_button : view<trigger_button<Fn>> {
     decltype(widget_t::on_click) action = [f = fn] (auto& ec) { context_invoke<State>(f, ec); };
     auto size = sz + vec2f{button_margin, button_margin} * 2;
     auto res = widget_t{{size}};
+    res.text_width = size.x;
     res.str = str;
     res.on_click = std::move(action);
     res.font_size = font_size;
@@ -198,6 +208,9 @@ struct graphic_toggle_button : widget_base {
   bool flag;
   bool hovered = false;
   
+  vec2f min_size() const { return size(); }
+  vec2f expand_factor() const { return {0, 0}; }
+  
   void on(mouse_event e, event_context& ec) {
     if (e.is_mouse_enter())
       (hovered = true, ec.request_repaint());
@@ -225,6 +238,9 @@ struct graphic_trigger_button : widget_base {
   widget_action<void()> on_click;
   
   bool hovered = false;
+  
+  vec2f min_size() const { return size(); }
+  vec2f expand_factor() const { return {0, 0}; }
   
   void on(mouse_event e, event_context& ec) {
     if (e.is_mouse_enter())

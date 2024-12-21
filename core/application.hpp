@@ -240,10 +240,7 @@ struct application_context {
     overlay{nullptr},
     med{root.borrow()}
   {
-    layout_context lc;
-    lc.min = win.size();
-    lc.max = lc.min;
-    root.layout(lc);
+    layout_root();
   }
   
   void grab_mouse_focus(widget_ref new_focused, const event_context_parent_stack& parents) {
@@ -295,6 +292,10 @@ struct application_context {
     return win;
   }
   
+  void request_rebuild() {
+    rebuild_requested = true;
+  }
+  
   /// Implementation only.
   void paint() {
     painter p = graphics_context().painter();
@@ -334,20 +335,19 @@ struct application_context {
   
   void on_window_resize() {
     debug_log("window resize");
-    layout_context lc;
-    lc.min = win.size();
-    lc.max = lc.min;
-    root.layout(lc);
+    layout_root();
     paint();
-  }
-  
-  void request_rebuild() {
-    rebuild_requested = true;
   }
   
   std::atomic<bool> rebuild_requested = false;
   
   private : 
+  
+  void layout_root() {
+    std::cerr << "\n window size " << win.size() << std::endl;
+    root.layout(win.size());
+    root.debug_dump(3);
+  }
   
   sdl_backend backend;
   struct window win;

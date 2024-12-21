@@ -22,9 +22,11 @@ struct slider : widget_base
   std::string value_str;
   write_fn<float> write;
   
-  using value_type = float;
-  
   using EvCtx = event_context;
+  
+  vec2f min_size() const { return {30, 15}; }
+  vec2f max_size() const { return {100, 15}; }
+  vec2f expand_factor() const { return {1, 0}; }
   
   void on_value_change(float new_val) {
     value = new_val;
