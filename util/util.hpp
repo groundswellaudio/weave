@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iostream>
+#include <limits>
 
 struct ignore {
   template <class T>
@@ -35,3 +36,6 @@ template <class T>
 void debug_log(T val) {
   std::cerr << val << std::endl;
 }
+
+template <class T>
+T infinity() { return std::numeric_limits<T>::infinity(); }

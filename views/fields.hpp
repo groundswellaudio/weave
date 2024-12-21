@@ -27,6 +27,7 @@ struct text_field : widget_base {
   }
   
   vec2f min_size() const { return min_size_field; }
+  vec2f max_size() const { return {infinity<float>(), 15.f}; }
   
   vec2f expand_factor() const {
     return {1, 0};
@@ -133,6 +134,8 @@ struct numeric_field : widget_base {
   }
   
   vec2f min_size() const { return min_size_field; }
+  vec2f max_size() const { return {infinity<float>(), 15.f}; }
+  
   vec2f expand_factor() const { return {1, 0}; }
   
   void update_from_str() {

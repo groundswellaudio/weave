@@ -241,6 +241,9 @@ struct application_context {
     med{root.borrow()}
   {
     layout_root();
+    auto size_info = root.size_info();
+    win.set_min_size(size_info.min);
+    win.set_max_size(size_info.max);
   }
   
   void grab_mouse_focus(widget_ref new_focused, const event_context_parent_stack& parents) {

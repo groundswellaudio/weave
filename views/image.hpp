@@ -6,9 +6,28 @@ namespace widgets {
 
 struct image : widget_base {
   
-  vec2f min_size() const { return {30, 30}; }
-  vec2f expand_factor() const {
-    return {1, 1};
+  optional<texture_handle> texture;
+  vec2f max_size;
+  vec2i corner_offset;
+  
+  widget_size_info size_info() const {
+    if (!texture)
+      return {{0, 0}, {0, 0}};
+    else
+      return {{30, 30 * aspect_ratio()}, max_size};
+  }
+  
+  vec2f layout(vec2f sz) const {
+    if (!texture)
+      return {0, 0};
+    if (aspect_ratio() > 1)
+      return {sz[1] / aspect_ratio(), sz[1]};
+    else
+      return {sz[0], sz[0] * aspect_ratio()};
+  }
+  
+  float aspect_ratio() const {
+    return max_size.y / max_size.x;
   }
   
   void on(ignore, ignore) {}
@@ -21,9 +40,6 @@ struct image : widget_base {
     //p.stroke_style(colors::white);
     //p.stroke_rect({0, 0}, size());
   }
-  
-  optional<texture_handle> texture;
-  vec2i corner_offset;
 };
 
 } // widgets
@@ -74,7 +90,7 @@ struct image : view<image<ImgT, Proj>> {
     if (!img.empty())
       texture = make_texture(b.context());
     auto wsize = get_display_size();
-    return widget_t{{wsize}, texture, corner_offset};
+    return widget_t{{wsize}, texture, wsize, corner_offset};
   }
   
   rebuild_result rebuild(image& old, widget_ref elem, const widget_updater& up, ignore) {
@@ -99,6 +115,7 @@ struct image : view<image<ImgT, Proj>> {
     auto new_size = get_display_size();
     if (w.size() == new_size)
       return {};
+    w.max_size = new_size;
     w.set_size(new_size);
     return rebuild_result::size_change;
   }

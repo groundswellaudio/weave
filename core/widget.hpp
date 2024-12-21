@@ -30,8 +30,9 @@ struct input_event : variant<mouse_event, keyboard_event> {
 };
 
 struct widget_size_info {
-  vec2f min {0, 0};
-  vec2f expand_factor {1, 1};
+  vec2f min {0, 0}; 
+  vec2f max {infinity<float>(), infinity<float>()};
+  // vec2f expand_factor {1, 1};
 };
 
 struct layout_context {
@@ -54,14 +55,36 @@ auto& operator<<(std::ostream& os, const vec<T, 2>& v) {
 
 struct widget_ref;
 
+struct any_invocable { bool operator()(auto&&... args) { return false; } };
+
+template <class W>
+concept widget_has_children = requires (W& obj) { obj.traverse_children(any_invocable{}); };
+
 struct widget_base {
   
   vec2f size() const { return sz; }
   vec2f position() const { return pos; }
   
   void set_size(vec2f v) {
+    assert( std::abs(v.x) < 1e10 && std::abs(v.y) < 1e10 && "aberrant size value" );
     assert( !std::isnan(v.x) && !std::isnan(v.y) && "NaN in widget size?" );
     sz = v;
+  }
+  
+  void debug_dump(this auto& self, int indent = 0) {
+    for (int k = 0; k < indent; ++k)
+      std::cerr << '\t';
+    using T = %remove_reference(type_of(^self));
+    std::cerr << %stringify(canonical(^T)) << " " << self.position() << " " << self.size();
+    auto info = self.size_info();
+    std::cerr << " minmax " << info.min << " " << info.max;
+    if constexpr ( widget_has_children<T> ) {
+      self.traverse_children( [indent] (auto& elem) {
+        std::cerr << '\n';
+        elem.debug_dump(indent + 1); 
+        return true;
+      });
+    }
   }
   
   void set_position(float x, float y) {
@@ -69,6 +92,7 @@ struct widget_base {
   }
   
   void set_position(vec2f p) {
+    assert( std::abs(p.x) < 1e10 && std::abs(p.y) < 1e10 && "aberrant position value" );
     assert( !std::isnan(p.x) && !std::isnan(p.y) && "NaN in widget position?" );
     pos = p;
   }
@@ -80,14 +104,14 @@ struct widget_base {
   }
   
   widget_size_info size_info(this auto& self) {
-    return {self.min_size(), self.expand_factor()};
+    return {self.min_size(), self.max_size()};
   }
    
   vec2f do_layout(this auto& self, vec2f sz) {
     if constexpr (requires {self.layout(sz);}) {
       auto res = self.layout(sz);
-      self.set_size(sz);
-      return sz;
+      self.set_size(res);
+      return res;
     }
     else {  
       self.set_size(sz);
@@ -111,11 +135,6 @@ template <class T>
 concept keyboard_event_listener = requires (T obj, keyboard_event e, event_context& ec) {
   obj.on(e, ec);
 };
-
-struct any_invocable { bool operator()(auto&& elem) { return false; } };
-
-template <class W>
-concept widget_has_children = requires (W& obj) { obj.traverse_children(any_invocable{}); };
 
 namespace impl 
 {
@@ -375,7 +394,6 @@ struct event_context {
   template <class S, class View>
   auto build_view(View&& v) {
     auto w = v.build( widget_builder{context()}, state<S>() );
-    widget_ref(&w).layout({});
     return w;
   }
   
@@ -440,17 +458,7 @@ namespace impl {
           });
       },
       +[] (widget_base* self, int indent) {
-        for (int k = 0; k < indent; ++k)
-          std::cerr << '\t';
-        std::cerr << %stringify(^W) << " " << self->position() << " " << self->size() 
-                  << " expand-factor" << static_cast<W*>(self)->size_info().expand_factor;
-        if constexpr ( widget_has_children<W> ) {
-          static_cast<W*>(self)->traverse_children( [indent] (auto& elem) {
-            std::cerr << '\n';
-            to_widget_ref(elem).debug_dump(indent+1);
-            return true;
-          });
-        }
+        static_cast<W*>(self)->debug_dump(indent + 1);
       },
       +[] (widget_base* self) {
         delete static_cast<W*>(self);

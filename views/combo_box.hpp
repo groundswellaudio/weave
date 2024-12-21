@@ -18,6 +18,8 @@ struct combo_box : widget_base {
   bool hovered = false;
   
   vec2f min_size() const { return {30, 15}; }
+  vec2f max_size() const { return {infinity<float>(), 15.f}; }
+  
   vec2f expand_factor() const { return {1, 0}; }
   
   void select(event_context& ec, int choice) {

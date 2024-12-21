@@ -38,7 +38,9 @@ struct toggle_button : widget_base
     }
   }
   
-  vec2f expand_factor() const { return {1, 0}; }
+  widget_size_info size_info() const {
+    return {{20, 15}};
+  }
   
   void paint(painter& p) 
   {
@@ -73,11 +75,8 @@ struct trigger_button : widget_base {
   bool hovered = false;
   float text_width = 20;
   
-  vec2f min_size() const {
-    return {30, 20};
-  }
-  
-  vec2f expand_factor() const { return {size().x < text_width ? 1.f : 0.f, 0.f}; }
+  vec2f min_size() const { return {30, 20}; }
+  vec2f max_size() const { return {text_width + 20, 20}; }
   
   void on(mouse_event e, event_context& ec) {
     if (disabled)
@@ -109,8 +108,8 @@ struct trigger_button : widget_base {
     
     p.font_size(font_size);
     p.fill_style(!disabled ? rgba{colors::white} : rgba{colors::white}.with_alpha(110));
-    p.text_align(text_align::x::left, text_align::y::center);
-    p.text( {button_margin, sz.y / 2.f}, str ); 
+    p.text_align(text_align::x::center, text_align::y::center);
+    p.text( {sz.x / 2, sz.y / 2.f}, str ); 
   }
 };
 
@@ -209,7 +208,9 @@ struct graphic_toggle_button : widget_base {
   bool hovered = false;
   
   vec2f min_size() const { return size(); }
-  vec2f expand_factor() const { return {0, 0}; }
+  vec2f max_size() const { return size(); }
+  
+  // vec2f expand_factor() const { return {0, 0}; }
   
   void on(mouse_event e, event_context& ec) {
     if (e.is_mouse_enter())
@@ -240,7 +241,7 @@ struct graphic_trigger_button : widget_base {
   bool hovered = false;
   
   vec2f min_size() const { return size(); }
-  vec2f expand_factor() const { return {0, 0}; }
+  vec2f max_size() const { return size(); }
   
   void on(mouse_event e, event_context& ec) {
     if (e.is_mouse_enter())

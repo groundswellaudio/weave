@@ -26,7 +26,7 @@ struct slider : widget_base
   
   vec2f min_size() const { return {30, 15}; }
   vec2f max_size() const { return {100, 15}; }
-  vec2f expand_factor() const { return {1, 0}; }
+  // vec2f expand_factor() const { return {1, 0}; }
   
   void on_value_change(float new_val) {
     value = new_val;

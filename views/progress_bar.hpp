@@ -11,6 +11,8 @@ struct progress_bar : widget_base
   void on(ignore, ignore) {}
   
   vec2f min_size() const { return {80, 8}; }
+  vec2f max_size() const { return {infinity<float>(), 8}; };
+  
   vec2f expand_factor() const { return {1, 0}; }
   
   void paint(painter& p) {

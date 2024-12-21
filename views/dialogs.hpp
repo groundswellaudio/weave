@@ -46,7 +46,7 @@ struct popup_menu : widget_base {
   }
   
   vec2f min_size() const { return size(); }
-  vec2f expand_factor() const { return {0, 0}; }
+  vec2f max_size() const { return size(); }
   
   void update_size(graphics_context& gctx) {
     auto r = std::views::transform(elements, [] (auto& e) -> auto& { return e.name; });
@@ -110,7 +110,7 @@ struct popup_menu : widget_base {
 struct popup_menu_stack : widget_base {
   
   vec2f min_size() const { return size(); }
-  vec2f expand_factor() const { return {0, 0}; }
+  vec2f max_size() const { return size(); }
   
   void push(popup_menu&& m) {
     menus.push_back(std::move(m));

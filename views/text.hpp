@@ -18,8 +18,7 @@ struct text : widget_base
   float text_width = 20;
   
   vec2f min_size() const { return {20, prop.font_size + 2}; }
-  vec2f max_size() const { return {text_width, prop.font_size + 2}; }
-  vec2f expand_factor() const { return {1.f, 0}; }
+  vec2f max_size() const { return {text_width + 20, prop.font_size + 2}; }
   
   void on(ignore, ignore) 
   {

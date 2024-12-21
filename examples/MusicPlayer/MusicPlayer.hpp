@@ -55,6 +55,7 @@ void on_file_drop(event_context& ec, const std::string& path_str) {
   }.background(rgb_f(colors::gray) * 0.3);
   
   auto w = ec.build_view<State>(dialog);
+  w.do_layout({300, 150});
   w.set_position(ec.context().window().size() / 2 - w.size() / 2);
   ec.push_overlay(std::move(w));
 }
@@ -162,7 +163,7 @@ struct LibraryView {
       for_each(state.tags(), [] (auto& p) {
         return selectable{ text{p.name()}, group };
       }); */ 
-    };
+    }.fill();
   }
   
   /* 
@@ -206,7 +207,7 @@ struct LibraryView {
       },
       [&] (album_id id) {
         return vstack {
-          views::image{state.database.album(id.value).cover, false}.fit({200, 200}),
+          views::image{state.database.album(id.value).cover, false}.fit({600, 600}),
           text{state.database.album(id.value).name},
           table{state.database.album_tracks(id.value), false}.on_cell_double_click(&State::play_track)
         };
@@ -264,7 +265,7 @@ auto make_view(State& state)
                  hstack{ 
                         library_view{}, 
                         views::image{state.current_cover, update_cover}
-                        .fit({300, 300})
+                        .fit({600, 600})
                         }.align(1).fill()
                }.align_center()
                 .margin({10, 10})

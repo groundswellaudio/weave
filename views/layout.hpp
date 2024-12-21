@@ -146,14 +146,14 @@ namespace impl {
       auto size_info = e.size_info();
       min[axis] += size_info.min[axis];
       min[1 - axis] = std::max(min[1 - axis], size_info.min[1 - axis]);
-      axis_expand_norm += size_info.expand_factor[axis];
+      axis_expand_norm += (std::min(size_info.max[axis], this_sz[axis]) - size_info.min[axis]);
     }
 
     auto layout_children = [&] (auto sizer) {
       float axis_pos = data.margin[axis];
       for (auto& e : children) {
         auto child_sz = sizer(e);
-        e.layout(child_sz);
+        child_sz = e.layout(child_sz);
         vec2f child_pos;
         child_pos[axis] = axis_pos;
         child_pos[1 - axis] = data.margin[1 - axis];
@@ -163,19 +163,20 @@ namespace impl {
       }
     };
     
-    auto cross_axis_size = [&] (widget_size_info info) {
-      auto cross_axis_expand = info.expand_factor[1 - axis];
-      if (data.fill_cross_axis || cross_axis_expand)
+    auto cross_axis_size = [data, this_sz, axis] (widget_size_info info) {
+      // auto cross_axis_expand = info.expand_factor[1 - axis];
+      if (data.fill_cross_axis)
         return this_sz[1 - axis];
-      
+      else
+        return std::min(this_sz[1 - axis], info.max[1 - axis]);
     };
     
     auto axis_leftover = this_sz[axis] - min[axis];
-    if (axis_expand_norm == 0 || axis_leftover == 0) {
+    if (axis_leftover == 0 || axis_expand_norm == 0) {
       layout_children( [&] (auto& e) {
         auto info = e.size_info();
         vec2f child_size = info.min;
-        child_size[1 - axis] = data.fill_cross_axis ? this_sz[1 - axis] : info.min[1 - axis];
+        child_size[1 - axis] = cross_axis_size(info);
         return child_size;
       });
     }
@@ -185,10 +186,8 @@ namespace impl {
       layout_children( [&] (auto& e) {
         auto info = e.size_info();
         vec2f child_size = info.min;
-        child_size[axis] += info.expand_factor[axis] * axis_leftover / axis_expand_norm;
-        auto cross_axis_expand = info.expand_factor[1 - axis];
-        if (data.fill_cross_axis || cross_axis_expand >= 1.f)
-          child_size[1 - axis] = this_sz[1 - axis];
+        child_size[axis] += (std::min(info.max[axis], this_sz[axis]) - info.min[axis]) * axis_leftover / axis_expand_norm;
+        child_size[1 - axis] = cross_axis_size(info);
         return child_size;
       });
     }
@@ -295,18 +294,27 @@ struct stack : widget_base
   }
   
   widget_size_info size_info() const {
-    vec2f min {0, 0};
-    vec2f factor {0, 0};
+    if (!children_vec.size())
+      return { data.margin * 2, data.margin * 2 };
+    
+    vec2f min {0, 0}, max{0, 0};
+    // vec2f factor {0, 0};
     for (auto& e : children_vec) {
       auto i = e.size_info();
       min[Axis] += i.min[Axis];
-      min[Axis] += data.interspace;
       min[1 - Axis] = std::max(min[1 - Axis], i.min[1 - Axis]);
+      max[Axis] += i.max[Axis];
+      max[1 - Axis] = std::max(max[1 - Axis], i.max[1 - Axis]);
+      /* 
       factor[Axis] += i.expand_factor[Axis];
-      factor[1 - Axis] = std::max(i.expand_factor[1 - Axis], factor[1 - Axis]);
+      factor[1 - Axis] = std::max(i.expand_factor[1 - Axis], factor[1 - Axis]); */ 
     }
-    min[Axis] -= data.interspace;
-    return {min, factor};
+    
+    min[Axis] += (children_vec.size() - 1) * data.interspace;
+    max[Axis] += (children_vec.size() - 1) * data.interspace;
+    min += data.margin * 2.f;
+    max += data.margin * 2.f;
+    return {min, max};
   }
   
   void on(ignore, ignore) {}
@@ -326,13 +334,8 @@ using vstack = stack<1>;
 
 struct flow : widget_base {
   
-  vec2f min_size() const {
-    //auto first = children_vec.front().size_info();
-    return {200, 200};
-  }
-  
-  vec2f expand_factor() const {
-    return {1, 1};
+  widget_size_info size_info() const {
+    return {{200, 200}};
   }
   
   vec2f layout(vec2f sz) {

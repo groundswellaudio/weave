@@ -63,8 +63,8 @@ struct table : widget_base, scrollable_base {
   
   table(vec2f sz) : widget_base{sz} {}
   
-  vec2f min_size() const {
-    return {properties.size() * 30.f, first_row + row_height * 3};
+  widget_size_info size_info() const {
+    return {{properties.size() * 30.f, first_row + row_height * 3}};
   }
   
   vec2f expand_factor() const {
