@@ -4,7 +4,7 @@ set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -cppmeta")
 include(FetchContent)
 
-project(Spiral)
+project(Weave)
 
 FetchContent_Declare(SDL2
   GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
@@ -41,9 +41,9 @@ include_directories(${dr_libs_SOURCE_DIR})
 include_directories(${stb_SOURCE_DIR})
 
 if (CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
-  add_executable(Spiral main.cpp misc/mini_audio_impl.cpp graphics/graphics.cpp)
+  add_executable(Weave main.cpp misc/mini_audio_impl.cpp graphics/graphics.cpp)
 else()
-  add_library(Spiral STATIC misc/mini_audio_impl.cpp graphics/graphics.cpp)
+  add_library(Weave STATIC misc/mini_audio_impl.cpp graphics/graphics.cpp)
 endif()
 
 target_include_directories(Spiral PUBLIC 
