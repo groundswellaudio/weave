@@ -18,6 +18,8 @@
 
 #include "nfd.h"
 
+namespace weave {
+
 namespace impl {
 
   struct mouse_event_dispatcher 
@@ -350,6 +352,9 @@ struct application_context {
     std::cerr << "\n window size " << win.size() << std::endl;
     root.layout(win.size());
     root.debug_dump(3);
+    auto size_info = root.size_info();
+    win.set_min_size(size_info.min);
+    win.set_max_size(size_info.max);
   }
   
   sdl_backend backend;
@@ -436,6 +441,10 @@ struct application
     app_view->rebuild(old_view, impl.root.borrow(), upd, state);
     impl.med.update_absolute_position();
     impl.rebuild_requested = false;
+    // Note : it would be nice to not have to do this on every rebuild ? 
+    auto size_info = impl.root.size_info();
+    impl.win.set_min_size(size_info.min);
+    impl.win.set_max_size(size_info.max);
   }
   
   void run(State& state)
@@ -461,9 +470,11 @@ struct application
   }
 };
 
-// Construct an application with a given State and view constructor.
+/// Construct an application with a given State and view constructor.
 template <class State, class Ctor>
 auto make_app(State& state, Ctor view_ctor, window_properties prop) {
   using ViewT = decltype(view_ctor(state));
   return application<Ctor, ViewT, State>{state, view_ctor, std::move(prop)};
 }
+
+} // weave

@@ -2,6 +2,8 @@
 
 #include <functional>
 
+namespace weave {
+
 struct empty_lens {};
 
 /* 
@@ -127,8 +129,8 @@ struct invocable_lens {
 
 template <class L>
 auto make_lens(L l) {
-  static_assert( !is_instance_of(^L, ^invocable_lens) );
-  if constexpr (is_instance_of(^L, ^lens_readwrite))
+  static_assert( !is_instance_of(^^L, ^^invocable_lens) );
+  if constexpr (is_instance_of(^^L, ^^lens_readwrite))
     return l;
   else 
     return invocable_lens{invocable_wrapper{l}};
@@ -141,3 +143,5 @@ auto readwrite(A a, B b) {
 
 template <class T>
 using make_lens_result = decltype(make_lens(std::declval<T>()));
+
+}

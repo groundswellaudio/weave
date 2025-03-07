@@ -4,6 +4,8 @@
 #include <cmath>
 #include "util/gen-operators.hpp"
 
+namespace weave {
+
 enum class rgb_encoding {
   linear, 
   gamma22
@@ -233,3 +235,5 @@ namespace colors
   static constexpr rgb_u8 maroon  {128, 0, 0};
   static constexpr rgb_u8 purple  {128, 0, 128};
 }
+
+} // weave

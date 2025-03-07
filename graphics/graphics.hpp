@@ -16,6 +16,8 @@
 #include "util/util.hpp"
 #include "util/vec.hpp"
 
+namespace weave {
+
 namespace impl
 {
   inline auto to_nvg_col(const rgba_f& c) { return nvgRGBAf(c[0], c[1], c[2], c[3]); }
@@ -449,3 +451,5 @@ struct graphics_context
   NVGcontext* ctx = nullptr;
   float text_vert_offset;
 };
+
+} // weave

@@ -1,6 +1,8 @@
 #pragma once
 #include <SDL.h>
 
+namespace weave {
+
 struct window_properties {
   std::string name;
   vec2f size {600, 400};
@@ -66,3 +68,5 @@ struct window {
   SDL_Window* win;
   void* gl_ctx;
 };
+
+} // weave

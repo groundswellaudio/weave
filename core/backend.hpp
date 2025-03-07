@@ -8,6 +8,8 @@
 #include "events/keyboard.hpp"
 #include <iostream>
 
+namespace weave::impl {
+
 class sdl_backend
 {
   bool mouse_is_dragging = false;
@@ -177,3 +179,5 @@ class sdl_backend
 	  }
 	}
 };
+
+} // impl

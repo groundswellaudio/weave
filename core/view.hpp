@@ -3,6 +3,8 @@
 #include "widget.hpp"
 #include "../util/util.hpp"
 
+namespace weave {
+
 struct layout_tag {};
 
 struct widget_builder;
@@ -45,7 +47,7 @@ struct view_sequence_base {
 };
 
 template <class T>
-concept is_view_sequence = is_base_of(^view_sequence_base, ^T);
+concept is_view_sequence = is_base_of(^^view_sequence_base, ^^T);
 
 /// The base for a View. Any View is also a ViewSequence, so we implement this here
 template <class T>
@@ -114,3 +116,5 @@ struct simple_view_for : view<simple_view_for<Widget, Lens, Prop>>, Prop {
   
   Lens lens;
 };
+
+} // weave

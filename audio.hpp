@@ -7,6 +7,8 @@
 #include <cassert>
 #include <util/optional.hpp>
 
+namespace weave {
+
 struct audio_buffer_format {
   int sample_rate = 44100;
   int buffer_size = 512;
@@ -191,3 +193,5 @@ struct audio_renderer
   audio_buffer_format current_format;
   int device_index = 0;
 };
+
+} // weave

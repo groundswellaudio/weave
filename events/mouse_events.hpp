@@ -4,6 +4,8 @@
 #include "../util/variant.hpp"
 #include <string>
 
+namespace weave {
+
 struct mouse_enter {};
 
 struct mouse_exit {};
@@ -52,14 +54,14 @@ struct mouse_event {
   
   bool is_double_click() const { return is_mouse_down() && get_as<mouse_down>().double_click; }
   vec2f scroll_delta() const { return get_as<mouse_scroll>().delta; }
-  bool is_mouse_scroll() const { return is<mouse_scroll>(); }
-  bool is_mouse_enter() const { return is<mouse_enter>(); }
-  bool is_mouse_exit() const { return is<mouse_exit>(); }
-  bool is_mouse_move() const { return is<mouse_move>(); }
+  bool is_scroll() const { return is<mouse_scroll>(); }
+  bool is_enter() const { return is<mouse_enter>(); }
+  bool is_exit() const { return is<mouse_exit>(); }
+  bool is_move() const { return is<mouse_move>(); }
   auto drag_delta() const { return get_as<mouse_move>().delta; }
-  bool is_mouse_drag() const { return is<mouse_move>() && get_as<mouse_move>().is_dragging; }
-  bool is_mouse_down() const { return is<mouse_down>(); }
-  bool is_mouse_up() const { return is<mouse_up>(); }
+  bool is_drag() const { return is<mouse_move>() && get_as<mouse_move>().is_dragging; }
+  bool is_down() const { return is<mouse_down>(); }
+  bool is_up() const { return is<mouse_up>(); }
   bool is_right_click() const { 
     return is<mouse_down>() && get_as<mouse_down>().button == mouse_button::right; 
   }
@@ -73,3 +75,5 @@ static constexpr auto is_one_of = ((^T == ^Ts) or ...);
 
 template <class T>
 concept is_mouse_event = is_one_of<T, mouse_enter, mouse_exit, mouse_down, mouse_up, mouse_move, mouse_scroll>;
+
+} // weave 

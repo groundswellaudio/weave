@@ -11,7 +11,7 @@
 #include "dr_flac.h"
 #include "dr_wav.h"
 
-optional<audio_buffer> read_audio_file(const std::string& path) 
+optional<audio_buffer> weave::read_audio_file(const std::string& path) 
 {
   if (path.ends_with(".mp3"))
   {

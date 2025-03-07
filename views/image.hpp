@@ -2,7 +2,7 @@
 
 #include "../util/optional.hpp"
 
-namespace widgets {
+namespace weave::widgets {
 
 struct image : widget_base {
   
@@ -14,16 +14,17 @@ struct image : widget_base {
     if (!texture)
       return {{0, 0}, {0, 0}};
     else
-      return {{30, 30 * aspect_ratio()}, max_size};
+      return {{100, 100 * aspect_ratio()}, max_size};
   }
   
   vec2f layout(vec2f sz) const {
     if (!texture)
       return {0, 0};
-    if (aspect_ratio() > 1)
-      return {sz[1] / aspect_ratio(), sz[1]};
-    else
+    if (aspect_ratio() * sz[0] < sz[1])
       return {sz[0], sz[0] * aspect_ratio()};
+    else {
+      return {sz[1] / aspect_ratio(), sz[1]};
+    }
   }
   
   float aspect_ratio() const {
@@ -37,14 +38,14 @@ struct image : widget_base {
       return;
     p.fill_style(*texture, -corner_offset, size());
     p.rectangle({0, 0}, size());
-    //p.stroke_style(colors::white);
-    //p.stroke_rect({0, 0}, size());
+    // p.stroke_style(colors::red);
+    // p.stroke_rect({0, 0}, size());
   }
 };
 
 } // widgets
 
-namespace views {
+namespace weave::views {
 
 static constexpr auto default_image_proj = [] (auto&& pix) { return pix; };
 
@@ -123,10 +124,10 @@ struct image : view<image<ImgT, Proj>> {
   private : 
   
   texture_handle make_texture(application_context& ctx) {
-    if constexpr (^ImgT == ^image<rgba<unsigned char>>)
+    if constexpr (std::is_same_v<ImgT, weave::image<rgba<unsigned char>>) 
       return ctx.graphics_context().create_texture(img, img.shape());
     else {
-      ::image<rgba<unsigned char>> tex;
+      weave::image<rgba<unsigned char>> tex;
       tex.reshape(img.shape());
       for (int y : iota(tex.shape()[0]))
         for (int x : iota(tex.shape()[1]))

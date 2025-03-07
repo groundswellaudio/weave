@@ -4,6 +4,8 @@
 #include "../geometry/geometry.hpp"
 #include <functional>
 
+namespace weave {
+
 template <class Range>
 float max_text_width(Range& range, graphics_context& ctx, int font_size) {
   float res = 0;
@@ -41,3 +43,5 @@ decltype(auto) context_invoke(Fn fn, event_context& ec, Args&&... args) {
   else
     return (std::invoke(fn, (Args&&)args...));
 }
+
+} // weave

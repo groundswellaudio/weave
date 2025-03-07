@@ -1,4 +1,7 @@
 #pragma once
+
+namespace weave {
+
 #include <SDL.h>
 
 enum class mouse_cursor : char
@@ -28,3 +31,5 @@ inline void set_mouse_cursor(mouse_cursor cursor_kind = mouse_cursor::arrow)
 
   SDL_SetCursor(cursor);
 }
+
+} // weave

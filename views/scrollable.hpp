@@ -4,7 +4,7 @@
 #include <string_view>
 #include "../cursor.hpp"
 
-namespace widgets {
+namespace weave::widgets {
 
 struct scrollable_base {
   
@@ -88,7 +88,7 @@ struct scrollable : widget_base, scrollable_base {
 
 } // widgets
 
-namespace views {
+namespace weave::views {
 
 template <class View>
 struct scrollable : view<scrollable<View>> {

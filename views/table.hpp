@@ -6,7 +6,13 @@
 #include <functional>
 #include <ranges>
 
-namespace widgets {
+namespace weave {
+  /// The trait used by the table view to determine how to present a type
+  template <class T>
+  struct table_model;
+} // weave
+
+namespace weave::widgets {
 
 struct table : widget_base, scrollable_base {
   
@@ -83,6 +89,12 @@ struct table : widget_base, scrollable_base {
     }
   }
   
+  void sort_by_property(int property_index) {
+    std::sort( cells.begin(), cells.end(), [property_index] (auto& a, auto& b) { 
+      return a.prop[property_index] < b.prop[property_index];
+    }); 
+  }
+  
   void set_properties(auto&& range) {
     float posx = 0;
     for (auto& e : range) {
@@ -96,8 +108,10 @@ struct table : widget_base, scrollable_base {
     {
       auto& [_, posx] = properties[k];
       float x = p.x;
-      if (x < posx - 5)
+      if (x < posx - 5) {
+        sort_by_property(k - 1);
         break;
+      }
       if (std::abs(x - posx) < 10)
       {
         dragging = k; 
@@ -293,6 +307,8 @@ struct table : widget_base, scrollable_base {
     for (auto& [prop, posx] : properties) {
       p.line( {posx, 0}, {posx, first_row}, 1 );
       p.text( {5 + posx, first_row / 2}, prop );
+      if (posx > size().x)
+        break;
     }
     
     p.stroke_style(rgba_f(colors::black) * 0.5);
@@ -311,11 +327,7 @@ struct table : widget_base, scrollable_base {
 
 } // widgets
 
-/// The trait used to determine how to present a type
-template <class T>
-struct table_model;
-
-namespace views {
+namespace weave::views {
 
 template <class T>
   requires complete_type<table_model<T>>

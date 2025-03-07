@@ -2,7 +2,7 @@
 
 #include <util/vec.hpp>
 
-namespace geo {
+namespace weave::geo {
 
 template <class T>
 struct rectangle {

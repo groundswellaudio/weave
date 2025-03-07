@@ -2,6 +2,8 @@
 
 #include "views_core.hpp"
 
+namespace weave::views {
+
 template <class Range, class ViewCtor>
 struct for_each : view_sequence_base {
   
@@ -47,5 +49,4 @@ for_each(R&, V) -> for_each<R&, V>;
 template <class R, class V>
 for_each(R&&, V) -> for_each<R, V>;
 
-
-
+} // views

@@ -3,6 +3,8 @@
 #include "views_core.hpp"
 #include <format>
 
+namespace weave {
+
 struct slider_properties {
   bool operator==(const slider_properties&) const = default;
   float min = 0, max = 1;
@@ -12,7 +14,9 @@ struct slider_properties {
   rgba_u8 text_color = colors::white;
 };
 
-namespace widgets 
+} // weave
+
+namespace weave::widgets 
 {
 
 struct slider : widget_base

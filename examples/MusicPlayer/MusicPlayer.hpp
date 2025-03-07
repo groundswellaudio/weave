@@ -1,7 +1,9 @@
 #pragma once
 
-#include "spiral.hpp"
+#include "weave.hpp"
 #include "Model.hpp"
+
+using namespace weave;
 
 void paint_play_button(painter& p, bool flag, vec2f sz) {
   p.fill_style(colors::white);
@@ -133,16 +135,16 @@ struct LibraryView {
     int artist = -1;
   };
   
-  using view_state = std::unique_ptr<ViewState>;
+  using view_state = ViewState;
   
   auto init_state() {
-    return view_state( new ViewState{songs_t{}} );
+    return ViewState{songs_t{}};
   }
   
   auto left_panel(State& state, view_state& self) {
     using namespace views;
     
-    auto setter = [p = self.get()] (auto v) { return p->selection.setter(v); };
+    auto setter = [p = &self] (auto v) { return p->selection.setter(v); };
     
     auto panel_item = [setter] (auto&& str, auto id) {
       return selectable{text{str}, setter(id)};
@@ -216,39 +218,6 @@ struct LibraryView {
     
     return hstack{left_panel(state, self), center_view};
   }
-};
-
-/// A composite view is a composition of a view state and a body() function 
-/// which is a product of both this view state and the global state.
-template <class T, class State>
-struct composite_view : view<composite_view<T, State>> {
-  
-  using view_state_t = typename T::view_state;
-  
-  using body_t = decltype(std::declval<T&>().body(std::declval<State&>(), std::declval<view_state_t&>()));
-  
-  composite_view(auto&&... args) : definition{args...} {}
-  composite_view(composite_view&&) = default;
-  
-  auto build(const widget_builder& ctx, State& state) {
-    view_state = definition.init_state();
-    definition_body.reset(new optional<body_t>{definition.body(state, view_state)});
-    return (**definition_body).build(ctx, state);
-  }
-  
-  auto rebuild(auto& old, widget_ref r, auto&& up, auto& state) {
-    // Move the value
-    auto old_body = std::move(**old.definition_body);
-    // Move the pointer
-    definition_body = std::move(old.definition_body);
-    view_state = std::move(old.view_state);
-    definition_body->emplace(definition.body(state, view_state));
-    return (**definition_body).rebuild(old_body, r, up, state);
-  }
-  
-  T definition;
-  view_state_t view_state;
-  std::unique_ptr<optional<body_t>> definition_body;
 };
 
 using library_view = composite_view<LibraryView, State>;

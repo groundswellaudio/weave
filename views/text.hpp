@@ -3,7 +3,7 @@
 #include "views_core.hpp"
 #include <string_view>
 
-namespace widgets {
+namespace weave::widgets {
 
 struct text : widget_base
 {
@@ -60,7 +60,7 @@ struct with_label : W {
 
 } // widgets
 
-namespace views {
+namespace weave::views {
 
 struct text : view<text> {
   

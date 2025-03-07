@@ -7,6 +7,8 @@
 #include "views_core.hpp"
 #include "../cursor.hpp"
 
+namespace weave {
+
 struct button_properties {
   bool operator==(const button_properties&) const = default; 
   std::string_view str;
@@ -17,7 +19,9 @@ struct button_properties {
 static constexpr rgba_u8 button_overlay_color = rgba_u8{colors::white}.with_alpha(75);
 static constexpr float button_margin = 5;
 
-namespace widgets {
+}
+
+namespace weave::widgets {
 
 struct toggle_button : widget_base
 {
@@ -115,7 +119,7 @@ struct trigger_button : widget_base {
 
 } // widgets
 
-namespace views {
+namespace weave::views {
 
 template <class Lens>
 struct toggle_button : view<toggle_button<Lens>> {
@@ -196,7 +200,7 @@ using button = trigger_button<Fn>;
 
 } // views
 
-namespace widgets
+namespace weave::widgets
 {
 
 template <class PaintFn>
@@ -263,7 +267,7 @@ struct graphic_trigger_button : widget_base {
 
 } // widgets
 
-namespace views 
+namespace weave::views 
 {
   template <class PaintFn, class WriteFn>
   struct graphic_toggle_button : view<graphic_toggle_button<PaintFn, WriteFn>> {

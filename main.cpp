@@ -1,4 +1,4 @@
-#include "spiral.hpp"
+#include "weave.hpp"
 #include "examples/TextureSynthesis/TextureSynthesis.hpp"
 
 /* 

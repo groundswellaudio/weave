@@ -2,7 +2,7 @@
 
 #include "views_core.hpp"
 
-namespace widgets {
+namespace weave::widgets {
 
 struct progress_bar : widget_base
 {
@@ -12,8 +12,6 @@ struct progress_bar : widget_base
   
   vec2f min_size() const { return {80, 8}; }
   vec2f max_size() const { return {infinity<float>(), 8}; };
-  
-  vec2f expand_factor() const { return {1, 0}; }
   
   void paint(painter& p) {
     p.stroke_style(colors::white);
@@ -25,7 +23,7 @@ struct progress_bar : widget_base
 
 } // widgets
 
-namespace views {
+namespace weave::views {
 
 struct progress_bar : view<progress_bar> {
   

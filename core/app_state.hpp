@@ -1,5 +1,7 @@
 #pragma once
 
+namespace weave {
+
 struct app_state {
   void apply_write(this auto& self, auto&& fn) {
     fn(self);
@@ -8,3 +10,5 @@ struct app_state {
     return (fn(self));
   }
 };
+
+}

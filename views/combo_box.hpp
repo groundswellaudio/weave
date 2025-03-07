@@ -6,7 +6,7 @@
 
 #include <ranges>
 
-namespace widgets {
+namespace weave::widgets {
 
 struct combo_box : widget_base {
 
@@ -58,7 +58,7 @@ struct combo_box : widget_base {
 
 } // widgets
 
-namespace views {
+namespace weave::views {
 
 template <class Lens, class Range = std::vector<std::string>>
 struct combo_box : view<combo_box<Lens, Range>> {

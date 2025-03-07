@@ -8,6 +8,8 @@
 
 #pragma once
 
+namespace weave {
+
 #include <SDL.h>
 
 // the identifier for a (virtual) key
@@ -127,3 +129,5 @@ inline bool is_being_held(keycode k)
   auto* state = SDL_GetKeyboardState(nullptr);
   return state[SDL_GetScancodeFromKey(impl::to_sdl_keycode(k))];
 }
+
+} // weave

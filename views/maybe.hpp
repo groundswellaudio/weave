@@ -5,6 +5,8 @@
 #include "../util/variant.hpp"
 #include "../util/optional.hpp"
 
+namespace weave::views {
+
 template <class View>
 struct maybe : view_sequence_base {
   
@@ -58,13 +60,13 @@ namespace impl {
   
   consteval void with_index(function_builder& b, unsigned max, expr fn) {
     for (int k = 0; k < max; ++k)
-      b << ^ [k, fn] { case k : return (%fn)(Index<k>{}); };
+      b << ^^ [k, fn] { case k : return [:fn:](Index<k>{}); };
   }
   
   template <unsigned Max>
   constexpr auto with_index(unsigned index, auto fn) -> decltype(fn(Index<0>{})) {
     switch(index) {
-      %with_index(Max, ^(fn));
+      [:with_index(Max, ^^(fn)):];
       default : 
         std::unreachable();
     }
@@ -73,7 +75,7 @@ namespace impl {
   template <class... Ts, class... Vs>
   variant<Ts...> make_variant(unsigned index, Vs&&... vs) {
     return with_index<sizeof...(Vs)>(index, [&vs...] <unsigned I> (Index<I>) {
-      return variant<Ts...>{ in_place_index<I>, %(^(vs...)[I]) };
+      return variant<Ts...>{ in_place_index<I>, [:(^^(vs...)[I]):] };
     });
   }
   
@@ -140,3 +142,5 @@ either(int index, Ts... ts) -> either<Ts...>;
 
 template <class... Vs, class... Fn>
 either(variant<Vs...>, Fn... fns) -> either<std::invoke_result_t<Fn, Vs>...>;
+
+} // views

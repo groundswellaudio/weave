@@ -151,7 +151,7 @@ void patch_match_search(const I& examplar, I& generated, search_map& Map, int pa
   
   std::random_device rd;
   std::default_random_engine gen(rd());
-  std::uniform_int_distribution<int> rand{-1000, 1000};
+  std::uniform_int_distribution<int> rand{-10000, 10000};
   
   for_each_pixel( generated, [&] (auto& pix, vec2i idx) {
     auto y = idx[0];
@@ -160,10 +160,13 @@ void patch_match_search(const I& examplar, I& generated, search_map& Map, int pa
     float min_dist = Map(idx).m1;
     vec2i origin = Map(idx).m0;
     
-    for(int distance = 64; distance > 1; distance /= 2)
+    int ratio = 1;
+    int max_size = std::min(examplar.shape()[0], examplar.shape()[1]);
+    
+    for(; max_size / ratio > 1; ratio *= 2)
     {
-      auto rx = rand(gen) % distance;
-      auto ry = rand(gen) % distance;
+      auto rx = rand(gen) % max_size;
+      auto ry = rand(gen) % max_size;
       auto nx = origin.x + rx;
       auto ny = origin.y + ry;
       nx = wrap(nx, 0, examplar.shape().x - 1);
@@ -228,9 +231,10 @@ void patch_match_propagation(I& examplar, I& generated, search_map& Map, int pat
   {
     for (auto x : drop_first(xrange, 1))
     {
+      /* 
       // skip propagation for 30 percent of pixels
       if (distrib(gen) > 70)
-        continue;
+        continue; */ 
       
       auto try_propagate = [&] (int dy, int dx) {
         
@@ -275,6 +279,7 @@ void patch_match_synthesize(I& source, I& generated, search_map& map)
     pix = source(map(idx).m0);
   });
   
+  /* 
   for_point_in( iota(1, generated.shape()[0] - 1), iota(1, generated.shape()[1] - 1), 
                 [&] (vec2i idx) {
                   auto acc = [&] (vec2i delta) {
@@ -290,7 +295,7 @@ void patch_match_synthesize(I& source, I& generated, search_map& map)
                   acc({-1, 0});
                   acc({-1, -1});
                   generated(idx) /= 10;
-                });
+                }); */ 
 }
 
 /// Patch match resynthesis with completeness constraints
@@ -432,6 +437,20 @@ struct PatchMatchMap {
   bool flip_propagation = false;
 };
 
+template <class I, class V>
+void add_noise(I& img, V amplitude) {
+  std::random_device rd;
+  std::default_random_engine gen(rd());
+  using scalar = typename I::pixel_type::scalar;
+  using distrib_t = %distrib_type(^scalar);
+  distrib_t
+    distrib(amplitude, amplitude);
+  for_each_pixel( img, [&] (auto& pix, ignore) {
+    for (auto k : iota(I::pixel_type::channels))
+      pix[k] += distrib(gen);
+  });
+}
+
 struct TextureSynthesis : app_state {
   
   static constexpr auto max_gen_sz = vec2i{1080, 1920};
@@ -492,6 +511,12 @@ struct TextureSynthesis : app_state {
     };
     progress = 0;
     synth_task = std::async(fn);
+  }
+  
+  void inject_noise() {
+    add_noise(generated, 0.1);
+    patch_match_update_distance(examplar, generated, map, patch_hs);
+    refresh_display = true;
   }
   
   void v2() {
@@ -567,12 +592,14 @@ auto make_view(TextureSynthesis& state)
     .disable_if(state.is_working() || state.examplar.empty()),
     trigger_button{ "Save output", &TextureSynthesis::save_image }
     .disable_if(state.is_working()),
+    trigger_button { "Inject noise", &TextureSynthesis::inject_noise }
+    .disable_if(state.is_working()), 
     hstack {
       text( "Generated size" ),
       size_dial(1), 
       size_dial(0), 
       text( "Patch half-size " ), 
-      numeric_field{ &State::patch_hs }.range(3, 20)
+      numeric_field{ &State::patch_hs }.range(3, 20), 
     },
     views::image{ state.examplar, refresh_examplar }.fit({300, 300}), 
     hstack { 

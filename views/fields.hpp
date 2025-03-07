@@ -7,7 +7,7 @@
 #include <cstdlib> // strtod
 #include <format>
 
-namespace widgets {
+namespace weave::widgets {
 
 static constexpr vec2f min_size_field = {50, 15};
 
@@ -27,7 +27,7 @@ struct text_field : widget_base {
   }
   
   vec2f min_size() const { return min_size_field; }
-  vec2f max_size() const { return {infinity<float>(), 15.f}; }
+  vec2f max_size() const { return {100.f, 15.f}; }
   
   vec2f expand_factor() const {
     return {1, 0};
@@ -78,7 +78,7 @@ struct text_field : widget_base {
 
 } // widgets
 
-namespace views {
+namespace weave::views {
 
 template <class Lens>
 struct text_field : view<text_field<Lens>> {
@@ -115,7 +115,7 @@ struct numeric_field_properties {
   double min = 0, max = std::numeric_limits<double>::max();
 };
 
-namespace widgets {
+namespace weave::widgets {
 
 struct numeric_field : widget_base {
   
@@ -134,7 +134,7 @@ struct numeric_field : widget_base {
   }
   
   vec2f min_size() const { return min_size_field; }
-  vec2f max_size() const { return {infinity<float>(), 15.f}; }
+  vec2f max_size() const { return {100.f, 15.f}; }
   
   vec2f expand_factor() const { return {1, 0}; }
   
@@ -197,7 +197,7 @@ struct numeric_field : widget_base {
 
 } // widgets
 
-namespace views {
+namespace weave::views {
 
 template <class Lens>
 struct numeric_field : view<numeric_field<Lens>> {
@@ -245,7 +245,7 @@ numeric_field(Lens) -> numeric_field<make_lens_result<Lens>>;
 
 } // views
 
-namespace widgets {
+namespace weave::widgets {
 
 struct numeric_dial : widget_base 
 {
@@ -285,7 +285,7 @@ struct numeric_dial : widget_base
 
 } // widgets
 
-namespace views {
+namespace weave::views {
 
 template <class L>
 struct numeric_dial : simple_view_for<widgets::numeric_dial, L, numeric_field_properties> {

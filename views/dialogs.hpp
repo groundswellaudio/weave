@@ -5,7 +5,7 @@
 
 #include <ranges>
 
-namespace widgets {
+namespace weave::widgets {
 
 struct popup_menu : widget_base {
   
@@ -168,7 +168,3 @@ inline void enter_popup_menu_relative(event_context& ec, popup_menu m, widget_re
 }
 
 } // widgets
-
-namespace views {
-
-} // views

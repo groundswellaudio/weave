@@ -251,31 +251,7 @@ namespace impl {
   
 } // impl
 
-template <class T, class... Ts>
-struct stack_base : view<stack_base<T, Ts...>>, stack<Ts...> {
-  
-  template <class... Vs>
-  constexpr stack_base(Vs&&... ts) : stack<Ts...>{ {(Vs&&)(ts)...} } {} 
-  
-  stack_base(stack_base&& o) : stack<Ts...>{std::move(o)} {}
-  stack_base(const stack_base&) = default;
-  
-  template <class S>
-  auto build(const widget_builder& ctx, S& state) 
-  {
-    auto Res = impl::build_stack<T>(*this, ctx, state, this->info);
-    return Res;
-  }
-  
-  template <class S>
-  rebuild_result rebuild(stack_base<T, Ts...>& Old, widget_ref wb, const widget_updater& ctx, S& state) {
-    return impl::rebuild_stack<T>(*this, Old, wb, ctx, state);
-  }
-  
-  void destroy(widget_ref wb) {}
-};
-
-namespace widgets {
+namespace weave::widgets {
 
 template <int Axis>
 struct stack : widget_base
@@ -374,8 +350,32 @@ struct flow : widget_base {
 
 } // widgets
 
-namespace views 
+namespace weave::views 
 {
+
+template <class T, class... Ts>
+struct stack_base : view<stack_base<T, Ts...>>, stack<Ts...> {
+  
+  template <class... Vs>
+  constexpr stack_base(Vs&&... ts) : stack<Ts...>{ {(Vs&&)(ts)...} } {} 
+  
+  stack_base(stack_base&& o) : stack<Ts...>{std::move(o)} {}
+  stack_base(const stack_base&) = default;
+  
+  template <class S>
+  auto build(const widget_builder& ctx, S& state) 
+  {
+    auto Res = impl::build_stack<T>(*this, ctx, state, this->info);
+    return Res;
+  }
+  
+  template <class S>
+  rebuild_result rebuild(stack_base<T, Ts...>& Old, widget_ref wb, const widget_updater& ctx, S& state) {
+    return impl::rebuild_stack<T>(*this, Old, wb, ctx, state);
+  }
+  
+  void destroy(widget_ref wb) {}
+};
 
 template <class... Ts>
   requires (is_view_sequence<Ts> && ...)

@@ -16,6 +16,8 @@
 #include "../util/variant.hpp"
 #include "../util/util.hpp"
 
+namespace weave {
+
 struct painter;
 struct widget_builder;
 struct widget_updater;
@@ -30,13 +32,12 @@ struct input_event : variant<mouse_event, keyboard_event> {
 };
 
 struct widget_size_info {
-  vec2f min {0, 0}; 
+  vec2f min {0, 0};
   vec2f max {infinity<float>(), infinity<float>()};
   // vec2f expand_factor {1, 1};
 };
 
 struct layout_context {
-  
   vec2f min{0, 0};
   vec2f max{1000000, 1000000};
 };
@@ -64,6 +65,7 @@ struct widget_base {
   
   vec2f size() const { return sz; }
   vec2f position() const { return pos; }
+  rectangle area() const { return {pos, sz}; }
   
   void set_size(vec2f v) {
     assert( std::abs(v.x) < 1e10 && std::abs(v.y) < 1e10 && "aberrant size value" );
@@ -237,6 +239,7 @@ class widget_ref {
   widget_size_info size_info() const { return vptr->size_info(data); }
   
   vec2f size() const { return data->size(); }
+  rectangle area() const { return data->area(); }
   
   void set_size(vec2f sz) { data->set_size(sz); }
   
@@ -473,3 +476,5 @@ struct widget_updater
   auto& context() const { return ctx; }
   application_context& ctx;
 };
+
+} // weave

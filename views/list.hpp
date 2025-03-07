@@ -7,7 +7,7 @@
 #include <string>
 #include <initializer_list>
 
-namespace widgets {
+namespace weave::widgets {
 
 struct list : widget_base {
   
@@ -64,7 +64,7 @@ struct list : widget_base {
 
 } // widgets
 
-namespace views {
+namespace weave::views {
 
 template <class T>
 struct list : view<list<T>> {
