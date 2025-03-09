@@ -7,6 +7,8 @@
 #include <algorithm>
 #include <concepts>
 
+namespace weave {
+
 struct stack_data {
   float interspace = 8;
   vec2f margin {0, 0};
@@ -251,7 +253,7 @@ namespace impl {
   
 } // impl
 
-namespace weave::widgets {
+namespace widgets {
 
 template <int Axis>
 struct stack : widget_base
@@ -264,7 +266,7 @@ struct stack : widget_base
   
   void paint(painter& p) {
     p.fill_style(data.background_col);
-    p.rectangle({0, 0}, size());
+    p.fill(rectangle(size()));
     // p.stroke_style(colors::green);
     // p.stroke_rect({0, 0}, size(), 2);
   }
@@ -350,7 +352,7 @@ struct flow : widget_base {
 
 } // widgets
 
-namespace weave::views 
+namespace views 
 {
 
 template <class T, class... Ts>
@@ -434,3 +436,5 @@ template <class... Ts>
 flow(float, Ts... ts) -> flow<Ts...>;  
 
 } // views
+
+} // weave

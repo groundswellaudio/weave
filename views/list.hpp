@@ -15,7 +15,7 @@ struct list : widget_base {
   static constexpr float row_size = 13.f;
   
   void on(mouse_event e, event_context& ec) {
-    if (!e.is_mouse_down())
+    if (!e.is_down())
       return;
     auto s = (e.position.y - margin) / row_size;
     if (s > cells.size()) {
@@ -53,7 +53,7 @@ struct list : widget_base {
     
     if (cell_selected != -1) {
       p.fill_style(button_overlay_color);
-      p.rectangle({0, (float) cell_selected * row_size + margin}, {size().x, row_size});
+      p.fill( rectangle({0, (float) cell_selected * row_size + margin}, {size().x, row_size}) );
     }
   }
   

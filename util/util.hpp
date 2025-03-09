@@ -1,7 +1,12 @@
 #pragma once
+#pragma once
 
 #include <iostream>
 #include <limits>
+#include <source_location>
+#include <string_view>
+
+namespace weave {
 
 struct ignore {
   template <class T>
@@ -39,3 +44,14 @@ void debug_log(T val) {
 
 template <class T>
 T infinity() { return std::numeric_limits<T>::infinity(); }
+
+template <class T>
+std::string_view stringify() {
+  auto n = std::source_location::current().function_name();
+  auto&& prefix = "std::string_view stringify() [T =";
+  auto start = n + sizeof(prefix);
+  auto end = n + std::string_view{n}.size() - 1; 
+  return {start, end};
+}
+
+} // weave

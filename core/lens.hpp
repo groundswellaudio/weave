@@ -127,13 +127,16 @@ struct invocable_lens {
   Fn fn;
 };
 
+template <class A, class B>
+auto make_lens(lens_readwrite<A, B> l) {
+  // static_assert( !is_instance_of(^^L, ^^invocable_lens) );
+  return l;
+}
+
 template <class L>
 auto make_lens(L l) {
-  static_assert( !is_instance_of(^^L, ^^invocable_lens) );
-  if constexpr (is_instance_of(^^L, ^^lens_readwrite))
-    return l;
-  else 
-    return invocable_lens{invocable_wrapper{l}};
+  // static_assert( !is_instance_of(^^L, ^^invocable_lens) );
+  return invocable_lens{invocable_wrapper{l}};
 }
 
 template <class A, class B>

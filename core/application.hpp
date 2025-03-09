@@ -113,7 +113,7 @@ namespace impl {
     {
       event_frame_result res;
       
-      if (e.is_mouse_move() && !e.is_mouse_drag())
+      if (e.is_move() && !e.is_drag())
       {
         auto old_focus = focused;
         auto old_pos = focused_absolute_pos;
@@ -289,7 +289,7 @@ struct application_context {
     return backend.is_active(mod);
   }
   
-  ::graphics_context& graphics_context() {
+  graphics_context& graphics_context() {
     return gctx;
   }
   
@@ -357,7 +357,7 @@ struct application_context {
     win.set_max_size(size_info.max);
   }
   
-  sdl_backend backend;
+  impl::sdl_backend backend;
   struct window win;
   struct graphics_context gctx;
   widget_box root, overlay;
@@ -453,7 +453,7 @@ struct application
     {
       event_frame_result frame;
       impl.backend.visit_event( [&, this] (auto&& e) {
-        if constexpr ( remove_reference(type_of(^e)) == ^keyboard_event )
+        if constexpr ( std::is_same_v<std::remove_reference_t<decltype(e)>, keyboard_event> )
           frame = impl.keyboard.on(e, &state, impl);
         else
           frame = impl.med.on(e, &state, impl);

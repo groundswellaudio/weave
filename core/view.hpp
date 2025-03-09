@@ -47,7 +47,7 @@ struct view_sequence_base {
 };
 
 template <class T>
-concept is_view_sequence = is_base_of(^^view_sequence_base, ^^T);
+concept is_view_sequence = std::is_base_of_v<view_sequence_base, T>;
 
 /// The base for a View. Any View is also a ViewSequence, so we implement this here
 template <class T>
@@ -97,14 +97,14 @@ struct simple_view_for : view<simple_view_for<Widget, Lens, Prop>>, Prop {
   simple_view_for(auto lens = {}) : lens{make_lens(lens)} {}
   
   simple_view_for(Lens lens, Prop prop)
-    requires (^Prop != ^ignore)
+    requires (not std::is_same_v<Prop, ignore>)
   : Prop{prop}, lens{lens}
   {
   }
   
   template <class State>
   auto build(const auto& builder, State& state) {
-    if constexpr (^Prop != ^ignore)
+    if constexpr (not std::is_same_v<Prop, ignore>)
       return Widget{(Prop&)*this};
     else
       return Widget{};

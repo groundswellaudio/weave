@@ -1,10 +1,14 @@
 cmake_minimum_required(VERSION 3.10)
 
-set(CMAKE_CXX_STANDARD 26)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -cppmeta")
+set(CMAKE_CXX_STANDARD 23)
 include(FetchContent)
 
 project(Weave)
+
+FetchContent_Declare(swl-variant
+  GIT_REPOSITORY https://github.com/groundswellaudio/swl-variant.git
+  GIT_TAG "origin/main")
+FetchContent_MakeAvailable(swl-variant)
 
 FetchContent_Declare(SDL2
   GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
@@ -31,6 +35,13 @@ FetchContent_Declare(stb
   GIT_REPOSITORY https://github.com/nothings/stb.git)
 FetchContent_MakeAvailable(stb)
 
+FetchContent_Declare(kumi-tuple
+  GIT_REPOSITORY https://github.com/jfalcou/kumi.git
+  GIT_TAG "origin/main")
+
+set(KUMI_BUILD_TEST OFF)
+FetchContent_MakeAvailable(kumi-tuple)
+
 include_directories(./deps/glad/include)
 include_directories(./)
 include_directories(${SDL2_SOURCE_DIR}/include)
@@ -46,17 +57,19 @@ else()
   add_library(Weave STATIC misc/mini_audio_impl.cpp graphics/graphics.cpp)
 endif()
 
-target_include_directories(Spiral PUBLIC 
+target_include_directories(Weave PUBLIC 
   ./deps/glad/include
   ${SDL2_SOURCE_DIR}/include 
   ${nanovg_SOURCE_DIR}/src
   ${nfd_SOURCE_DIR}/include
   ${miniaudio_SOURCE_DIR}
   ${dr_libs_SOURCE_DIR}
-  ${stb_SOURCE_DIR})
+  ${stb_SOURCE_DIR}
+  ${swl-variant_SOURCE_DIR}/include
+  ${kumi-tuple_SOURCE_DIR}/include)
 
-target_sources(Spiral PRIVATE ./deps/glad/src/glad.c)
-target_sources(Spiral PRIVATE ${nanovg_SOURCE_DIR}/src/nanovg.c)
+target_sources(Weave PRIVATE ./deps/glad/src/glad.c)
+target_sources(Weave PRIVATE ${nanovg_SOURCE_DIR}/src/nanovg.c)
 
-target_link_libraries(Spiral SDL2::SDL2main SDL2::SDL2-static)
-target_link_libraries(Spiral nfd)
+target_link_libraries(Weave SDL2::SDL2main SDL2::SDL2-static)
+target_link_libraries(Weave nfd)

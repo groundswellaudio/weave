@@ -80,8 +80,8 @@ struct table : widget_base, scrollable_base {
   void update_properties(auto&& range) {
     auto it = std::ranges::begin(range);
     for (auto& p : properties)
-      p.m0 = *it++;
-    auto pos_end = properties.back().m1;
+      get<0>(p) = *it++;
+    auto pos_end = get<1>(properties.back());
     while (it != std::ranges::end(range))
     {
       pos_end += size().x / std::ranges::size(range);
@@ -187,7 +187,7 @@ struct table : widget_base, scrollable_base {
   
   void on(mouse_event e, event_context& Ec) 
   {
-    if (e.is_mouse_down() && edited_field) {
+    if (e.is_down() && edited_field) {
       edited_field.reset();
       Ec.request_repaint();
     }
@@ -200,7 +200,7 @@ struct table : widget_base, scrollable_base {
       return;
     }
     
-    if (e.is_mouse_down()) {
+    if (e.is_down()) {
       if (e.position.y < first_row) 
         handle_mouse_down_header(e.position);
       else 
@@ -209,13 +209,13 @@ struct table : widget_base, scrollable_base {
       return;
     }
     
-    if (e.is_mouse_drag() && dragging != -1) {
+    if (e.is_drag() && dragging != -1) {
       constexpr float margin = 50;
       int k = dragging;
-      auto& posx = properties[k].m1;
+      auto& posx = get<1>(properties[k]);
       posx = e.position.x;
-      float min = properties[k-1].m1 + margin;
-      auto col_end = k == properties.size() - 1 ? size().x : properties[k + 1].m1;
+      float min = get<1>(properties[k-1]) + margin;
+      auto col_end = k == properties.size() - 1 ? size().x : get<1>(properties[k + 1]);
       if (posx < min)
         posx = min;
       else {
@@ -226,11 +226,11 @@ struct table : widget_base, scrollable_base {
         auto p = edited_field->position();
         if (focused_cell->x == dragging) {
           edited_field->set_position({posx, p.y});
-          auto w = col_end - properties[dragging].m1;
+          auto w = col_end - get<1>(properties[dragging]);
           edited_field->set_size({w, edited_field->size().y});
         }
         else if (focused_cell->x + 1 == dragging) {
-          auto w = properties[dragging].m1 - properties[focused_cell->x].m1; 
+          auto w = get<1>(properties[dragging]) - get<1>(properties[focused_cell->x]); 
           edited_field->set_size( {w, edited_field->size().y} );
         }
       }
@@ -238,7 +238,7 @@ struct table : widget_base, scrollable_base {
       return;
     }
     
-    if (e.is_mouse_up())
+    if (e.is_up())
       dragging = -1;
   }
   
@@ -251,9 +251,9 @@ struct table : widget_base, scrollable_base {
       p.fill_style(rgba{colors::cyan}.with_alpha(70));
       auto pos_y = selection.x * row + first_row;
       if (selection.y != -1)
-        p.rectangle( {0, pos_y}, {size().x, (selection.y - selection.x + 1) * row} );
+        p.fill( rectangle({0, pos_y}, {size().x, (selection.y - selection.x + 1) * row}) );
       else
-        p.rectangle( {0, pos_y}, {size().x, row} );
+        p.fill( rectangle({0, pos_y}, {size().x, row}) );
     }
   }
   
@@ -274,10 +274,10 @@ struct table : widget_base, scrollable_base {
       int k = 0;
       for (auto& prop : c.prop) {
         float width = k == c.prop.size() - 1 
-          ? (size().x - properties[k].m1) 
-          : properties[k+1].m1 - properties[k].m1;
+          ? (size().x - get<1>(properties[k])) 
+          : get<1>(properties[k+1]) - get<1>(properties[k]);
         
-        p.text_bounded({margin + properties[k++].m1, pos + row / 2}, width - margin * 2, prop);
+        p.text_bounded({margin + get<1>(properties[k++]), pos + row / 2}, width - margin * 2, prop);
       }
     }
     
@@ -285,9 +285,9 @@ struct table : widget_base, scrollable_base {
       p.fill_style(rgba{colors::cyan}.with_alpha(70));
       auto pos_y = selection.x * row - scroll_offset;
       if (selection.y != -1)
-        p.rectangle( {0, pos_y}, {size().x, (selection.y - selection.x + 1) * row} );
+        p.fill( rectangle({0, pos_y}, {size().x, (selection.y - selection.x + 1) * row}) );
       else
-        p.rectangle( {0, pos_y}, {size().x, row} );
+        p.fill( rectangle({0, pos_y}, {size().x, row}) );
     }
   }
   
@@ -296,7 +296,8 @@ struct table : widget_base, scrollable_base {
     auto background_col = rgb_f(colors::gray) * 0.3;
     
     p.fill_style(rgba_f(colors::black) * 0.3);
-    p.rectangle({0, 0}, {size().x, first_row});
+    p.fill(rectangle({size().x, first_row})); // header background
+    
     p.font_size(13);
     p.fill_style(colors::white);
     float pos_x = 0;
@@ -312,7 +313,7 @@ struct table : widget_base, scrollable_base {
     }
     
     p.stroke_style(rgba_f(colors::black) * 0.5);
-    p.stroke_rect({0, 0}, size(), 1);
+    p.stroke(area());
     
     {
       auto _ = p.translate({0, first_row});

@@ -2,7 +2,7 @@
 
 #include <limits>
 #include <cmath>
-#include "util/gen-operators.hpp"
+#include <type_traits>
 
 namespace weave {
 
@@ -14,6 +14,38 @@ enum class rgb_encoding {
 template <class T>
 struct rgba;
 
+/* 
+consteval void color_operators(class_builder& b) {
+  b << ^^ struct C {
+    template <operator_kind Op>
+      requires (is_compound_assign(Op))
+    constexpr auto& apply_op(const C& o) {
+      for (int k = 0; k < channels; ++k)
+        ([:make_operator_expr(Op, ^^((*this)[k]), ^^(o[k])):]);
+      return *this;
+    }
+    
+    template <class O, operator_kind Op>
+      requires (!is_compound_assign(Op))
+    constexpr auto apply_op(const O& o) const {
+      auto res {*this};
+      ([:make_operator_expr(compound_equivalent(Op), ^^(res), ^^(o)):]);
+      return res;
+    }
+    
+    template<operator_kind Op>
+      requires (is_compound_assign(Op))
+    constexpr auto& apply_op(C::scalar o) {
+      for (int k = 0; k < channels; ++k)
+        ([:make_operator_expr(Op, ^^((*this)[k]), ^^(o)):]);
+      return *this;
+    }
+    
+    [:declare_arithmetic(^^const C&):];
+    [:declare_arithmetic(^^T):];
+  };
+} */ 
+
 // RGB color in gamma 2.2
 template <class T>
 struct rgb {
@@ -22,7 +54,7 @@ struct rgb {
   static constexpr auto channels = 3;
   
   static constexpr auto norm() {
-    if constexpr (^T == ^float or ^T == ^double)
+    if constexpr (std::is_same_v<T, float> || std::is_same_v<T, double>)
       return 1.f;
     else
       return std::numeric_limits<T>::max();
@@ -43,46 +75,13 @@ struct rgb {
   template <class V>
   constexpr operator rgba<V> () const;
   
-  template <operator_kind Op>
-    requires (is_compound_assign(Op))
-  constexpr auto& apply_op(const rgb<T>& o) {
-    for (int k = 0; k < channels; ++k)
-      (%make_operator_expr(Op, ^((*this)[k]), ^(o[k])));
-    return *this;
-  }
-  
-  template <operator_kind Op>
-    requires (!is_compound_assign(Op))
-  constexpr auto apply_op(const rgb<T>& o) const {
-    auto res {*this};
-    (%make_operator_expr(compound_equivalent(Op), ^(res), ^(o)));
-    return res;
-  }
-  
-   template <operator_kind Op>
-    requires (!is_compound_assign(Op))
-  constexpr auto apply_op(T o) const {
-    auto res {*this};
-    (%make_operator_expr(compound_equivalent(Op), ^(res), ^(o)));
-    return res;
-  }
-  
-  template<operator_kind Op>
-    requires (is_compound_assign(Op))
-  constexpr auto& apply_op(T o) {
-    for (int k = 0; k < channels; ++k)
-      (%make_operator_expr(Op, ^((*this)[k]), ^(o)));
-    return *this;
-  }
-  
-  %declare_arithmetic(^const rgb<T>&);
-  %declare_arithmetic(^T);
+  // [:color_operators()];
   
   T data[3];
 };
 
 template <class T>
-using distance_return_type = %( is_integral(^T) ? ^int : ^T );
+using distance_return_type = std::conditional_t<std::is_integral_v<T>, int, T>; 
 
 template <class T, class X = distance_return_type<T>>
 constexpr X distance_squared(const rgb<T>& a, const rgb<T>& b) 
@@ -142,40 +141,7 @@ struct rgba {
   
   constexpr bool operator==(const rgba<T>& o) const = default;
 
-  template <operator_kind Op>
-    requires (is_compound_assign(Op))
-  constexpr auto& apply_op(const rgba<T>& o) {
-    for (int k = 0; k < channels; ++k)
-      (%make_operator_expr(Op, ^((*this)[k]), ^(o[k])));
-    return *this;
-  }
-  
-  template <operator_kind Op>
-    requires (!is_compound_assign(Op))
-  constexpr auto apply_op(const rgba<T>& o) const {
-    auto res {*this};
-    (%make_operator_expr(compound_equivalent(Op), ^(res), ^(o)));
-    return res;
-  }
-  
-   template <operator_kind Op>
-    requires (!is_compound_assign(Op))
-  constexpr auto apply_op(T o) const {
-    auto res {*this};
-    (%make_operator_expr(compound_equivalent(Op), ^(res), ^(o)));
-    return res;
-  }
-  
-  template<operator_kind Op>
-    requires (is_compound_assign(Op))
-  constexpr auto& apply_op(T o) {
-    for (int k = 0; k < channels; ++k)
-      (%make_operator_expr(Op, ^((*this)[k]), ^(o)));
-    return *this;
-  }
-  
-  %declare_arithmetic(^const rgba<T>&);
-  %declare_arithmetic(^T);
+  // [:color_operators()];
   
   rgb<T> col;
   T alpha = norm();

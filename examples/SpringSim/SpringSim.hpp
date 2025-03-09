@@ -151,7 +151,7 @@ struct Editor : widget_base {
   }
   
   void on_child_event(mouse_event e, event_context<Editor>& ctx, widget_ref child) {
-    if (e.is_mouse_down()) {
+    if (e.is_down()) {
       auto& p = child.as<Particle>();
       auto index = &p - particles.data();
       if (e.is_double_click()) {
@@ -163,13 +163,13 @@ struct Editor : widget_base {
       ctx.read().selection.set_particle(index);
       connecting = tuple{e.position, e.position};
     }
-    else if (e.is_mouse_drag()) {
+    else if (e.is_drag()) {
       if (ctx.context().is_active(key_modifier::shift))
         child.set_position(child.position() + e.mouse_drag_delta());
       else
         get<1>(*connecting) = e.position;
     }
-    else if (e.is_mouse_up()) {
+    else if (e.is_up()) {
       auto w = find_child_at(e.position);
       if (!w) {
         connecting.reset();
@@ -237,20 +237,20 @@ struct Editor : widget_base {
   
   void on(mouse_event e, event_context<Editor>& ec) 
   {
-    if (e.is_mouse_enter())
+    if (e.is_enter())
       ec.grab_keyboard_focus(this);
     
-    if (e.is_mouse_drag() && selection_rect) {
+    if (e.is_drag() && selection_rect) {
       update_selection_rect(e.position, ec);
       return;
     }
     
-    if (e.is_mouse_up()) {
+    if (e.is_up()) {
       selection_rect.reset();
       return;
     }
     
-    if (!e.is_mouse_down())
+    if (!e.is_down())
       return;
     
     if (e.is_double_click()) {

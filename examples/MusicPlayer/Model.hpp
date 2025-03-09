@@ -1,6 +1,6 @@
 #pragma once
 
-#include "spiral.hpp"
+#include "weave.hpp"
 
 #include <taglib/tag.h>
 #include <taglib/fileref.h>
@@ -11,9 +11,11 @@
 #include <set>
 #include <ranges>
 
-struct TrackPlayer : audio_renderer<TrackPlayer>
+using namespace weave;
+
+struct TrackPlayer : weave::audio_renderer<TrackPlayer>
 {
-  void render_audio(audio_output_stream& os) {
+  void render_audio(weave::audio_output_stream& os) {
     if (head == -1)
       return;
     if (head + os.sample_size() > buffer.size()) {
@@ -38,12 +40,12 @@ struct TrackPlayer : audio_renderer<TrackPlayer>
   }
   
   std::atomic<float> volume;
-  audio_buffer buffer;
+  weave::audio_buffer buffer;
   int head = -1;
   std::atomic<bool> done_reading = false;
 };
 
-static optional<image<rgba<unsigned char>>> read_file_cover(const std::string& path) {
+static optional<weave::image<weave::rgba<unsigned char>>> read_file_cover(const std::string& path) {
   TagLib::FileRef f{path.c_str()};
   if (!f.tag())
     return {};
@@ -55,7 +57,7 @@ static optional<image<rgba<unsigned char>>> read_file_cover(const std::string& p
   if (data_it == pic.end())
     return {};
   auto&& data_vec = data_it->second.toByteVector();
-  return decode_image({(unsigned char*)data_vec.data(), data_vec.size()});
+  return weave::decode_image({(unsigned char*)data_vec.data(), data_vec.size()});
 }
 
 struct Database {
@@ -82,7 +84,7 @@ struct Database {
   struct Album { 
     
     // Name and artist
-    using Key = tuple<std::string_view, std::string_view>;
+    using Key = weave::tuple<std::string_view, std::string_view>;
     
     bool less(Key o) const {
       auto [name2, artist_name2] = o;
@@ -115,7 +117,7 @@ struct Database {
     
     std::string name;
     std::string artist_name;
-    image<rgb_u8> cover;
+    weave::image<weave::rgb_u8> cover;
     std::vector<int> tracks;
   };
   
@@ -193,29 +195,29 @@ struct Database {
   }
   
   void try_add_album(Track& track, int track_id) {
-    auto key = tuple{std::string_view{track.album()}, std::string_view{track.artist()}};
+    auto key = weave::tuple{std::string_view{track.album()}, std::string_view{track.artist()}};
     auto it = std::lower_bound(albums.begin(), albums.end(), key);
     if (it == albums.end() || *it != key) {
-      it = albums.insert(it, Album{std::string(key.m0), std::string(key.m1)});
+      it = albums.insert(it, Album{std::string(get<0>(key)), std::string(get<1>(key))});
     }
     if (it->cover.empty()) {
       auto c = read_file_cover(track.file_path);
       if (c)
-        it->cover = c->to<rgb_u8>();
+        it->cover = c->to<weave::rgb_u8>();
     }
     it->tracks.push_back(track_id);
   }
 };
 
 template <>
-struct table_model<std::vector<Database::Track>> {
+struct weave::table_model<std::vector<Database::Track>> {
   auto&& properties(ignore) { return Database::properties_v; }
   auto& cells(auto& self) { return self; }
   auto& cell_properties(Database::Track& t) { return t.properties; }
 };
 
 template <>
-struct table_model<Database::AlbumTracks> {
+struct weave::table_model<Database::AlbumTracks> {
   auto&& properties(ignore) { return Database::properties_v; }
   auto cells(auto& obj) { return obj.tracks(); }
   auto& cell_properties(Database::Track& t) { return t.properties; }
@@ -229,7 +231,7 @@ inline bool is_audio_file(fs::path path) {
         || ext == ".flac" || ext == ".FLAC";
 }
 
-struct State : app_state {
+struct State : weave::app_state {
   
   bool set_play(bool Play) {
     if (Play)
@@ -333,6 +335,6 @@ struct State : app_state {
   Database database;
   bool table_mutated = false;
   
-  image<rgba<unsigned char>> current_cover;
+  weave::image<rgba<unsigned char>> current_cover;
   bool current_cover_updated = false;
 };

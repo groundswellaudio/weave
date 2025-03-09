@@ -32,11 +32,11 @@ struct toggle_button : widget_base
   bool value;
   
   void on(mouse_event e, event_context& ec) {
-    if (e.is_mouse_enter())
+    if (e.is_enter())
       set_mouse_cursor(mouse_cursor::hand);
-    else if (e.is_mouse_exit())
+    else if (e.is_exit())
       set_mouse_cursor(mouse_cursor::arrow);
-    else if (e.is_mouse_down()) {
+    else if (e.is_down()) {
       write(ec, !value);
       value = !value;
     }
@@ -52,14 +52,16 @@ struct toggle_button : widget_base
     p.fill_style(colors::white);
     
     p.stroke_style(rgba_f{colors::white}.with_alpha(0.5));
-    p.stroke_rounded_rect({0, 0}, sz, 6, 1);
+    p.stroke(rounded_rectangle(sz), 1);
+    
+    p.stroke(rounded_rectangle(sz));
     
     // p.circle({button_radius, button_radius}, button_radius);
     
     if (value)
     {
       p.fill_style(prop.active_color);
-      p.fill_rounded_rect({0, 0}, sz, 6);
+      p.fill(rounded_rectangle(sz, 6));
       //p.circle({button_radius, button_radius}, 6);
     } 
     
@@ -79,17 +81,19 @@ struct trigger_button : widget_base {
   bool hovered = false;
   float text_width = 20;
   
-  vec2f min_size() const { return {30, 20}; }
-  vec2f max_size() const { return {text_width + 20, 20}; }
+  static constexpr point margin = {10, 4};
+  
+  vec2f min_size() const { return point{10, font_size} + 2 * margin; }
+  vec2f max_size() const { return point{text_width, font_size} + 2 * margin; }
   
   void on(mouse_event e, event_context& ec) {
     if (disabled)
       return;
-    if (e.is_mouse_enter()) 
+    if (e.is_enter()) 
       (hovered = true, ec.request_repaint());
-    else if (e.is_mouse_exit())
+    else if (e.is_exit())
       (hovered = false, ec.request_repaint());
-    if (!e.is_mouse_down())
+    if (!e.is_down())
       return;
     on_click(ec);
   }
@@ -103,11 +107,11 @@ struct trigger_button : widget_base {
   void paint(painter& p) 
   {
     p.stroke_style(colors::white);
-    p.stroke_rounded_rect({0, 0}, size(), 6, 1);
+    p.stroke(rounded_rectangle(size()), 1);
     
     if (hovered) {
       p.fill_style(button_overlay_color);
-      p.fill_rounded_rect({0, 0}, size(), 6);
+      p.fill(rounded_rectangle(size()));
     }
     
     p.font_size(font_size);
@@ -144,15 +148,16 @@ struct toggle_button : view<toggle_button<Lens>> {
   button_properties properties;
 };
 
+/// The view of a trigger button.
 template <class Fn>
-struct trigger_button : view<trigger_button<Fn>> {
+struct button : view<button<Fn>> {
   
   using widget_t = widgets::trigger_button;
   
   template <class T>
-  trigger_button(T str, Fn fn) : str{str}, fn{fn} {} 
+  button(T str, Fn fn) : str{str}, fn{fn} {} 
   
-  trigger_button(const trigger_button&) = default;
+  button(const button&) = default;
   
   auto text_bounds(application_context& ctx) {
     return ctx.graphics_context().text_bounds(str, font_size);
@@ -173,11 +178,25 @@ struct trigger_button : view<trigger_button<Fn>> {
   }
   
   template <class State>
-  rebuild_result rebuild(trigger_button<Fn>& Old, widget_ref w, auto&& up, State& s) {
+  rebuild_result rebuild(button<Fn>& Old, widget_ref w, auto&& up, State& s) {
     auto& b = w.as<widget_t>();
+    rebuild_result res;
     b.set_disabled(disabled);
-    b.str = str;
-    b.font_size = font_size;
+    bool update_bounds = false; 
+    if (b.str != str) {
+      b.str = str;
+      update_bounds = true;
+    }
+    if (font_size != b.font_size) {
+      b.font_size = font_size;
+      update_bounds = true;
+    }
+    if (update_bounds) {
+      auto sz = text_bounds(up.context());
+      b.text_width = sz.x;
+      res |= rebuild_result::size_change;
+    }
+    b.on_click = [f = fn] (auto& ec) { context_invoke<State>(f, ec); };
     return {};
   }
   
@@ -186,6 +205,8 @@ struct trigger_button : view<trigger_button<Fn>> {
     return *this;
   }
   
+  private : 
+  
   std::string_view str;
   Fn fn;
   float font_size = 11;
@@ -193,10 +214,7 @@ struct trigger_button : view<trigger_button<Fn>> {
 };
 
 template <class T, class Fn>
-trigger_button(T, Fn) -> trigger_button<Fn>; 
-
-template <class Fn>
-using button = trigger_button<Fn>;
+button(T, Fn) -> button<Fn>;
 
 } // views
 
@@ -217,11 +235,11 @@ struct graphic_toggle_button : widget_base {
   // vec2f expand_factor() const { return {0, 0}; }
   
   void on(mouse_event e, event_context& ec) {
-    if (e.is_mouse_enter())
+    if (e.is_enter())
       (hovered = true, ec.request_repaint());
-    else if (e.is_mouse_exit())
+    else if (e.is_exit())
       (hovered = false, ec.request_repaint());
-    else if (e.is_mouse_down()) {
+    else if (e.is_down()) {
       flag = !flag;
       write(ec, flag);
     }
@@ -231,7 +249,7 @@ struct graphic_toggle_button : widget_base {
     std::invoke(paint_fn, p, flag, size());
     if (hovered) {
       p.fill_style(button_overlay_color);
-      p.rounded_rectangle({0, 0}, size(), 6);
+      p.fill( rounded_rectangle(size()) );
     }
   }
 };
@@ -248,11 +266,11 @@ struct graphic_trigger_button : widget_base {
   vec2f max_size() const { return size(); }
   
   void on(mouse_event e, event_context& ec) {
-    if (e.is_mouse_enter())
+    if (e.is_enter())
       (hovered = true, ec.request_repaint());
-    else if (e.is_mouse_exit())
+    else if (e.is_exit())
       (hovered = false, ec.request_repaint());
-    else if (e.is_mouse_down())
+    else if (e.is_down())
       on_click(ec);
   }
   
@@ -260,7 +278,7 @@ struct graphic_trigger_button : widget_base {
     std::invoke(paint_fn, p, size());
     if (hovered) {
       p.fill_style(button_overlay_color);
-      p.rounded_rectangle({0, 0}, size(), 6);
+      p.fill(rounded_rectangle(size()));
     }
   }
 };
@@ -303,27 +321,39 @@ namespace weave::views
   };
   
   template <class PaintFn, class Payload>
-  struct graphic_trigger_button : view<graphic_trigger_button<PaintFn, Payload>> {
+  struct graphic_button : view<graphic_button<PaintFn, Payload>> {
     
-    graphic_trigger_button (PaintFn P, Payload W) 
+    graphic_button (PaintFn P, Payload W) 
     : paint_fn{P}, payload{W} {}
+    
+    using widget_t = widgets::graphic_trigger_button<PaintFn>;
     
     template <class S>
     auto build(const widget_builder& b, S& state) {
-      widgets::graphic_trigger_button<PaintFn> res {{size_v}, paint_fn, {}};
-      res.on_click = [w = payload] (event_context& ec) {
-        context_invoke<S>(w, ec);
-      };
+      widget_t res {{size_v}, paint_fn, {}};
+      res.on_click = action<S>();
       return res;
     }
     
-    rebuild_result rebuild(ignore Old, widget_ref w, ignore, ignore) {
+    template <class S>
+    rebuild_result rebuild(ignore Old, widget_ref w, ignore, S& state) {
+      auto& b = w.as<widget_t>();
+      b.on_click = action<S>();
       return {};
     }
     
     auto& size(vec2f sz) {
       size_v = sz;
       return *this;
+    }
+    
+    private : 
+    
+    template <class S>
+    auto action() const { 
+      return [w = payload] (event_context& ec) {
+        context_invoke<S>(w, ec);
+      };
     }
     
     vec2f size_v = {20, 20};

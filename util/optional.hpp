@@ -2,4 +2,6 @@
 
 #include <optional>
 
-using std::optional;
+namespace weave {
+  using std::optional;
+}

@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 
-set(CMAKE_CXX_STANDARD 26)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -cppmeta")
+set(CMAKE_CXX_STANDARD 23)
 include(FetchContent)
 
 project(MusicPlayer)
@@ -13,7 +12,7 @@ FetchContent_Declare(filesystem
   GIT_REPOSITORY https://github.com/gulrak/filesystem.git)
 FetchContent_MakeAvailable(filesystem)
 
-add_subdirectory(../../ Spiral)
+add_subdirectory(../../ Weave)
 include_directories(../../)
 
 include_directories(${TagLib_SOURCE_DIR})
@@ -23,4 +22,4 @@ add_executable(MusicPlayer main.cpp)
 
 target_include_directories(MusicPlayer PUBLIC ${TagLib_SOURCE_DIR})
 
-target_link_libraries(MusicPlayer Spiral TagLib::tag)
+target_link_libraries(MusicPlayer Weave TagLib::tag)

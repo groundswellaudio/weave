@@ -31,18 +31,18 @@ struct scrollable_base {
   }
   
   bool on(this auto& self, mouse_event e, event_context& ec) {
-    if (e.is_mouse_scroll()) 
+    if (e.is_scroll()) 
       return (self.scrollbar_move(e.scroll_delta().y, ec), true);
-    else if (e.is_mouse_drag() && self.is_dragging) 
+    else if (e.is_drag() && self.is_dragging) 
       return (self.scrollbar_move(e.drag_delta().y, ec), true);
-    else if (self.scrollbar_rect().contains(e.position) && e.is_mouse_down())
+    else if (self.scrollbar_rect().contains(e.position) && e.is_down())
       return (self.is_dragging = true, true);
     self.is_dragging = false;
     return false;
   }
   
   void on_child_event(this auto& self, mouse_event e, event_context& ec) {
-    if (e.is_mouse_scroll())
+    if (e.is_scroll())
       self.scrollbar_move(e.scroll_delta(), ec);
   }
   
@@ -50,7 +50,7 @@ struct scrollable_base {
     p.fill_style(colors::gray);
     auto r = self.scrollbar_rect();
     if (r.size.y != self.scroll_zone().size.y)
-      p.rounded_rectangle(r.origin, r.size, 6);
+      p.fill(rounded_rectangle(r));
   }
   
   private : 

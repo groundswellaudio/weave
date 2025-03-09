@@ -9,10 +9,11 @@
 #include "events/mouse_events.hpp"
 #include "events/keyboard.hpp"
 
+#include "../geometry/geometry.hpp"
+
 #include "lens.hpp"
 #include "../util/tuple.hpp"
 #include "../util/optional.hpp"
-#include "../util/meta.hpp"
 #include "../util/variant.hpp"
 #include "../util/util.hpp"
 
@@ -25,10 +26,10 @@ struct event_context;
 
 struct input_event : variant<mouse_event, keyboard_event> {
   using variant<mouse_event, keyboard_event>::variant;
-  bool is_mouse_event() const { return index() == 0; }
-  auto& mouse() { return get<0>(); }
-  bool is_keyboard_event() const { return index() == 1; }
-  auto& keyboard() { return get<1>(); }
+  bool is_mouse() const { return index() == 0; }
+  auto& mouse() { return get<0>(*this); }
+  bool is_keyboard() const { return index() == 1; }
+  auto& keyboard() { return get<1>(*this); }
 };
 
 struct widget_size_info {
@@ -41,12 +42,6 @@ struct layout_context {
   vec2f min{0, 0};
   vec2f max{1000000, 1000000};
 };
-
-consteval std::meta::expr to_str(std::meta::type t) {
-  std::meta::ostream os;
-  os << t;
-  return make_literal_expr(os);
-}
 
 template <class T>
 auto& operator<<(std::ostream& os, const vec<T, 2>& v) {
@@ -76,8 +71,8 @@ struct widget_base {
   void debug_dump(this auto& self, int indent = 0) {
     for (int k = 0; k < indent; ++k)
       std::cerr << '\t';
-    using T = %remove_reference(type_of(^self));
-    std::cerr << %stringify(canonical(^T)) << " " << self.position() << " " << self.size();
+    using T = std::remove_reference_t<decltype(self)>;
+    std::cerr << stringify<T>() << " " << self.position() << " " << self.size();
     auto info = self.size_info();
     std::cerr << " minmax " << info.min << " " << info.max;
     if constexpr ( widget_has_children<T> ) {
@@ -178,7 +173,7 @@ class widget_ref {
   widget_ref() : data{nullptr} {}
   
   template <class W>
-    requires (is_base_of(^widget_base, ^W))
+    requires (std::is_base_of_v<widget_base, W>)
   widget_ref(W* widget) {
     data = widget;               
     vptr = &impl::widget_vtable_impl<std::remove_const_t<W>>::value;
@@ -216,7 +211,7 @@ class widget_ref {
   }
   
   template <class T>
-    requires (is_base_of(^widget_base, ^T))
+    requires (std::is_base_of_v<widget_base, T>)
   bool is() const {
     return vptr == &impl::widget_vtable_impl<std::remove_const_t<T>>::value;
   }
@@ -269,7 +264,7 @@ struct widget_box : widget_ref {
   widget_box(std::nullptr_t) : widget_ref{nullptr, nullptr} {}
   
   template <class W>
-    requires (is_base_of(^widget_base, remove_reference(^W)))
+    requires (std::is_base_of_v<widget_base, std::remove_reference_t<W>>)
   widget_box(W&& widget) {
     data = new std::decay_t<W> { (W&&)widget };
     vptr = &impl::widget_vtable_impl<std::decay_t<W>>::value;
@@ -309,7 +304,7 @@ struct widget_box : widget_ref {
 namespace impl {
   
   template <class T>
-    requires (is_base_of(^widget_base, remove_reference(^T)))
+    requires (std::is_base_of_v<widget_base, std::remove_reference_t<T>>)
   widget_ref to_widget_ref(T&& val) {
     return widget_ref{&val};
   }

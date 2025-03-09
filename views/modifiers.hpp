@@ -33,7 +33,7 @@ struct event_listener : W {
 namespace weave::views {
 
 template <class V, class Filter, class Action>
-struct event_listener : view<on_click<V, Filter, Action>> {
+struct event_listener : view<event_listener<V, Filter, Action>> {
   using widget_t = widgets::event_listener<typename V::widget_t>;
   
   event_listener(auto&& v, Filter filter, Action action) : view{v}, filter{filter}, action{action} {}
@@ -54,18 +54,20 @@ struct event_listener : view<on_click<V, Filter, Action>> {
   Action action;
 };
 
-template <class V, class Fn>
-event_listener(V, Fn fn) -> on_click<V, Fn>;
+template <class V, class Filter, class Fn>
+event_listener(V, Filter filter, Fn fn) -> event_listener<V, Filter, Fn>;
 
 inline bool is_mouse_down(input_event e) {
-  return e.is_mouse_event() && e.mouse().is_mouse_down();
+  return e.is_mouse() && e.mouse().is_down();
 }
 
 inline bool is_key_down(input_event e) {
   return e.is_keyboard() && e.keyboard().is_key_down();
 }
 
-struct with_event_modifiers {
+/// Common extensions for views.
+
+struct view_modifiers {
 
   struct is_this_key_down {
     bool operator()(input_event e) const { return is_key_down(e) && e.keyboard().key == key; }

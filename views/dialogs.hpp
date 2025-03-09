@@ -29,8 +29,9 @@ struct popup_menu : widget_base {
   
   template <class Str, class Fn>
   void add_element(Str&& str, Fn fn) {
-    constexpr bool is_submenu_opener 
-      = ^decltype(std::invoke(fn, std::declval<event_context&>())) == ^popup_menu;  
+    constexpr bool is_submenu_opener = std::is_same_v<popup_menu, 
+      decltype(std::invoke(fn, std::declval<event_context&>()))
+    >;
     auto action = [fn] (event_context& ec) -> optional<popup_menu> {
       if constexpr (is_submenu_opener)
         return std::invoke(fn, ec);
@@ -63,12 +64,12 @@ struct popup_menu : widget_base {
   
   void on(mouse_event e, event_context& ec) 
   {
-    if (e.is_mouse_down())
+    if (e.is_down())
     {
       if (hovered != -1 && !elements[hovered].is_submenu_opener)
         elements[hovered].action(ec);
     }
-    else if (e.is_mouse_move()) 
+    else if (e.is_move()) 
     {
       auto next_hovered = e.position.y / row_size;
       if (next_hovered == hovered)
@@ -88,9 +89,9 @@ struct popup_menu : widget_base {
   
   void paint(painter& p) {
     p.fill_style(rgb_f(colors::gray) * 0.35);
-    p.fill_rounded_rect({0, 0}, size(), 6);
+    p.fill(rounded_rectangle(size()));
     p.stroke_style(colors::black);
-    p.stroke_rounded_rect({0, 0}, size(), 6);
+    p.stroke(rounded_rectangle(size()));
     float pos = margin.y;
     p.fill_style(colors::white);
     p.font_size(13);
@@ -102,7 +103,8 @@ struct popup_menu : widget_base {
     
     if (hovered != -1) {  
       p.fill_style(rgba_f{colors::cyan}.with_alpha(0.3));
-      p.rectangle({0, hovered * row_size + margin.y}, {size().x, row_size});
+      auto overlay = rectangle({0, row_size + margin.y}, {size().x, row_size}); 
+      p.fill(overlay);
     }
   }
 };
@@ -121,7 +123,7 @@ struct popup_menu_stack : widget_base {
   }
   
   void on(mouse_event e, event_context& ec) {
-    if (e.is_mouse_down())
+    if (e.is_down())
       ec.pop_overlay();
   }
   

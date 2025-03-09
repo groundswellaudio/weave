@@ -28,8 +28,8 @@ struct combo_box : widget_base {
   }
   
   void on(mouse_event e, event_context& ec) {
-    hovered = e.is_mouse_enter() ? true : e.is_mouse_exit() ? false : hovered;
-    if (!e.is_mouse_down())
+    hovered = e.is_enter() ? true : e.is_exit() ? false : hovered;
+    if (!e.is_down())
       return;
     popup_menu m;
     int k = 0;
@@ -42,11 +42,11 @@ struct combo_box : widget_base {
   
   void paint(painter& p) {
     p.stroke_style(colors::white);
-    p.stroke_rounded_rect({0, 0}, size(), 6);
+    p.stroke(rounded_rectangle(size()));
     
     if (hovered) {
       p.fill_style(rgba_f{colors::white}.with_alpha(0.3));
-      p.fill_rounded_rect({0, 0}, size(), 6);
+      p.fill(rounded_rectangle(size()));
     }
     
     p.fill_style(colors::white);
@@ -72,9 +72,9 @@ struct combo_box : view<combo_box<Lens, Range>> {
   
   decltype(auto) make_string_vec() {
     using Res = StringVec;
-    if constexpr (^Range == ^Res) 
+    if constexpr (std::is_same_v<Range, Res>)
       return (choices);
-    else if constexpr (^Range == ^audio_devices_range) {
+    else if constexpr (std::is_same_v<Range, audio_devices_range>) {
       Res vec;
       for (auto h : choices)
         vec.emplace_back(h.name());

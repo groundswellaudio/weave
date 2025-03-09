@@ -8,11 +8,11 @@ using namespace weave;
 void paint_play_button(painter& p, bool flag, vec2f sz) {
   p.fill_style(colors::white);
   if (!flag)
-    p.triangle({0, 0}, {0, sz.y}, {sz.x, sz.y / 2});
+    p.fill(triangle({0, 0}, {0, sz.y}, {sz.x, sz.y / 2}));
   else {
     auto rsz = vec2f{sz.x / 5, sz.y};
-    p.rectangle({1 * sz.x / 5, 0}, rsz);
-    p.rectangle({3 * sz.x / 5, 0}, rsz);
+    p.fill( rectangle(rsz).translated({1 * sz.x / 5, 0}) );
+    p.fill( rectangle(rsz).translated({3 * sz.x / 5, 0}) );
   }
 }
 
@@ -24,16 +24,18 @@ void paint_transport_button(painter& p, vec2f sz) {
   sz -= 3;
   
   if (Direction) {
-    p.triangle({0, 0}, {0, sz.y}, sz / 2);
-    p.triangle({sz.x / 2, 0}, {sz.x / 2, sz.y}, {sz.x, sz.y / 2});
+    auto tri = triangle({0, 0}, {0, sz.y}, sz / 2);
+    p.fill( tri );
+    p.fill( tri.translated({sz.x, 0}) );
   }
   else {
     auto a = vec2f{0, sz.y / 2};
     auto b = vec2f{sz.x / 2, 0};
     auto c = vec2f{sz.x / 2, sz.y};
-    p.triangle(a, b, c);
-    auto o = vec2f{sz.x / 2, 0};
-    p.triangle(a + o, b + o, c + o);
+    auto tri = triangle{a, b, c};
+    
+    p.fill(tri);
+    p.fill(tri.translated({sz.x / 2, 0}));
   }
 }
 
@@ -51,8 +53,8 @@ void on_file_drop(event_context& ec, const std::string& path_str) {
   auto dialog = vstack{ 
     text{"Import all audio files from directory?"},
     hstack{
-      trigger_button{"Yes", yes},
-      trigger_button{"Cancel", &event_context::pop_overlay}    
+      button{"Yes", yes},
+      button{"Cancel", &event_context::pop_overlay}    
     }
   }.background(rgb_f(colors::gray) * 0.3);
   
@@ -68,9 +70,9 @@ auto top_panel(State& state)
   
   return hstack {
     hstack {
-      graphic_trigger_button{&paint_transport_button<false>, &State::previous_track},
+      graphic_button{&paint_transport_button<false>, &State::previous_track},
       graphic_toggle_button{&paint_play_button, state.is_playing, &State::set_play}.size({20, 20}),
-      graphic_trigger_button{&paint_transport_button<true>, &State::next_track}
+      graphic_button{&paint_transport_button<true>, &State::next_track}
     },
     text{state.current_track_name()},
     slider{ [] (auto& s) -> auto& { return s.player.volume; } }
@@ -195,7 +197,7 @@ struct LibraryView {
           for_each(state.database.albums, [p = self.get(), k = 0] (auto& a) mutable {
             auto setter = p->selection.setter(album_id{k++});
             return vstack {
-              on_click{views::image{a.cover, false}.fit({100, 100}), setter},
+              views::image{a.cover, false}.fit({100, 100}).on_click(setter),
               text{a.name}
             };
           })
@@ -220,7 +222,7 @@ struct LibraryView {
   }
 };
 
-using library_view = composite_view<LibraryView, State>;
+using library_view = weave::views::composite_view<LibraryView, State>;
 
 auto make_view(State& state)
 {

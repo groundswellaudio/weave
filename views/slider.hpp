@@ -39,7 +39,7 @@ struct slider : widget_base
   
   void on(mouse_event e, EvCtx& ec) 
   {
-    if (!e.is_mouse_drag() && !e.is_mouse_down())
+    if (!e.is_drag() && !e.is_down())
       return;
     
     auto sz = size();
@@ -56,14 +56,14 @@ struct slider : widget_base
   {
     auto sz = size();
     p.fill_style(prop.background_color);
-    p.fill_rounded_rect({0, 0}, sz, 6);
+    p.fill(rounded_rectangle(sz));
     p.fill_style(prop.active_color);
     auto e = (value - prop.min) / (prop.max - prop.min);
-    p.rectangle({0, 0}, {e * sz.x, sz.y});
+    p.fill(rounded_rectangle({e * sz.x, sz.y}));
     
     static constexpr auto outline_col = rgba_f{colors::white}.with_alpha(0.5);
     p.stroke_style(outline_col);
-    p.stroke_rounded_rect({0, 0}, sz, 6, 1);
+    p.stroke(rounded_rectangle(sz));
     
     p.fill_style(colors::white);
     p.text_align(text_align::x::center, text_align::y::center);
@@ -74,7 +74,7 @@ struct slider : widget_base
 
 } // widgets
 
-namespace views {
+namespace weave::views {
 
 template <class Lens>
 struct slider : view<slider<Lens>> {

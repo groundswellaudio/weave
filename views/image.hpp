@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../util/optional.hpp"
+#include "modifiers.hpp"
 
 namespace weave::widgets {
 
@@ -8,7 +9,7 @@ struct image : widget_base {
   
   optional<texture_handle> texture;
   vec2f max_size;
-  vec2i corner_offset;
+  vec2f corner_offset;
   
   widget_size_info size_info() const {
     if (!texture)
@@ -37,7 +38,7 @@ struct image : widget_base {
     if (!texture)
       return;
     p.fill_style(*texture, -corner_offset, size());
-    p.rectangle({0, 0}, size());
+    p.fill(area());
     // p.stroke_style(colors::red);
     // p.stroke_rect({0, 0}, size());
   }
@@ -50,7 +51,7 @@ namespace weave::views {
 static constexpr auto default_image_proj = [] (auto&& pix) { return pix; };
 
 template <class ImgT, class Proj = decltype(default_image_proj)>
-struct image : view<image<ImgT, Proj>> {
+struct image : view<image<ImgT, Proj>>, view_modifiers {
   
   using widget_t = widgets::image;
   
@@ -124,7 +125,7 @@ struct image : view<image<ImgT, Proj>> {
   private : 
   
   texture_handle make_texture(application_context& ctx) {
-    if constexpr (std::is_same_v<ImgT, weave::image<rgba<unsigned char>>) 
+    if constexpr (std::is_same_v<ImgT, weave::image<rgba<unsigned char>>>) 
       return ctx.graphics_context().create_texture(img, img.shape());
     else {
       weave::image<rgba<unsigned char>> tex;

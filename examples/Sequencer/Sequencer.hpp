@@ -49,9 +49,9 @@ struct sequencer_view {
       })
       .on_key_down( keycode::arrow_left )
       .on_child_event( [p = &state, first_pos = vec2f{0, 0}] (mouse_event e, event_context& ec, widget_ref child) {
-        if (e.is_mouse_down())
+        if (e.is_down())
           first_pos = (int) e.position.x / p->grid_scale;
-        if (e.is_mouse_drag()) {
+        if (e.is_drag()) {
           auto new_pos = (int) e.position.x / p->grid_scale;
           if (new_pos != first_pos) {
             ec.state<State>().move_notes(p->selection, new_pos - first_pos);

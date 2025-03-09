@@ -15,9 +15,9 @@ struct progress_bar : widget_base
   
   void paint(painter& p) {
     p.stroke_style(colors::white);
-    p.stroke_rounded_rect({0, 0}, size(), 6, 1);
+    p.stroke(rounded_rectangle(size()));
     p.fill_style(rgba_f{colors::cyan}.with_alpha(0.3));
-    p.fill_rounded_rect({0, 0}, {size().x * ratio, size().y}, 6);
+    p.fill(rounded_rectangle({size().x * ratio, size().y}));
   }
 };
 

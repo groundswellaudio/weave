@@ -61,16 +61,11 @@ struct text_field : widget_base {
   }
   
   void paint(painter& p) {
-    p.fill_style(colors::black);
-    p.rectangle({0, 0}, size());
+    p.fill_style(editing ? colors::red : colors::black);
+    p.fill(area());
     p.fill_style(colors::white);
     p.stroke_style(colors::white);
-    if (editing) {
-      p.fill_style(colors::red);
-      p.rectangle({0, 0}, size());
-      p.fill_style(colors::white);
-    }
-    p.stroke_rounded_rect({0, 0}, size(), 6);
+    p.stroke(rounded_rectangle(size()));
     p.text_align(text_align::x::left, text_align::y::center);
     p.text(vec2f{5, size().y / 2}, value_str);
   }
@@ -186,10 +181,10 @@ struct numeric_field : widget_base {
   
   void paint(painter& p) {
     p.fill_style(colors::black);
-    p.rectangle({0, 0}, size());
-    p.fill_style(colors::white);
+    p.fill(area());
     p.stroke_style(colors::white);
-    p.stroke_rounded_rect({0, 0}, size(), 6);
+    p.stroke(rounded_rectangle(size()));
+    p.fill_style(colors::white);
     p.text_align(text_align::x::center, text_align::y::center);
     p.text(size() / 2, value_str);
   }
@@ -211,7 +206,7 @@ struct numeric_field : view<numeric_field<Lens>> {
     auto init_val = lens.read(state);
     auto res = widget_t{{50, 15}, prop, (double)init_val};
     res.update_str();
-    res.accept_decimal = is_floating_point(type_of(^init_val));
+    res.accept_decimal = std::is_floating_point_v<decltype(init_val)>;
     res.write = [a = lens] (event_context& ec, double value) {
       ec.request_rebuild();
       a.write(ec.state<S>(), value);
@@ -259,9 +254,9 @@ struct numeric_dial : widget_base
   write_fn<float> write;
   
   void on(mouse_event e, event_context& ec) {
-    if (e.is_mouse_down())
+    if (e.is_down())
       mult_mod = (1.f - 3 * e.position.x / size().x);
-    else if (e.is_mouse_drag())
+    else if (e.is_drag())
     {
       auto delta = - std::pow(10, mult_mod) * e.drag_delta().y;
       auto NewVal = std::clamp<float>( value + delta, prop.min, prop.max );
@@ -272,7 +267,7 @@ struct numeric_dial : widget_base
   
   void paint(painter& p) {
     p.stroke_style(colors::white);
-    p.stroke_rounded_rect({0, 0}, size(), 6);
+    p.stroke(rounded_rectangle(size()));
     p.font_size(13.f);
     p.fill_style(colors::white);
     auto str = std::format("{:.2f}", value);

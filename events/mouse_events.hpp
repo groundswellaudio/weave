@@ -52,7 +52,7 @@ struct mouse_event {
   template <class T>
   auto& get_as(this auto&& self) { return get<T>(self.event); }
   
-  bool is_double_click() const { return is_mouse_down() && get_as<mouse_down>().double_click; }
+  bool is_double_click() const { return is_down() && get_as<mouse_down>().double_click; }
   vec2f scroll_delta() const { return get_as<mouse_scroll>().delta; }
   bool is_scroll() const { return is<mouse_scroll>(); }
   bool is_enter() const { return is<mouse_enter>(); }
@@ -71,7 +71,7 @@ struct mouse_event {
 };
 
 template <class T, class... Ts>
-static constexpr auto is_one_of = ((^T == ^Ts) or ...);
+static constexpr auto is_one_of = ((std::is_same_v<T, Ts>) or ...);
 
 template <class T>
 concept is_mouse_event = is_one_of<T, mouse_enter, mouse_exit, mouse_down, mouse_up, mouse_move, mouse_scroll>;

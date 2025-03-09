@@ -2,6 +2,8 @@
 
 #include <ranges>
 
+namespace weave { 
+
 inline constexpr auto iota(int k) {
   return std::ranges::iota_view(0, k);
 }
@@ -14,3 +16,5 @@ template <class Range>
 inline constexpr auto enumerate(Range&& range) {
   return std::views::join((Range&&) range, iota(range.size()));
 }
+
+} // weave

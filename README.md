@@ -2,9 +2,8 @@
 
 weave is a declarative UI library for C++, inspired by the likes of ImGUI, SwiftUI, and xilem.
 
-It's based on a high level description of UI elements (called "views") that is rebuilt 
-on every action, which is is translated to the UI elements (called "widgets") and update 
-them whenever needed.
+Its goal is to provide a terse, declarative API (like ImGUI) for designing user interfaces, 
+while offering the extensibility of traditional UI libraries. 
 
 ## Hello world
 
@@ -30,12 +29,13 @@ int main() {
 }
 ```
 
-On a click of the button, a `rebuild` is triggered, and the text is updated.
+The views are the high level description of the user interface. Roughly every time an user 
+action is triggered, the view constructor (`make_view`) is run and compared against the old 
+version to provide updates.
 
-Note that the button above does not take a callback containing a reference (which is avoided
-as much as possible) : the user provided state is passed again to views on building/updating 
-the widgets, and again to widgets, which operates on an abstract state, thanks to a layer of 
-type erasure.
+Note that the button above does not take a callback containing a reference : the user 
+state is passed down to views and widgets. One of the design goal of `weave` is to 
+reduce as much as possible the need to store references. 
 
 ## The widgets API 
 
@@ -68,7 +68,7 @@ struct button : widget_base {
 };
 ```
 
-### Widget tree
+### The widget tree
 
 Some widgets have children. The only thing that a widget needs to do in order 
 to make its children available to the tree traversal is to declare a function 
@@ -101,3 +101,19 @@ above. It could turns out that a `rebuild` triggered by an interaction from a fi
 invalidate the reference held by weave for dispatching mouse events, or maybe we know 
 that a change from a field cannot change the quantity from which the fields are instantiated, 
 so that unique address might not be needed.
+
+## State mutation 
+
+A lot of views (sliders, fields, knobs...) are both state displayer and mutator. 
+These views always need to be passed two things : a value to read, and an invokable 
+to write. In weave this pair is called a `read_write`. 
+In some cases, those two things can be passed at once, for example 
+by passing a pointer to member or any invokable returning a reference : 
+
+```cpp
+auto make_app(State& s) {
+  auto s  = views::slider{ &State::x }; 
+  auto s2 = views::slider{ [] (State& s) -> auto& { return s.x; } };
+  auto s3 = views::slider{ read_write{&State::get_x, &State::set_x} };
+}
+```

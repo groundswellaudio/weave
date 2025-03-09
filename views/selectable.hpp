@@ -29,7 +29,7 @@ struct selectable : W {
   auto& base() { return (W&)*this; }
   
   void on(mouse_event e, event_context& ec) {
-    if (e.is_mouse_down() && !is_selected)
+    if (e.is_down() && !is_selected)
     {
       is_selected = true;
       ec.request_repaint();
@@ -47,7 +47,7 @@ struct selectable : W {
     W::paint(p);
     if (is_selected) {
       p.fill_style(rgba_f{colors::white}.with_alpha(0.3));
-      p.rounded_rectangle({0, 0}, this->size(), 5);
+      p.fill(rounded_rectangle(this->size()));
     }
   }
   

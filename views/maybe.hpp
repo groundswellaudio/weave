@@ -58,24 +58,26 @@ namespace impl {
   template <unsigned Idx>
   struct Index {};
   
-  consteval void with_index(function_builder& b, unsigned max, expr fn) {
-    for (int k = 0; k < max; ++k)
-      b << ^^ [k, fn] { case k : return [:fn:](Index<k>{}); };
-  }
-  
-  template <unsigned Max>
+  template <unsigned Max, unsigned Offset = 0>
   constexpr auto with_index(unsigned index, auto fn) -> decltype(fn(Index<0>{})) {
     switch(index) {
-      [:with_index(Max, ^^(fn)):];
+      case 0 : return fn(Index<0 + Offset>{});
+      case 1 : return fn(Index<1 + Offset>{});
+      case 2 : return fn(Index<2 + Offset>{});
+      case 3 : return fn(Index<3 + Offset>{});
+      case 4 : return fn(Index<4 + Offset>{});
+      case 5 : return fn(Index<5 + Offset>{});
+      case 6 : return fn(Index<6 + Offset>{});
+      case 7 : return fn(Index<7 + Offset>{});
       default : 
-        std::unreachable();
+        return with_index<Max, Offset - 8>(index - 8, fn);
     }
   }
   
   template <class... Ts, class... Vs>
   variant<Ts...> make_variant(unsigned index, Vs&&... vs) {
     return with_index<sizeof...(Vs)>(index, [&vs...] <unsigned I> (Index<I>) {
-      return variant<Ts...>{ in_place_index<I>, [:(^^(vs...)[I]):] };
+      return variant<Ts...>{ swl::in_place_index<I>, get<I>(forward_as_tuple(vs...)) };
     });
   }
   

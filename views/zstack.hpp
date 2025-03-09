@@ -32,16 +32,16 @@ struct zstack_with_lasso : widget_base {
   }
   
   void on(mouse_event e, event_context& ec) {
-    if (e.is_mouse_down())
+    if (e.is_down())
       lasso->set_origin(e.position);
-    else if (e.is_mouse_drag())
+    else if (e.is_drag())
     {
       lasso->set_corner(e.position);
       for (auto& c : children)
         if (c.widget.area().intersect(lasso))
           c.set_selected(true);
     }
-    else if (e.is_mouse_up())
+    else if (e.is_up())
       lasso.reset();
   }
   

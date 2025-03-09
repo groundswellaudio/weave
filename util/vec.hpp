@@ -1,53 +1,95 @@
+#pragma once
 
-#include "gen-operators.hpp"
+#include <type_traits>
 
-using namespace std::meta;
-
-consteval void gen_operators(class_builder& b) {
-  b << ^^ struct T {
-    template <operator_kind Op>
-      requires (std::meta::is_compound_assign(Op))
-    constexpr auto& apply_op(const vec<T, N>& o)
-    {
-      for (int k = 0; k < N; ++k)
-        ([: make_operator_expr(Op, ^^((*this)[k]), ^^(o[k])) :]);
-      return *this;
-    }
-    
-    template <operator_kind Op>
-      requires (not std::meta::is_compound_assign(Op))
-    constexpr auto apply_op(const vec<T, N>& o) const 
-    {
-      auto Res {*this};
-      ([: make_operator_expr(std::meta::compound_equivalent(Op), ^^(Res), ^^(o)) :]);
-      return Res;
-    }
-    
-    constexpr bool operator==(const vec<T, N>& o) const {
-      for (int k = 0; k < N; ++k)
-        if ((*this)[k] != o[k])
-          return false;
-      return true;
-    }
-    
-    constexpr bool operator!=(const vec<T, N>& o) const {
-      return !(*this == o);
-    }
-    
-    [: declare_arithmetic(^^const T&) :];
-  };
-}
+namespace weave {
 
 template <class T, unsigned N>
 struct vec 
 {
   T data[N];
   
+  constexpr bool operator==(const vec& o) const = default; 
+  
   decltype(auto) operator[](this auto&& self, int index) {
     return (self.data[index]);
   }
   
-  [: gen_operators() :];
+  // Mutating operators 
+  
+  constexpr auto& operator+=(vec o) {
+    for (int k = 0; k < N; ++k)
+      data += o.data[k];
+    return *this;
+  }
+  
+  constexpr auto& operator-=(vec o) {
+    for (int k = 0; k < N; ++k)
+      data -= o.data[k];
+    return *this;
+  }
+  
+  constexpr auto& operator+=(T o) {
+   for (int k = 0; k < N; ++k)
+      data += o;
+    return *this;
+  }
+  
+  constexpr auto& operator-=(T o) {
+    for (int k = 0; k < N; ++k)
+      data -= o;
+    return *this;
+  }
+  
+  constexpr auto& operator*=(T o) {
+    for (int k = 0; k < N; ++k)
+      data *= o;
+    return *this;
+  }
+  
+  constexpr auto& operator/=(T o) {
+    for (int k = 0; k < N; ++k)
+      data /= o;
+    return *this;
+  }
+  
+  // Pure operators
+  
+  constexpr auto operator+(vec o) const {
+    auto Res{*this};
+    Res += o;
+    return Res;
+  }
+  
+  constexpr auto operator-(vec o) const {
+    auto Res{*this};
+    Res -= o;
+    return Res;
+  }
+  
+  constexpr auto operator+(T o) const {
+    auto Res{*this};
+    Res += o;
+    return Res;
+  }
+  
+  constexpr auto operator-(T o) const {
+    auto Res {*this};
+    Res -= o;
+    return Res;
+  }
+  
+  constexpr auto operator*(T o) const {
+    auto Res{*this};
+    Res *= o;
+    return Res;
+  }
+  
+  constexpr auto operator/(T o) const {
+    auto Res {*this};
+    Res /= o;
+    return Res;
+  }
 };
 
 template <class T>
@@ -59,24 +101,121 @@ struct vec<T, 2> {
     return (index ? self.y : self.x);
   }
   
-  [: gen_operators() :];
+  constexpr bool operator==(const vec& o) const = default; 
+  
+  // Mutating operators
+  
+  constexpr auto& operator+=(vec o) {
+    x += o.x;
+    y += o.y;
+    return *this;
+  }
+  
+  constexpr auto& operator-=(vec o) {
+    x -= o.x;
+    y -= o.y;
+    return *this;
+  }
+  
+  constexpr auto& operator+=(T o) {
+    x += o;
+    y += o;
+    return *this;
+  }
+  
+  constexpr auto& operator-=(T o) {
+    x -= o;
+    y -= o;
+    return *this;
+  }
+  
+  constexpr auto& operator*=(T o) {
+    x *= o;
+    y *= o;
+    return *this;
+  }
+  
+  constexpr auto& operator/=(T o) {
+    x /= o;
+    y /= o;
+    return *this;
+  }
+  
+  // Pure operators
+  
+  constexpr auto operator+(vec o) const {
+    auto Res{*this};
+    Res += o;
+    return Res;
+  }
+  
+  constexpr auto operator-(vec o) const {
+    auto Res{*this};
+    Res -= o;
+    return Res;
+  }
+  
+  constexpr auto operator+(T o) const {
+    auto Res{*this};
+    Res += o;
+    return Res;
+  }
+  
+  constexpr auto operator-(T o) const {
+    auto Res {*this};
+    Res -= o;
+    return Res;
+  }
+  
+  constexpr auto operator*(T o) const {
+    auto Res{*this};
+    Res *= o;
+    return Res;
+  }
+  
+  constexpr auto operator/(T o) const {
+    auto Res {*this};
+    Res /= o;
+    return Res;
+  }
 };
 
-consteval void glm_aliases(namespace_builder& b) {
-  const char* tsuffix[] { "u", "i", "f", "d", "b" }; 
-  type_list bases { ^^unsigned, ^^int, ^^float, ^^double, ^^bool };
-  auto vecid = identifier{"vec"};
-  for ( int k = 0; k < size(bases); ++k)
-  {
-    for (int dim = 2; dim < 5; ++dim)
-    {
-      auto type = type_of(substitute(^^vec, {bases[k], value_template_argument(dim)}));
-      auto name = cat(cat(vecid, dim), tsuffix[k]);
-      b << ^^ [type, name] namespace {
-        using name[:name:] = [: type :];
-      };
-    }
-  }
+template <class U, class T, unsigned N>
+  requires (std::is_scalar_v<U>)
+constexpr vec<T, N> operator*(U x, vec<T, N> v) {
+  return v * x;
 }
 
-[: glm_aliases() :];
+template <class T>
+constexpr vec<T, 2> operator-(vec<T, 2> v) {
+  return {-v.x, -v.y};
+}
+
+template <class T, unsigned N>
+constexpr vec<T, N> operator-(const vec<T, N>& v) {
+  auto Res = v;
+  for (auto& e : Res)
+    e = -e;
+  return Res;
+}
+
+template <class T>
+constexpr vec<T, 2> min(vec<T, 2> a, vec<T, 2> b) {
+  return {std::min(a.x, b.x), std::min(a.y, b.y)};
+}
+
+template <class T>
+constexpr vec<T, 2> max(vec<T, 2> a, vec<T, 2> b) {
+  return {std::max(a.x, b.x), std::max(a.y, b.y)};
+}
+
+template <class T>
+using vec2 = vec<T, 2>;
+
+using vec2f = vec2<float>;
+using vec2d = vec2<double>;
+using vec2i = vec2<int>;
+using vec2u = vec2<unsigned>;
+using vec2b = vec2<bool>;
+
+} // weave
