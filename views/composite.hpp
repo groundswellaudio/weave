@@ -22,12 +22,9 @@ struct composite_view : view<composite_view<T, State>> {
   };
   
   auto build(const widget_builder& ctx, State& state) {
-    definition_body.reset(
-      new Data {
-        definition.init_state(),
-        definition.body(state, view_state)
-      }
-    );
+    auto ptr = new Data {definition.init_state()};
+    ptr->definition_body.emplace(definition.body(state, ptr->view_state));
+    data.reset(ptr);
     return data->definition_body->build(ctx, state);
   }
   
@@ -36,8 +33,8 @@ struct composite_view : view<composite_view<T, State>> {
     auto old_body = std::move(data->definition_body);
     // Move the pointer
     data = std::move(old.data);
-    data->definition_body->emplace(definition.body(state, view_state));
-    return data->definition_body->rebuild(old_body, r, up, state);
+    data->definition_body.emplace(definition.body(state, data->view_state));
+    return data->definition_body->rebuild(*old_body, r, up, state);
   }
   
   T definition;

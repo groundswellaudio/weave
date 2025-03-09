@@ -214,9 +214,9 @@ namespace impl {
       Res.children_vec.push_back( widget_box{(decltype(args)&&)(args)...} );
     };
     
-    tuple_for_each(view.children, [&] (auto& elem) -> void {
+    tuple_for_each([&] (auto& elem) {
       elem.seq_build(consumer, ctx, state);
-    });
+    }, view.children);
     return Res;
   }
   
@@ -235,10 +235,10 @@ namespace impl {
     
     rebuild_result res; 
     
-    tuple_for_each_with_index( New.children, [&] (auto& elem, auto elem_index) -> void 
+    tuple_for_each_with_index( [&] (auto elem_index, auto& elem) -> void 
     { 
       res |= elem.seq_rebuild(get<elem_index.value>(Old.children), seq_updater, up, state);
-    });
+    }, New.children);
     
     for (auto i : seq_updater.to_erase)
       w.children_vec.erase(w.children_vec.begin() + i);

@@ -21,13 +21,11 @@ template <class Pixel, class T>
 image<Pixel> make_image_from_raw(const T* ptr, vec2i sz); 
 
 /// Decode a compressed image buffer
-inline optional<image<rgba<unsigned char>>> 
-  decode_image(std::span<const unsigned char> data);
+optional<image<rgba<unsigned char>>> decode_image(std::span<const unsigned char> data);
 
-inline optional<image<rgba<unsigned char>>> load_image_from_file(const std::string& path); 
+optional<image<rgba<unsigned char>>> load_image_from_file(const std::string& path); 
 
-inline bool save_image_to_file(const std::string& path, 
-                               const image<rgba<unsigned char>>& img);
+bool save_image_to_file(const std::string& path, const image<rgba<unsigned char>>& img);
 
 
 template <class Pixel>

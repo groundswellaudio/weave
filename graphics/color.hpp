@@ -75,6 +75,14 @@ struct rgb {
   template <class V>
   constexpr operator rgba<V> () const;
   
+  constexpr rgb operator*(T x) const {
+    return {data[0] * x, data[1] * x, data[2] * x};
+  }
+  
+  constexpr rgb operator/(T x) const {
+    return {data[0] / x, data[1] / x, data[2] / x};
+  }
+  
   // [:color_operators()];
   
   T data[3];
@@ -141,6 +149,14 @@ struct rgba {
   
   constexpr bool operator==(const rgba<T>& o) const = default;
 
+  constexpr rgba operator*(T x) const {
+    return {col * x, alpha * x};
+  }
+  
+  constexpr rgba operator/(T x) const {
+    return {col / x, alpha / x};
+  }
+  
   // [:color_operators()];
   
   rgb<T> col;

@@ -48,9 +48,11 @@ struct image : widget_base {
 
 namespace weave::views {
 
-static constexpr auto default_image_proj = [] (auto&& pix) { return pix; };
+struct identity {
+  constexpr auto&& operator()(auto&& p) { return (p); }
+};
 
-template <class ImgT, class Proj = decltype(default_image_proj)>
+template <class ImgT, class Proj = identity>
 struct image : view<image<ImgT, Proj>>, view_modifiers {
   
   using widget_t = widgets::image;
@@ -60,7 +62,7 @@ struct image : view<image<ImgT, Proj>>, view_modifiers {
   {
   }
   
-  auto& with_corner_offset(vec2i corner) {
+  auto& with_corner_offset(point corner) {
     corner_offset = corner;
     return *this;
   }
@@ -140,7 +142,7 @@ struct image : view<image<ImgT, Proj>>, view_modifiers {
   const ImgT& img;
   Proj image_proj;
   optional<vec2f> max_bounds;
-  vec2i corner_offset = {0, 0};
+  point corner_offset = {0, 0};
   bool refresh; 
 };
 

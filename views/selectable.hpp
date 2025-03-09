@@ -3,16 +3,30 @@
 #include "views_core.hpp"
 #include <functional>
 
+inline void do_nothing() {}
+
+template <class T>
+struct selection_value;
+
+template <class T>
+struct observed_value_setter {
+  
+  void operator() (std::function<void()> next_observer = &do_nothing) const {
+    self->value = new_value; 
+    if (self->on_change)
+      self->on_change();
+    self->on_change = next_observer; 
+  }
+  
+  selection_value<T>* self;
+  T new_value; 
+};
+
 template <class T>
 struct selection_value {
   
   auto setter(T val) { 
-    return [this, val] (std::function<void()> next_on_change = [] () {}) { 
-      value = val;
-      if (on_change)
-        on_change();
-      on_change = next_on_change;
-    };
+    return observed_value_setter{this, value};
   }
   
   T value;

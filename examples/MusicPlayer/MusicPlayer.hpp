@@ -146,7 +146,7 @@ struct LibraryView {
   auto left_panel(State& state, view_state& self) {
     using namespace views;
     
-    auto setter = [p = &self] (auto v) { return p->selection.setter(v); };
+    auto setter = [&self] (auto v) { return self.selection.setter(v); };
     
     auto panel_item = [setter] (auto&& str, auto id) {
       return selectable{text{str}, setter(id)};
@@ -181,7 +181,7 @@ struct LibraryView {
     bool update_table = std::exchange(state.table_mutated, false);
     
     auto center_view = either {
-      self->selection.value, 
+      self.selection.value, 
       [&] (songs_t) {
         return table{state.database.tracks, update_table}
                     .on_cell_double_click(&State::play_track)
@@ -194,8 +194,8 @@ struct LibraryView {
       [&] (albums_t) {
         return flow{ 
           400,
-          for_each(state.database.albums, [p = self.get(), k = 0] (auto& a) mutable {
-            auto setter = p->selection.setter(album_id{k++});
+          for_each(state.database.albums, [&self, k = 0] (auto& a) mutable {
+            auto setter = self.selection.setter(album_id{k++});
             return vstack {
               views::image{a.cover, false}.fit({100, 100}).on_click(setter),
               text{a.name}
