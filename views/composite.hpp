@@ -2,6 +2,8 @@
 
 #include "views_core.hpp"
 
+#include <cassert>
+
 namespace weave::views {
 
 /// A composite view is a composition of a view state and a body() function 
@@ -30,7 +32,8 @@ struct composite_view : view<composite_view<T, State>> {
   
   auto rebuild(auto& old, widget_ref r, auto&& up, auto& state) {
     // Move the value
-    auto old_body = std::move(data->definition_body);
+    assert( old.data.get() && "no data pointer?" );
+    auto old_body = std::move(old.data->definition_body);
     // Move the pointer
     data = std::move(old.data);
     data->definition_body.emplace(definition.body(state, data->view_state));
