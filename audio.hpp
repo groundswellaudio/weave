@@ -126,17 +126,22 @@ struct audio_renderer
   
   void start_audio_render(audio_buffer_format fmt = {})
   {
-    start_audio_device(fmt, 1);
+    start_audio_device(fmt, device_index);
   }
 
   void start_audio_input(audio_buffer_format fmt)
   {
-    start_audio_device(fmt, 1, true);
+    start_audio_device(fmt, device_index, true);
   }
 
   void stop_audio_render()
-  {
-    ma_device_stop(&device);
+  { 
+    if (is_rendering())
+      ma_device_stop(&device);
+  }
+  
+  bool is_rendering() const {
+    return ma_device_get_state(&device) == ma_device_state_started;
   }
   
   void set_audio_device(int id) {
@@ -172,6 +177,9 @@ struct audio_renderer
       self.render_audio(ostrm);
     };
     
+    if (device.pContext && device.state.value != ma_device_state_uninitialized)
+      ma_device_uninit(&device);
+    
     device_index = id;
     
     ma_device_config config   = ma_device_config_init(ma_device_type_playback);
@@ -184,7 +192,7 @@ struct audio_renderer
     config.pUserData          = static_cast<T*>(this);   // Can be accessed from the device object (device.pUserData).
     
     if (ma_device_init(impl::audio_context(), &config, &device) != MA_SUCCESS)
-        return;  // Failed to initialize the device.
+        assert(false);
     
     ma_device_start(&device);
   }

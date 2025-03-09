@@ -68,7 +68,11 @@ auto top_panel(State& state)
 {
   using namespace views;
   
+  auto rw_device = readwrite( [] (State& s) { return s.player.current_device_index(); }, 
+                              [] (State& s, int id) { s.player.set_audio_device(id); });
+  
   return hstack {
+    combo_box(rw_device, audio_output_devices()), 
     hstack {
       graphic_button{&paint_transport_button<false>, &State::previous_track},
       graphic_toggle_button{&paint_play_button, state.is_playing, &State::set_play}.size({20, 20}),

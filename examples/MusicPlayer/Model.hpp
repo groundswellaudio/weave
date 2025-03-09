@@ -39,7 +39,7 @@ struct TrackPlayer : weave::audio_renderer<TrackPlayer>
     }
   }
   
-  std::atomic<float> volume;
+  std::atomic<float> volume = 1.f;
   weave::audio_buffer buffer;
   int head = -1;
   std::atomic<bool> done_reading = false;

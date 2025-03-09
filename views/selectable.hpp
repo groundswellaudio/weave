@@ -25,8 +25,8 @@ struct observed_value_setter {
 template <class T>
 struct selection_value {
   
-  auto setter(T val) { 
-    return observed_value_setter{this, value};
+  auto setter(T next_value) { 
+    return observed_value_setter{this, next_value};
   }
   
   T value;

@@ -71,7 +71,11 @@ struct popup_menu : widget_base {
     }
     else if (e.is_move()) 
     {
-      auto next_hovered = e.position.y / row_size;
+      if (!rectangle(size()).contains(e.position)) {
+        hovered = -1;
+        return;
+      }
+      auto next_hovered = (e.position.y - margin.y) / row_size;
       if (next_hovered == hovered)
         return;
       hovered = next_hovered;
@@ -103,7 +107,7 @@ struct popup_menu : widget_base {
     
     if (hovered != -1) {  
       p.fill_style(rgba_f{colors::cyan}.with_alpha(0.3));
-      auto overlay = rectangle({0, row_size + margin.y}, {size().x, row_size}); 
+      auto overlay = rectangle({0, hovered * row_size + margin.y}, {size().x, row_size}); 
       p.fill(overlay);
     }
   }

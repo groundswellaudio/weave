@@ -18,9 +18,7 @@ struct combo_box : widget_base {
   bool hovered = false;
   
   vec2f min_size() const { return {30, 15}; }
-  vec2f max_size() const { return {infinity<float>(), 15.f}; }
-  
-  vec2f expand_factor() const { return {1, 0}; }
+  vec2f max_size() const { return {100.f, 15.f}; }
   
   void select(event_context& ec, int choice) {
     active = choice;
@@ -87,7 +85,7 @@ struct combo_box : view<combo_box<Lens, Range>> {
   auto build_impl(const widget_builder& builder, S& state) {
     auto size = vec2f{50, 20};
     auto&& vec = make_string_vec();
-    auto w = max_text_width(vec, builder.context().graphics_context());
+    auto w = max_text_width(vec, builder.context().graphics_context(), 11);
     return widget_t{{w + 2 * widget_t::margin, 20}, std::forward<StringVec>(vec)};
   }
   
@@ -97,7 +95,7 @@ struct combo_box : view<combo_box<Lens, Range>> {
     res.write = [f = lens] (event_context& ec, int val) {
       f.write(ec.state<S>(), val);
     };
-    res.set_value(lens.read(state));
+    res.active = lens.read(state);
     return res;
   }
   
