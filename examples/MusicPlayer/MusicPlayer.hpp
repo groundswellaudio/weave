@@ -61,8 +61,8 @@ void on_file_drop(event_context& ec, const std::string& path_str) {
   .align_center()
   .margin({30, 30});
   
-  auto w = ec.build_view<State>(dialog);
-  w.do_layout(w.size_info().min);
+  auto w = dialog.build(build_context{ec.context()}, ec.state<State>());
+  w.do_layout({300, 100});
   w.set_position(ec.context().window().size() / 2 - w.size() / 2);
   ec.push_overlay(std::move(w));
 }
@@ -112,7 +112,8 @@ auto track_info_menu(State& state, track_selection selected) {
 auto song_table_popup_menu(event_context& ec, track_selection selected) {
   widgets::popup_menu menu;
   auto info = [selected] (event_context& ec) {
-    auto w = ec.build_view<State>(track_info_menu(ec.state<State>(), selected));
+    auto& s = ec.state<State>();
+    auto w = track_info_menu(s, selected).build(build_context{ec.context()}, s);
     ec.push_overlay(w);
   };
   auto add_to_playlist = [selected] (event_context& ec) {
@@ -195,8 +196,8 @@ struct LibraryView {
       [&] (songs_t) {
         return table{state.database.tracks, update_table}
                     .on_cell_double_click(&State::play_track)
-                    .on_file_drop(&on_file_drop)
-                    .popup_menu(&song_table_popup_menu);
+                    .popup_menu(&song_table_popup_menu)
+                    .on_file_drop(&on_file_drop);
       },
       [&] (artists_t) {
         return list{state.artists(), false};
@@ -207,7 +208,7 @@ struct LibraryView {
           for_each(state.database.albums, [&self, k = 0] (auto& a) mutable {
             auto setter = self.selection.setter(album_id{k++});
             return vstack {
-              views::image{a.cover, false}.fit({100, 100}).on_click(setter),
+              views::image{a.cover, false}.fit({100, 100}).on_click([setter] (ignore, ignore) {setter();}),
               text{a.name}
             };
           })

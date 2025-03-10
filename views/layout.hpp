@@ -62,7 +62,7 @@ struct stack
 };
 
 struct stack_updater : view_sequence_updater<stack_updater> {
-  widget_builder b;
+  build_context b;
   std::vector<widget_box>& vec;
   std::vector<int> to_erase;
   int& index;
@@ -212,7 +212,7 @@ namespace impl {
   }
   
   template <class T, class V, class S>
-  auto build_stack(V& view, const widget_builder& ctx, S& state, auto&&... ctor_args) {
+  auto build_stack(V& view, const build_context& ctx, S& state, auto&&... ctor_args) {
     T Res { ctor_args... };
     auto consumer = [&] (auto&&... args) { 
       Res.children_vec.push_back( widget_box{(decltype(args)&&)(args)...} );
@@ -225,13 +225,13 @@ namespace impl {
   }
   
   template <class T, class V, class S>
-  rebuild_result rebuild_stack(V& New, V& Old, widget_ref wb, const widget_updater& up, S& state) {
+  rebuild_result rebuild_stack(V& New, V& Old, widget_ref wb, const build_context& ctx, S& state) {
     auto& w = wb.as<T>();
     int index = 0;
     
     stack_updater seq_updater {
       {}, 
-      up.builder(), 
+      ctx, 
       w.children_vec,
       {}, 
       index
@@ -241,7 +241,7 @@ namespace impl {
     
     tuple_for_each_with_index( [&] (auto elem_index, auto& elem) -> void 
     { 
-      res |= elem.seq_rebuild(get<elem_index.value>(Old.children), seq_updater, up, state);
+      res |= elem.seq_rebuild(get<elem_index.value>(Old.children), seq_updater, ctx, state);
     }, New.children);
     
     for (auto i : seq_updater.to_erase)
@@ -369,14 +369,14 @@ struct stack_base : view<stack_base<T, Ts...>>, stack<Ts...> {
   stack_base(const stack_base&) = default;
   
   template <class S>
-  auto build(const widget_builder& ctx, S& state) 
+  auto build(const build_context& ctx, S& state) 
   {
     auto Res = impl::build_stack<T>(*this, ctx, state, this->info);
     return Res;
   }
   
   template <class S>
-  rebuild_result rebuild(stack_base<T, Ts...>& Old, widget_ref wb, const widget_updater& ctx, S& state) {
+  rebuild_result rebuild(stack_base<T, Ts...>& Old, widget_ref wb, const build_context& ctx, S& state) {
     return impl::rebuild_stack<T>(*this, Old, wb, ctx, state);
   }
   

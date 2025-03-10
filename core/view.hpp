@@ -7,9 +7,6 @@ namespace weave {
 
 struct layout_tag {};
 
-struct widget_builder;
-struct widget_updater;
-
 template <class Producer, class Consumer, class Destroyer> 
 struct view_seq_rebuild_ctx {
   Producer produce;
@@ -46,6 +43,14 @@ struct view_sequence_base {
   
 };
 
+struct application_context; 
+
+struct build_context 
+{
+  auto& context() const { return ctx; }
+  application_context& ctx;
+};
+
 template <class T>
 concept is_view_sequence = std::is_base_of_v<view_sequence_base, T>;
 
@@ -54,20 +59,21 @@ template <class T>
 struct view : view_sequence_base {
   
   // must declare the following : 
-  // build(widget_builder& c, auto& state) -> Widget
-  // rebuild(self& new, widget& w, widget_updater up, auto& state)
+  // build(build_context& c, auto& state) -> Widget
+  // rebuild(self& new, widget& w, build_context up, auto& state)
   
-  void seq_build(this T& self, auto Consumer, const widget_builder& c, auto& state) {
-    Consumer(self.build(c, state));
+  void seq_build(this auto& self, auto Consumer, const build_context& ctx, auto& state) {
+    Consumer(self.build(ctx, state));
   }
   
-  rebuild_result seq_rebuild(this T& self, T& old, auto&& seq_updater, 
-                   const widget_updater& up, auto& state) 
+  template <class O>
+  rebuild_result seq_rebuild(this O& self, O& old, auto&& seq_updater, 
+                   const build_context& ctx, auto& state) 
   {
-    return self.rebuild(old, seq_updater.next(), up, state);
+    return self.rebuild(old, seq_updater.next(), ctx, state);
   }
   
-  void seq_destroy(this T& self, auto GetForDestroy) {
+  void seq_destroy(this auto& self, auto GetForDestroy) {
     self.destroy( GetForDestroy() );
   }
   

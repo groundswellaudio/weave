@@ -98,12 +98,12 @@ struct scrollable : view<scrollable<View>> {
   scrollable(vec2f sz, View child) : size{sz}, child{child} {}
   
   template <class State>
-  auto build(widget_builder b, State& state) {
+  auto build(build_context b, State& state) {
     return widget_t{ {size}, {}, child.build(b, state) };
   }
   
   template <class State>
-  void rebuild(scrollable<View>& New, widget_ref w, widget_updater up, State& s) {
+  void rebuild(scrollable<View>& New, widget_ref w, build_context up, State& s) {
     child.rebuild(New.child, widget_ref{&w.as<widget_t>().child}, up, s);
   }
   

@@ -135,7 +135,7 @@ struct toggle_button : view<toggle_button<Lens>> {
   }
   
   template <class S>
-  auto build(widget_builder b, S& s) {
+  auto build(build_context b, S& s) {
     auto value = lens.read(s);
     return widget_t{{50, 20}, properties, lens_write_for_widget(lens), value};
   }
@@ -164,7 +164,7 @@ struct button : view<button<Fn>> {
   }
   
   template <class State>
-  auto build(const widget_builder& b, State& s) {
+  auto build(const build_context& b, State& s) {
     auto sz = text_bounds(b.context());
     decltype(widget_t::on_click) action = [f = fn] (auto& ec) { context_invoke<State>(f, ec); };
     auto size = sz + vec2f{button_margin, button_margin} * 2;
@@ -294,7 +294,7 @@ namespace weave::views
     : val{val}, paint_fn{P}, write_fn{W} {}
     
     template <class S>
-    auto build(const widget_builder& b, S& state) {
+    auto build(const build_context& b, S& state) {
       widgets::graphic_toggle_button<PaintFn> res {{size_v}, paint_fn, {}, val};
       res.write = [w = write_fn] (event_context& ec, bool v) -> bool {
         return context_invoke<S>(w, ec, v);
@@ -329,7 +329,7 @@ namespace weave::views
     using widget_t = widgets::graphic_trigger_button<PaintFn>;
     
     template <class S>
-    auto build(const widget_builder& b, S& state) {
+    auto build(const build_context& b, S& state) {
       widget_t res {{size_v}, paint_fn, {}};
       res.on_click = action<S>();
       return res;

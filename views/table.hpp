@@ -2,6 +2,7 @@
 
 #include "views_core.hpp"
 #include "scrollable.hpp"
+#include "modifiers.hpp"
 
 #include <functional>
 #include <ranges>
@@ -195,10 +196,11 @@ struct table : widget_base, scrollable_base {
     if (scrollable_base::on(e, Ec))
       return;
     
+    /* 
     if (e.is_file_drop() && on_file_drop) {
       on_file_drop(Ec, e.dropped_file());
       return;
-    }
+    } */ 
     
     if (e.is_down()) {
       if (e.position.y < first_row) 
@@ -332,7 +334,7 @@ namespace weave::views {
 
 template <class T>
   requires complete_type<table_model<T>>
-struct table : view<table<T>> {
+struct table : view<table<T>>, view_modifiers {
   
   table(T data, bool RebuildWhen) : data{data}, rebuild_when{RebuildWhen} {}
   
@@ -383,21 +385,23 @@ struct table : view<table<T>> {
     return *this;
   }
   
+  /* 
   template <class S, class RT, class... Args>
   auto& on_file_drop(member_fn_ptr<RT, S, Args...> fn) {
     file_drop_fn = [fn] (event_context& ec, auto&& file) {
       context_invoke<S>(fn, ec, file);
     };
     return *this;
-  }
+  } */ 
   
+  /* 
   auto& on_file_drop(auto fn) {
     file_drop_fn = [fn] (event_context& ec, auto&& file) {
       ec.request_rebuild();
       fn(ec, file);
     };
     return *this;
-  }
+  } */ 
   
   auto& popup_menu(auto fn) {
     popup_opener = fn;

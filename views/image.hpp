@@ -97,7 +97,7 @@ struct image : view<image<ImgT, Proj>>, view_modifiers {
     return widget_t{{wsize}, texture, wsize, corner_offset};
   }
   
-  rebuild_result rebuild(image& old, widget_ref elem, const widget_updater& up, ignore) {
+  rebuild_result rebuild(image& old, widget_ref elem, const build_context& up, ignore) {
     auto& w = elem.as<widget_t>();
     if (!w.texture) {
       if (!img.empty())

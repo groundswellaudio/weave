@@ -26,17 +26,16 @@ struct maybe : view_sequence_base {
   }
   
   template <class State>
-  rebuild_result seq_rebuild(Self& Old, auto&& seq_updater, const widget_updater& up, State& s) 
+  rebuild_result seq_rebuild(Self& Old, auto&& seq_updater, const build_context& ctx, State& s) 
   {
     if (flag == Old.flag)
     {
       if (Old.flag)
-        view.seq_rebuild(Old.view, seq_updater, up, s);
+        view.seq_rebuild(Old.view, seq_updater, ctx, s);
     }
     else if (!Old.flag)
     {
-      auto nb = up.builder();
-      view.seq_build(seq_updater.consume_fn(), nb, s);
+      view.seq_build(seq_updater.consume_fn(), ctx, s);
       return {};
     }
     else
@@ -107,9 +106,9 @@ struct either : view_sequence_base {
   {
   }
   
-  void seq_build(auto consumer, auto&& b, auto& state) {
+  void seq_build(auto consumer, auto&& ctx, auto& state) {
     visit( [&] (auto& elem) {
-      elem.seq_build(consumer, b, state);
+      elem.seq_build(consumer, ctx, state);
     }, body);
   }
   
@@ -124,7 +123,7 @@ struct either : view_sequence_base {
         elem.seq_destroy(updater.destroy_fn());
       }, Old.body);
       visit( [&] (auto& elem) {
-        elem.seq_build(updater.consume_fn(), up.builder(), state);
+        elem.seq_build(updater.consume_fn(), up, state);
       }, body);
       return rebuild_result{}; 
     }

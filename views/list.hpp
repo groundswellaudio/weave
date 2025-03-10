@@ -83,7 +83,7 @@ struct list : view<list<T>> {
       w.cells.push_back(std::string(e));
   }
   
-  auto build(const widget_builder& b, ignore) {
+  auto build(const build_context& b, ignore) {
     widget_t res;
     set_cells(res);
     res.update_size(b.context().graphics_context());

@@ -20,9 +20,8 @@
 namespace weave {
 
 struct painter;
-struct widget_builder;
-struct widget_updater;
 struct event_context;
+struct application_context; 
 
 struct input_event : variant<mouse_event, keyboard_event> {
   using variant<mouse_event, keyboard_event>::variant;
@@ -335,14 +334,6 @@ optional<widget_ref> widget_base::find_child_at(this auto& self, vec2f pos) {
 /// and provided by event_context
 using event_context_parent_stack = std::vector<widget_ref>;
 
-struct application_context; 
-
-struct widget_builder 
-{
-  auto& context() const { return ctx; }
-  application_context& ctx;
-};
-
 struct event_frame_result {
   bool rebuild_requested = false;
   bool repaint_requested = false;
@@ -392,11 +383,12 @@ struct event_context {
     return Res;
   }
   
+  /* 
   template <class S, class View>
   auto build_view(View&& v) {
-    auto w = v.build( widget_builder{context()}, state<S>() );
+    auto w = v.build( build_context{context()}, state<S>() );
     return w;
-  }
+  } */ 
   
   application_context& ctx;
   event_frame_result& frame_result;
@@ -467,12 +459,5 @@ namespace impl {
     };
   };
 }
-
-struct widget_updater 
-{
-  widget_builder builder() const { return {ctx}; }
-  auto& context() const { return ctx; }
-  application_context& ctx;
-};
 
 } // weave

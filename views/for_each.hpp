@@ -11,14 +11,14 @@ struct for_each : view_sequence_base {
   
   using element = decltype( std::declval<ViewCtor>()(std::declval<Range>().front()) );
   
-  void seq_build(auto Consumer, const widget_builder& b,  auto& state) {
+  void seq_build(auto Consumer, const build_context& b,  auto& state) {
     for (auto&& elem : range) {
       elements.push_back(view_ctor(elem));
       Consumer( elements.back().build(b, state) );
     }
   }
   
-  rebuild_result seq_rebuild(for_each& Old, auto&& seq_updater, const widget_updater& up, auto& state) 
+  rebuild_result seq_rebuild(for_each& Old, auto&& seq_updater, const build_context& ctx, auto& state) 
   {
     for (auto&& e : range) {
       elements.push_back(view_ctor(e));
@@ -30,15 +30,15 @@ struct for_each : view_sequence_base {
     { 
       unsigned k = 0;
       for (; k < Old.elements.size(); ++k)
-        res |= elements[k].seq_rebuild(Old.elements[k], seq_updater, up, state);
+        res |= elements[k].seq_rebuild(Old.elements[k], seq_updater, ctx, state);
       for (; k < elements.size(); ++k) 
-        elements[k].seq_build( seq_updater.consume_fn(), up.builder(), state );
+        elements[k].seq_build( seq_updater.consume_fn(), ctx, state );
     }
     else if (Old.elements.size() > elements.size())
     {
       unsigned k = 0;
       for (; k < elements.size(); ++k)
-        res |= elements[k].seq_rebuild(Old.elements[k], seq_updater, up, state);
+        res |= elements[k].seq_rebuild(Old.elements[k], seq_updater, ctx, state);
       for (; k < Old.elements.size(); ++k)
         Old.elements[k].seq_destroy( seq_updater.destroy_fn() );
     }

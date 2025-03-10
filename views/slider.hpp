@@ -177,7 +177,7 @@ struct slider : view<slider<Lens>> {
   }
   
   template <class S>
-  auto build(const widget_builder& b, S& state) {
+  auto build(const build_context& b, S& state) {
     val = lens.read(state);
     auto res = widget_t{{size}, properties};
     res.write = [l = lens] (event_context& c, float val) { l.write(c.state<S>(), val); };
@@ -188,7 +188,7 @@ struct slider : view<slider<Lens>> {
   }
   
   template <class S>
-  rebuild_result rebuild(slider<Lens>& Old, widget_ref wb, widget_updater up, S& state) {
+  rebuild_result rebuild(slider<Lens>& Old, widget_ref wb, build_context up, S& state) {
     auto& w = wb.as<widget_t>();
     val = lens.read(state);
     if (properties != Old.properties) {

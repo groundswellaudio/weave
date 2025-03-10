@@ -23,7 +23,7 @@ struct composite_view : view<composite_view<T, State>> {
     optional<body_t> definition_body;
   };
   
-  auto build(const widget_builder& ctx, State& state) {
+  auto build(const build_context& ctx, State& state) {
     auto ptr = new Data {definition.init_state()};
     ptr->definition_body.emplace(definition.body(state, ptr->view_state));
     data.reset(ptr);

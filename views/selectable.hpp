@@ -79,7 +79,7 @@ struct selectable : view<selectable<V, OnSelect>> {
   
   selectable(auto&& v, auto&& selection) : view{v}, on_select{selection} {}
   
-  auto build(const widget_builder& b, auto& state) {
+  auto build(const build_context& b, auto& state) {
     auto res = widget_t{ view.build(b, state) };
     res.on_select = [f = on_select] (event_context& ec, auto next_on_change) {
       ec.request_rebuild();

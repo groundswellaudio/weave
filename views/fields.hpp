@@ -34,7 +34,7 @@ struct text_field : widget_base {
   }
   
   void on(keyboard_event e, event_context& Ec) {
-    if (e.is_key_up())
+    if (e.is_up())
       return;
     
     if (auto C = to_character(e.key))
@@ -83,14 +83,14 @@ struct text_field : view<text_field<Lens>> {
   using widget_t = widgets::text_field;
   
   template <class S>
-  auto build(const widget_builder&, S& state) {
+  auto build(const build_context&, S& state) {
     auto init_val = lens.read(state);
     auto res = widget_t{{50, 15}, init_val};
     res.write = to_widget_write(lens); 
     return res;
   }
   
-  rebuild_result rebuild(text_field<Lens>& old, widget_ref elem, const widget_updater& up, auto& state) {
+  rebuild_result rebuild(text_field<Lens>& old, widget_ref elem, const build_context& up, auto& state) {
     auto& w = elem.as<widget_t>();
     auto val = lens.read(state);
     if (!up.context().has_keyboard_focus(elem))
@@ -145,7 +145,7 @@ struct numeric_field : widget_base {
   }
   
   void on(keyboard_event e, event_context& Ec) {
-    if (e.is_key_up())
+    if (e.is_up())
       return;
     
     if (is_number(e.key)) {
@@ -202,7 +202,7 @@ struct numeric_field : view<numeric_field<Lens>> {
   numeric_field(auto lens) : lens{make_lens(lens)} {}
   
   template <class S>
-  auto build(const widget_builder&, S& state) {
+  auto build(const build_context&, S& state) {
     auto init_val = lens.read(state);
     auto res = widget_t{{50, 15}, prop, (double)init_val};
     res.update_str();
@@ -214,7 +214,7 @@ struct numeric_field : view<numeric_field<Lens>> {
     return res;
   }
   
-  rebuild_result rebuild(numeric_field<Lens>& old, widget_ref elem, const widget_updater& up, auto& state) {
+  rebuild_result rebuild(numeric_field<Lens>& old, widget_ref elem, const build_context& up, auto& state) {
     auto& w = elem.as<widget_t>();
     auto val = lens.read(state);
     if (!up.context().has_keyboard_focus(elem))

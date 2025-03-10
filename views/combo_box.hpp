@@ -101,7 +101,7 @@ struct combo_box : view<combo_box<Lens, Range>> {
   }
   
   template <class S>
-  auto build_impl(const widget_builder& builder, S& state) {
+  auto build_impl(const build_context& builder, S& state) {
     auto size = vec2f{50, 20};
     auto&& vec = make_string_vec();
     auto w = max_text_width(vec, builder.context().graphics_context(), 11);
@@ -111,7 +111,7 @@ struct combo_box : view<combo_box<Lens, Range>> {
   }
   
   template <class S>
-  auto build(const widget_builder& builder, S& state) {
+  auto build(const build_context& builder, S& state) {
     auto res = build_impl(builder, state);
     res.write = [f = lens] (event_context& ec, int val) {
       f.write(ec.state<S>(), val);

@@ -427,7 +427,7 @@ struct application
   : view_ctor{ctor}, 
     app_view{view_ctor(s)},
     impl{ prop, 
-          [&, this] { return app_view->build(widget_builder{impl}, s); } }
+          [&, this] { return app_view->build(build_context{impl}, s); } }
   {
     impl.paint();
     impl.root.debug_dump(3);
@@ -437,8 +437,8 @@ struct application
     debug_log("rebuilding");
     auto old_view = std::move(*app_view);
     app_view.emplace( view_ctor(state) );
-    auto upd = widget_updater{impl};
-    app_view->rebuild(old_view, impl.root.borrow(), upd, state);
+    auto bctx = build_context{impl};
+    app_view->rebuild(old_view, impl.root.borrow(), bctx, state);
     impl.med.update_absolute_position();
     impl.rebuild_requested = false;
     // Note : it would be nice to not have to do this on every rebuild ? 

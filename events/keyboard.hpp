@@ -56,8 +56,8 @@ struct keyboard_event {
   keycode key;
   bool is_press;
   
-  bool is_key_down() const { return is_press; }
-  bool is_key_up() const { return !is_press; }
+  bool is_down() const { return is_press; }
+  bool is_up() const { return !is_press; }
 };
 
 inline bool is_number(keycode k){

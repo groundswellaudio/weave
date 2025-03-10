@@ -121,7 +121,7 @@ class sdl_backend
       {
         std::string file = e.drop.file;
         SDL_free(e.drop.file);
-        vis( mouse_event{vec2f{0, 0}, file_drop_event(std::move(file))} );
+        vis( mouse_event{vec2f{0, 0}, file_drop(std::move(file))} );
         break;
       }
       
