@@ -51,7 +51,7 @@ struct combo_box : widget_base {
     p.fill_style(colors::white);
     p.text_align(text_align::x::center, text_align::y::center);
     p.font_size(11);
-    p.text( size() / 2, choices[active] );
+    p.text_bounded( size() / 2, size().x, choices[active] );
   }
 };
 

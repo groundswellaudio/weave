@@ -79,7 +79,7 @@ struct painter
   
   NVGcontext* ctx;
   float text_vert_offset = 0;
-  int current_aligment = 0;
+  int current_alignment = 0;
   float current_font_size = 11;
   
   void begin_frame(vec2f size, int ratio){
@@ -108,8 +108,8 @@ struct painter
   
   void text_align(text_align::x alignx, text_align::y aligny = text_align::y::center)
   {
-    current_aligment = (int)(alignx) | (int)(aligny);
-    nvgTextAlign(ctx, current_aligment);
+    current_alignment = (int)(alignx) | (int)(aligny);
+    nvgTextAlign(ctx, current_alignment);
   }
 
   // return the text bounding box if it were drawn at the given position
@@ -230,19 +230,36 @@ struct painter
     positions.resize(str.size());
     nvgTextGlyphPositions( ctx, pos.x, pos.y, str.begin(), str.end(), positions.data(), (int)(positions.size()) );
     
-    if (positions.back().maxx > pos.x + width) {
+    if (positions.back().maxx - positions.front().minx > width) {
       // Look at the space needed to display ... 
+      /* 
       NVGglyphPosition ellipsisPos[3];
       nvgTextGlyphPositions(ctx, 0, 0, "...", nullptr, ellipsisPos, 3);
-      auto ellipsis_width = ellipsisPos[2].maxx;
+      auto ellipsis_width = ellipsisPos[2].maxx; */ 
+      
+      auto ellipsis_width = font_size();
       
       auto it = std::find_if( positions.rbegin(), positions.rend(), 
-        [&] (auto& e) { return e.maxx + ellipsis_width < pos.x + width; } );
+        [&] (auto& e) { return e.maxx + ellipsis_width * 2 < positions.front().minx + width; } );
       
       int index = it == positions.rend() ? 0 : (int) str.size() - (it - positions.rbegin());
       
       text( pos, std::string_view{str.begin(), str.begin() + index} );
-      text( vec2f{positions[index].minx, pos.y}, "..." );
+      
+      // FIXME : Take into account top alignment
+      auto ellipsis_y = (current_alignment | (int) text_align::y::center) 
+        ? (pos.y + font_size() / 2 - ellipsis_width / 10)
+        : pos.y; 
+        
+      auto c = circle(vec2f{positions[0].minx + width, ellipsis_y}, ellipsis_width / 10);
+      c = c.translated({-c.radius * 2 - 3, 0});
+      
+      fill( c );
+      fill( c.translated({ellipsis_width / 3, 0}) );
+      fill( c.translated({2 * ellipsis_width / 3, 0}) );
+        
+      // text( vec2f{positions[index].minx, pos.y}, "..." );
+      
       return;
     }
     
