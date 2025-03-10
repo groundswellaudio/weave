@@ -166,7 +166,7 @@ struct Database {
   
   struct AlbumTracks {
     
-    auto tracks() {
+    auto tracks() const {
       return std::views::transform(self.album(album_id).tracks, [s = &self] (auto id) -> auto& { return s->track(id); });
     }
     
@@ -213,14 +213,14 @@ template <>
 struct weave::table_model<std::vector<Database::Track>> {
   auto&& properties(ignore) { return Database::properties_v; }
   auto& cells(auto& self) { return self; }
-  auto& cell_properties(Database::Track& t) { return t.properties; }
+  auto& cell_properties(const Database::Track& t) { return t.properties; }
 };
 
 template <>
 struct weave::table_model<Database::AlbumTracks> {
   auto&& properties(ignore) { return Database::properties_v; }
   auto cells(auto& obj) { return obj.tracks(); }
-  auto& cell_properties(Database::Track& t) { return t.properties; }
+  auto& cell_properties(const Database::Track& t) { return t.properties; }
 };
 
 namespace fs = ghc::filesystem; 

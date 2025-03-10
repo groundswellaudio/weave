@@ -237,10 +237,13 @@ struct painter
       nvgTextGlyphPositions(ctx, 0, 0, "...", nullptr, ellipsisPos, 3);
       auto ellipsis_width = ellipsisPos[2].maxx; */ 
       
+      // apply the scissor horizontally
+      scissor({pos.x, pos.y - (float)1e6}, {width, 2 * 1e6});
+      
       auto ellipsis_width = font_size();
       
       auto it = std::find_if( positions.rbegin(), positions.rend(), 
-        [&] (auto& e) { return e.maxx + ellipsis_width * 2 < positions.front().minx + width; } );
+        [&] (auto& e) { return e.maxx + ellipsis_width < positions.front().minx + width; } );
       
       int index = it == positions.rend() ? 0 : (int) str.size() - (it - positions.rbegin());
       
@@ -258,6 +261,8 @@ struct painter
       fill( c.translated({ellipsis_width / 3, 0}) );
       fill( c.translated({2 * ellipsis_width / 3, 0}) );
         
+      reset_scissor();
+      
       // text( vec2f{positions[index].minx, pos.y}, "..." );
       
       return;
