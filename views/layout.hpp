@@ -153,7 +153,7 @@ namespace impl {
     }
     
     min[axis] -= data.interspace;
-    min[axis] += 2 * data.margin[axis]; 
+    min += 2 * data.margin;
 
     auto layout_children = [&] (auto sizer) {
       float axis_pos = data.margin[axis];

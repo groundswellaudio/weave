@@ -6,19 +6,37 @@
 
 #include <ranges>
 
-namespace weave::widgets {
+namespace weave {
+
+namespace views { 
+  template <class Lens, class Range>
+  struct combo_box;
+}
+
+namespace widgets {
 
 struct combo_box : widget_base {
+  
+  private : 
+  
+  template <class L, class R>
+  friend struct views::combo_box; 
 
   static constexpr float margin = 5;
-  
   std::vector<std::string> choices;
   write_fn<int> write;
   int active = 0;
   bool hovered = false;
   
+  public : 
+  
+  combo_box(point size, std::vector<std::string> choices)
+  : widget_base{size}, choices{std::move(choices)} {}
+  
+  float max_width;
+  
   vec2f min_size() const { return {30, 15}; }
-  vec2f max_size() const { return {100.f, 15.f}; }
+  vec2f max_size() const { return {max_width, 15.f}; }
   
   void select(event_context& ec, int choice) {
     active = choice;
@@ -57,7 +75,7 @@ struct combo_box : widget_base {
 
 } // widgets
 
-namespace weave::views {
+namespace views {
 
 template <class Lens, class Range = std::vector<std::string>>
 struct combo_box : view<combo_box<Lens, Range>> {
@@ -87,7 +105,9 @@ struct combo_box : view<combo_box<Lens, Range>> {
     auto size = vec2f{50, 20};
     auto&& vec = make_string_vec();
     auto w = max_text_width(vec, builder.context().graphics_context(), 11);
-    return widget_t{{w + 2 * widget_t::margin, 20}, std::forward<StringVec>(vec)};
+    auto res = widget_t{{w + 2 * widget_t::margin, 20}, std::forward<StringVec>(vec)};
+    res.max_width = w + 20; 
+    return res;
   }
   
   template <class S>
@@ -100,11 +120,21 @@ struct combo_box : view<combo_box<Lens, Range>> {
     return res;
   }
   
-  rebuild_result rebuild(combo_box& Old, widget_ref w, ignore, auto& state) {
+  rebuild_result rebuild(combo_box& Old, widget_ref w, auto& ctx, auto& state) {
     auto& wb = w.as<widget_t>();
     auto val = lens.read(state);
     if (val != wb.active)
       wb.active = val;
+    auto new_choices = make_string_vec();
+    if (new_choices != wb.choices) {
+      wb.choices = std::move(new_choices);
+      auto old_width = wb.max_width;
+      wb.max_width = max_text_width(wb.choices, ctx.context().graphics_context(), 11) 
+                          + 20;
+      if (old_width != wb.max_width)
+        return rebuild_result::size_change;
+    }
+    wb.choices = make_string_vec();
     return {};
   }
   
@@ -116,3 +146,5 @@ template <class Lens, class Range = std::vector<std::string>>
 combo_box(Lens, Range) -> combo_box<make_lens_result<Lens>, Range>;
 
 } // views
+
+} // weave

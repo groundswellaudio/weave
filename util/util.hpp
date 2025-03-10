@@ -48,9 +48,9 @@ T infinity() { return std::numeric_limits<T>::infinity(); }
 template <class T>
 std::string_view stringify() {
   auto n = std::source_location::current().function_name();
-  auto&& prefix = "std::string_view stringify() [T =";
-  auto start = n + sizeof(prefix);
-  auto end = n + std::string_view{n}.size() - 1; 
+  auto&& prefix = "std::string_view weave::stringify() [T = ";
+  auto start = n + sizeof(prefix) - 1;
+  auto end = n + std::string_view{n}.size() - 1;
   return {start, end};
 }
 

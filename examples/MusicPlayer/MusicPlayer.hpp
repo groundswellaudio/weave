@@ -56,10 +56,13 @@ void on_file_drop(event_context& ec, const std::string& path_str) {
       button{"Yes", yes},
       button{"Cancel", &event_context::pop_overlay}    
     }
-  }.background(rgb_f(colors::gray) * 0.3);
+  }
+  .background(rgb_f(colors::gray) * 0.3)
+  .align_center()
+  .margin({30, 30});
   
   auto w = ec.build_view<State>(dialog);
-  w.do_layout({300, 150});
+  w.do_layout(w.size_info().min);
   w.set_position(ec.context().window().size() / 2 - w.size() / 2);
   ec.push_overlay(std::move(w));
 }

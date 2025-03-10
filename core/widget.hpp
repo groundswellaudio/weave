@@ -72,7 +72,10 @@ struct widget_base {
     for (int k = 0; k < indent; ++k)
       std::cerr << '\t';
     using T = std::remove_reference_t<decltype(self)>;
-    std::cerr << stringify<T>() << " " << self.position() << " " << self.size();
+    auto type_str = stringify<T>();
+    if (type_str.starts_with("weave::widgets::"))
+      type_str.remove_prefix(sizeof("weave::widgets::") - 1);
+    std::cerr << type_str << " " << self.position() << " " << self.size();
     auto info = self.size_info();
     std::cerr << " minmax " << info.min << " " << info.max;
     if constexpr ( widget_has_children<T> ) {
