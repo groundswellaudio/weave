@@ -65,6 +65,11 @@ struct table : widget_base, scrollable_base {
   widget_action<int> cell_double_click;
   widget_action<popup_menu(selection_t)> popup;
   
+  // Which property we're currently using for sorting order, if any
+  int property_sort_index : 31 = -1;
+  // Whether the sorting order is increasing or decreasing
+  bool property_sort_order : 1 = true;
+  
   using Self = table;
   
   public : 
@@ -102,10 +107,13 @@ struct table : widget_base, scrollable_base {
     }
   }
   
-  void sort_by_property(int property_index) {
-    std::sort( cells.begin(), cells.end(), [property_index] (auto& a, auto& b) { 
-      return a.prop[property_index] < b.prop[property_index];
-    }); 
+  void sort_by_property(int property_index, bool less = true) {
+    std::sort( cells.begin(), cells.end(), [property_index, less] (auto& a, auto& b) {
+      return less ? a.prop[property_index] < b.prop[property_index]
+                  : a.prop[property_index] > b.prop[property_index];
+    });
+    property_sort_index = property_index;
+    property_sort_order = less;
   }
   
   std::optional<vec2i> find_cell_at(vec2f pos) const {
@@ -273,20 +281,30 @@ struct table : widget_base, scrollable_base {
   }
   
   void handle_mouse_down_header(vec2f p) {
+    auto sort_by = [this] (int prop_index) {
+      bool increasing = true;
+        // Swap the order if we're clicking on the same property
+      if (prop_index == property_sort_index)
+        increasing = !property_sort_order;
+      sort_by_property(prop_index, increasing);
+    };
+    
     for (unsigned k = 1; k < properties.size(); ++k) 
     {
       auto& [_, posx] = properties[k];
       float x = p.x;
       if (x < posx - 5) {
-        sort_by_property(k - 1);
-        break;
+        sort_by(k - 1);
+        return;
       }
       if (std::abs(x - posx) < 10)
       {
         dragging = k; 
-        break;
+        return;
       }
     }
+    // if we reach here, we have a click on the last tab
+    sort_by(properties.size() - 1);
   }
   
   void paint_selection_overlay(painter& p) {
@@ -309,11 +327,25 @@ struct table : widget_base, scrollable_base {
     p.scissor({0, 0}, size());
     
     p.text_align(text_align::x::left, text_align::y::center);
+    
     for (auto& [prop, posx] : properties) {
       if (posx > size().x)
         break;
       p.line( {posx, 0}, {posx, first_row}, 1 );
       p.text( {5 + posx, first_row / 2}, prop );
+    }
+    
+    // Property order indicator
+    if (property_sort_index != -1) {
+      auto right_x = 
+        property_sort_index == (properties.size() - 1) 
+              ? size().x 
+              : get<1>(properties[property_sort_index + 1]);
+      
+      auto tri_sz = 4; 
+      auto tri = triangle(circle({right_x - tri_sz * 2, first_row / 2}, tri_sz), 
+                          degrees{property_sort_order ? 90.f : -90.f});
+      p.fill(tri);
     }
     
     p.reset_scissor();
@@ -328,6 +360,7 @@ struct table : widget_base, scrollable_base {
     float pos = (int) -scroll_offset % (int) row;
     
     assert( cells_begin >= 0 );
+    
     for (int i = cells_begin; i < cells_end; ++i, pos += row) {
       auto& c = cells[i];
       int k = 0;

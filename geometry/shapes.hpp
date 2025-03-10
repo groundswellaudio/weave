@@ -1,8 +1,10 @@
 #pragma once
 
 #include <util/vec.hpp>
+#include "angles.hpp"
 
 #include <numbers>
+#include <cmath>
 
 namespace weave::geo {
 
@@ -35,12 +37,12 @@ struct circle {
     return dist.x + dist.y < radius * radius;
   }
   
-  /* 
   template <class V>
   constexpr auto point(radians<V> r) const {
     return center + vec2<T>{radius * std::cos(r.value), radius * std::sin(r.value)};
-  }  
+  }
   
+  /* 
   template <class V>
   constexpr circle<V> to() const {
     return { center.template to<V>(), static_cast<V>(radius) };
@@ -65,15 +67,14 @@ circle(vec2<T>, T) -> circle<T>;
 
 template <class T>
 struct triangle {
-	
-	/* 
-	constexpr triangle(const circle<T>& c, radians<T> r)
-	: a{ c.point(r) },
-	  b{ c.point(r + radians<T>{2 * std::numbers::pi / 3}) },
-	  c{ c.point(r + radians<T>{2 * 2 * std::numbers::pi / 3}) }
-	{
-	} */ 
-	
+  
+  constexpr triangle(const circle<T>& c, radians<T> r)
+  : a{ c.point(r) },
+    b{ c.point(r + radians<T>{2 * std::numbers::pi / 3}) },
+    c{ c.point(r + radians<T>{2 * 2 * std::numbers::pi / 3}) }
+  {
+  }
+
   constexpr triangle(const vec2<T>& a_, const vec2<T>& b_, const vec2<T>& c_)
   : a{ a_ },
     b{ b_ },
