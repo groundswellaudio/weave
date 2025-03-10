@@ -147,9 +147,13 @@ namespace impl {
     for (auto& e : children) {
       auto size_info = e.size_info();
       min[axis] += size_info.min[axis];
+      min[axis] += data.interspace;
       min[1 - axis] = std::max(min[1 - axis], size_info.min[1 - axis]);
       axis_expand_norm += (std::min(size_info.max[axis], this_sz[axis]) - size_info.min[axis]);
     }
+    
+    min[axis] -= data.interspace;
+    min[axis] += 2 * data.margin[axis]; 
 
     auto layout_children = [&] (auto sizer) {
       float axis_pos = data.margin[axis];
@@ -267,8 +271,8 @@ struct stack : widget_base
   void paint(painter& p) {
     p.fill_style(data.background_col);
     p.fill(rectangle(size()));
-    // p.stroke_style(colors::green);
-    // p.stroke_rect({0, 0}, size(), 2);
+    p.stroke_style(colors::green);
+    p.stroke(rectangle(size()));
   }
   
   widget_size_info size_info() const {

@@ -36,6 +36,7 @@ struct combo_box : widget_base {
     m.update_size(ec.context().graphics_context());
     m.set_position(vec2f{0, size().y});
     enter_popup_menu_relative(ec, std::move(m), this);
+    hovered = false;
   }
   
   void paint(painter& p) {

@@ -80,6 +80,9 @@ auto top_panel(State& state)
     },
     text{state.current_track_name()},
     slider{ [] (auto& s) -> auto& { return s.player.volume; } }
+      .space(scalar_space::decibel())
+      .range(-80, 0)
+      .write_scaled(false)
   }.interspace(30);
 }
 

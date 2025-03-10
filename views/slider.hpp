@@ -14,6 +14,50 @@ struct slider_properties {
   rgba_u8 text_color = colors::white;
 };
 
+/// A function and its inverse
+struct scalar_space {
+  
+  static float identity (float x) { return x; }
+  
+  float operator()(float x) const { return fn(x); }
+  
+  static scalar_space exponential() {
+    return {(float(*)(float))&std::exp, (float(*)(float))&log};
+  }
+  
+  static scalar_space logarithmic() {
+    return { (float(*)(float)) &std::log, (float(*)(float)) &std::exp };
+  }
+  
+  static scalar_space log10() {
+    return {[] (float x) { return std::log(x) / std::log(10); }, 
+            [] (float x) { return std::exp(x * std::log(10)); }};
+  }
+  
+  static scalar_space square_root() {
+    return { static_cast<float(*)(float)>(&std::sqrt), [] (float x) { 
+      auto r = x * x;
+      return (x > 0) ? r : -r;
+    }};
+  }
+  
+  static scalar_space cubic_root() {
+    return {
+      [] (float x) { return std::pow(x, 1.f / 3.f); }, 
+      [] (float x) { return x * x * x; }
+    };
+  }
+  
+  static scalar_space decibel() {
+    return {
+      [] (float x) { return 20 * std::log(x) / std::log(10); },
+      [] (float x) { return std::exp(x * std::log(10) * 20); }
+    };
+  }
+  
+  std::function<float(float)> fn = &identity, inverse = &identity;
+};
+
 } // weave
 
 namespace weave::widgets 
@@ -22,19 +66,60 @@ namespace weave::widgets
 struct slider : widget_base
 {
   slider_properties prop;
-  float value;
+  float ratio_val; 
+  float scaled_val; 
   std::string value_str;
   write_fn<float> write;
+  scalar_space space;
+  
+  /// Whether to write the scaled value or the ratio value
+  bool write_scaled = true;
   
   using EvCtx = event_context;
   
   vec2f min_size() const { return {30, 15}; }
   vec2f max_size() const { return {100, 15}; }
+  
   // vec2f expand_factor() const { return {1, 0}; }
   
-  void on_value_change(float new_val) {
-    value = new_val;
-    value_str = std::format("{:.5}", new_val);
+  /// Set the ratio value and return the scaled value
+  float set_ratio(float new_ratio) {
+    auto delta = ratio_val - new_ratio;
+    // auto df = space((ratio_val + new_ratio) / 2);
+    ratio_val = new_ratio;
+    
+    auto scaled = scaled_value();
+    value_str = std::format("{:.5}", scaled);
+    return scaled;
+  }
+  
+  /// Set the scaled value.
+  void set_scaled(float value) {
+    auto min_inv = space.inverse(prop.min);
+    auto new_ratio = (space.inverse(value) - min_inv) / (space.inverse(prop.max) - min_inv);
+    set_ratio(new_ratio);
+  }
+  
+  /// Minmax of the scaled value
+  void set_range(float min, float max) {
+    prop.min = min;
+    prop.max = max;
+  }
+  
+  /// Set the function used to compute the scaled value
+  void set_value_space(const scalar_space& s) {
+    space = s;
+  }
+  
+  /// Return the value displayed as a string
+  float scaled_value() const {
+    auto min_inv = space.inverse(prop.min);
+    return space(min_inv + (space.inverse(prop.max) - min_inv) * ratio_val);
+  }
+  
+  /// Return the ratio of the slider bar (between 0 and 1)
+  float ratio_value() const {
+    return ratio_val;
   }
   
   void on(mouse_event e, EvCtx& ec) 
@@ -46,9 +131,9 @@ struct slider : widget_base
     float ratio = std::min(e.position.x / sz.x, 1.f);
     ratio = std::max(0.f, ratio);
     
-    auto new_val = prop.min + ratio * (prop.max - prop.min); 
-    write(ec, new_val);
-    on_value_change(new_val);
+    auto written_val = write_scaled ? scaled_value() : ratio; 
+    write(ec, written_val);
+    set_ratio(ratio);
     ec.request_repaint();
   }
   
@@ -57,9 +142,9 @@ struct slider : widget_base
     auto sz = size();
     p.fill_style(prop.background_color);
     p.fill(rounded_rectangle(sz));
+    
     p.fill_style(prop.active_color);
-    auto e = (value - prop.min) / (prop.max - prop.min);
-    p.fill(rounded_rectangle({e * sz.x, sz.y}));
+    p.fill(rounded_rectangle({ratio_value() * sz.x, sz.y}));
     
     static constexpr auto outline_col = rgba_f{colors::white}.with_alpha(0.5);
     p.stroke_style(outline_col);
@@ -84,12 +169,21 @@ struct slider : view<slider<Lens>> {
   
   using widget_t = widgets::slider;
   
+  void set_widget_value(widget_t& w, float val) {
+    if (write_scaled_v)
+      w.set_scaled(val);
+    else
+      w.set_ratio(val);
+  }
+  
   template <class S>
   auto build(const widget_builder& b, S& state) {
     val = lens.read(state);
     auto res = widget_t{{size}, properties};
     res.write = [l = lens] (event_context& c, float val) { l.write(c.state<S>(), val); };
-    res.on_value_change(val);
+    set_widget_value(res, val);
+    res.write_scaled = write_scaled_v;
+    res.space = space_v;
     return res;
   }
   
@@ -100,8 +194,10 @@ struct slider : view<slider<Lens>> {
     if (properties != Old.properties) {
       w.prop = properties;
     }
+    w.write_scaled = write_scaled_v;
+    w.space = space_v;
     if (val != Old.val) {
-      w.on_value_change(val);
+      set_widget_value(w, val);
     }
     if (size != Old.size) {
       w.set_size(size);
@@ -116,12 +212,34 @@ struct slider : view<slider<Lens>> {
     return *this;
   }
   
+  auto& space(const scalar_space& s) {
+    space_v = s;
+    return *this;
+  }
+  
+  auto& exponential() {
+    space_v = scalar_space::exponential();
+    return *this;
+  }
+  
+  auto& logarithmic() {
+    space_v = scalar_space::logarithmic();
+    return *this;
+  }
+  
+  auto& write_scaled(bool v) {
+    write_scaled_v = v;
+    return *this;
+  }
+  
   void destroy(widget_ref w) {}
   
   slider_properties properties;
   Lens lens;
   float val;
   vec2f size = {80, 15};
+  scalar_space space_v;
+  bool write_scaled_v = true;
 };
 
 template <class Lens>
