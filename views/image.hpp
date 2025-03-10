@@ -38,7 +38,7 @@ struct image : widget_base {
     if (!texture)
       return;
     p.fill_style(*texture, -corner_offset, size());
-    p.fill(area());
+    p.fill(rectangle(size()));
     // p.stroke_style(colors::red);
     // p.stroke_rect({0, 0}, size());
   }

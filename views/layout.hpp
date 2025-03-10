@@ -320,9 +320,18 @@ struct flow : widget_base {
     return {{200, 200}};
   }
   
-  vec2f layout(vec2f sz) {
-    vec2f pos = {0, 0};
+  point layout(point sz) {
+    point pos = {0, 0};
     float row_h = 0;
+    
+    widget_size_info row_sz_info;
+    
+    for (auto& c : children_vec) {
+      auto i = c.size_info();
+      row_sz_info.min[0] += i.min[0];
+      row_sz_info.min[1] = std::max(row_sz_info.min[1], i.min[1]);
+      
+    }
     
     /* 
     for (auto& c : children_vec) {

@@ -89,9 +89,6 @@ auto top_panel(State& state)
   }.interspace(30);
 }
 
-template <class T>
-using view_state = std::unique_ptr<T>;
-
 using track_selection = widgets::table::selection_t;
 
 auto track_info_menu(State& state, track_selection selected) {
@@ -246,7 +243,7 @@ auto make_view(State& state)
   return vstack{ top_panel(state),
                  hstack{ 
                         library_view{}, 
-                        views::image{state.current_cover, update_cover}
+                        views::image(state.current_cover, update_cover)
                         .fit({600, 600})
                         }.align(1).fill()
                }.align_center()

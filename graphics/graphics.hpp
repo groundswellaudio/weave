@@ -258,8 +258,8 @@ struct painter
       c = c.translated({-c.radius * 2 - 3, 0});
       
       fill( c );
-      fill( c.translated({ellipsis_width / 3, 0}) );
-      fill( c.translated({2 * ellipsis_width / 3, 0}) );
+      fill( c.translated({-ellipsis_width / 3, 0}) );
+      fill( c.translated({-2 * ellipsis_width / 3, 0}) );
         
       reset_scissor();
       
