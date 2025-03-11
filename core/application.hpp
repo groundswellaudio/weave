@@ -4,6 +4,7 @@
 #include <ranges>
 #include <optional>
 #include <atomic>
+#include <chrono>
 
 #include "backend.hpp"
 #include "view.hpp"
@@ -84,7 +85,7 @@ namespace impl {
       if (w == focused)
         return;
       
-      // often the case
+      // it will often be the case that &parents == &new_parents
       if (&parents != &new_parents)
         parents = new_parents;
       
@@ -194,6 +195,64 @@ namespace impl {
     event_context_parent_stack parents;
   };
   
+  struct widget_animations {
+    
+    struct animation {
+      
+      widget_ref widget;
+      std::function<bool(widget_ref)> call;
+      int period_in_ms;
+      std::chrono::steady_clock::time_point last_call;
+    };
+    
+    private :
+    
+    std::vector<animation> animations;
+    
+    public :
+    
+    template <class W, class Fn>
+    void animate(Widget& widget, Fn fn, int period_ms)
+    {
+      animations.push_back(
+          animation{
+            &widget,
+            [fn] (widget_ref w) -> bool { return fn(w.as<Widget>()); },
+            period_ms,
+            std::chrono::steady_clock::now()
+          }
+      );
+    }
+    
+    void deanimate(widget_ref w) {
+      erase_if(animations, [widget] (auto& a) { return a.widget == widget;} );
+    }
+  
+    /// Return true if a repaint is needed 
+    bool run()
+    {
+      if (animations.size() == 0)
+        return false;
+      
+      using namespace std::chrono;
+      const auto now = steady_clock::now();
+      
+      bool gotta_repaint = false;
+      
+      erase_if( animations, [now, &gotta_repaint] (auto& a)
+      {
+        const auto time_since_last = int(duration_cast<milliseconds>(now - a.last_call).count());
+        
+        if (time_since_last < a.period_in_ms)
+          return false;
+        
+        gotta_repaint = true;
+        a.last_call = now;
+        return not a.exec();
+      });
+      return gotta_repaint;
+    }
+  };
 } // impl
 
 template <class ViewCtor, class View, class State>
@@ -248,13 +307,22 @@ struct application_context {
     win.set_max_size(size_info.max);
   }
   
+  template <class W, class Fn>
+  void animate(W& widget, Fn fn, int period_in_ms) {
+    animations.animate(widget, fn, period_in_ms);
+  }
+  
+  void deanimate(widget_ref r) {
+    animations.deanimate(r);
+  }
+  
   void grab_mouse_focus(widget_ref new_focused, const event_context_parent_stack& parents) {
     med.set_focused(new_focused, parents);
   }
   
-  widget_ref push_overlay(widget_box menu) 
+  widget_ref push_overlay(widget_box w) 
   {
-    overlay = std::move(menu);
+    overlay = std::move(w);
     med.set_focused(overlay.borrow(), {});
     return overlay.borrow();
   }
@@ -363,6 +431,7 @@ struct application_context {
   widget_box root, overlay;
   impl::mouse_event_dispatcher med;
   impl::keyboard_event_dispatcher keyboard;
+  widget_animations animations;
 };
 
 auto event_context::lift_rebuild_request() {
@@ -402,6 +471,15 @@ widget_ref event_context::current_mouse_focus() {
   return ctx.current_mouse_focus();
 }
 
+template <class W, class Fn>
+void event_context::animate(W& widget, Fn fn, int period_in_ms) {
+  ctx.animate(widget, fn, period_in_ms);
+}
+  
+void event_context::deanimate(widget_ref w) {
+  ctx.deanimate(w);
+}
+
 void event_context::reset_mouse_focus() {
   ctx.reset_mouse_focus();
 }
@@ -421,15 +499,15 @@ struct application
   ViewCtor view_ctor;
   /// Some views are not assignable, so we emplace the main view instead
   std::optional<View> app_view;
-  application_context impl;
+  application_context app_ctx;
   
   application(State& s, ViewCtor ctor, window_properties prop) 
   : view_ctor{ctor}, 
     app_view{view_ctor(s)},
-    impl{ prop, 
+    app_ctx{ prop, 
           [&, this] { return app_view->build(build_context{impl}, s); } }
   {
-    impl.paint();
+    app_ctx.paint();
     // impl.root.debug_dump(3);
   }
   
@@ -439,20 +517,20 @@ struct application
     app_view.emplace( view_ctor(state) );
     auto bctx = build_context{impl};
     app_view->rebuild(old_view, impl.root.borrow(), bctx, state);
-    impl.med.update_absolute_position();
-    impl.rebuild_requested = false;
+    app_ctx.med.update_absolute_position();
+    app_ctx.rebuild_requested = false;
     // Note : it would be nice to not have to do this on every rebuild ? 
     auto size_info = impl.root.size_info();
-    impl.win.set_min_size(size_info.min);
-    impl.win.set_max_size(size_info.max);
+    app_ctx.win.set_min_size(size_info.min);
+    app_ctx.win.set_max_size(size_info.max);
   }
   
   void run(State& state)
   {
-    while(!impl.backend.want_quit)
+    while(!app_ctx.backend.want_quit)
     {
       event_frame_result frame;
-      impl.backend.visit_event( [&, this] (auto&& e) {
+      app_ctx.backend.visit_event( [&, this] (auto&& e) {
         if constexpr ( std::is_same_v<std::remove_reference_t<decltype(e)>, keyboard_event> )
           frame = impl.keyboard.on(e, &state, impl);
         else
@@ -465,7 +543,7 @@ struct application
       }
       
       if (frame.repaint_requested)
-        impl.paint(); 
+        app_ctx.paint(); 
     }
   }
 };

@@ -355,6 +355,13 @@ struct event_context {
   
   void pop_overlay();
   
+  /// Register an animation fn to be executed every period_in_ms
+  template <class W, class Fn>
+  void animate(W& widget, Fn fn, int period_in_ms);
+  
+  /// Remove all animations
+  void deanimate(widget_ref w);
+  
   vec2f absolute_position() const {
     vec2f res {0, 0};
     for (auto p : parents)

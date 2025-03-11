@@ -40,7 +40,7 @@ struct maybe : view_sequence_base {
     }
     else
     {
-      Old.view.seq_destroy(seq_updater.destroy_fn());
+      Old.view.seq_destroy(seq_updater.destroy_fn(), ctx.context());
     }
     return {};
   }
@@ -112,26 +112,26 @@ struct either : view_sequence_base {
     }, body);
   }
   
-  rebuild_result seq_rebuild(auto& Old, auto&& updater, auto& up, auto& state) {
+  rebuild_result seq_rebuild(auto& Old, auto&& updater, build_context ctx, auto& state) {
     if (Old.body.index() == body.index()) {
       return visit_with_index( [&] (auto& elem, auto index) {
-        return elem.seq_rebuild(get<index.value>(Old.body), updater, up, state);
+        return elem.seq_rebuild(get<index.value>(Old.body), updater, ctx, state);
       }, body);
     }
     else {
       visit( [&] (auto& elem) {
-        elem.seq_destroy(updater.destroy_fn());
+        elem.seq_destroy(updater.destroy_fn(), ctx.context());
       }, Old.body);
       visit( [&] (auto& elem) {
-        elem.seq_build(updater.consume_fn(), up, state);
+        elem.seq_build(updater.consume_fn(), ctx, state);
       }, body);
       return rebuild_result{}; 
     }
   }
   
-  void seq_destroy(auto Destroy) {
+  void seq_destroy(auto Destroy, application_context& ctx) {
     visit( [&] (auto& elem) {
-      elem.seq_destroy(Destroy);
+      elem.seq_destroy(Destroy, ctx);
     }, body);
   }
   

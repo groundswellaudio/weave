@@ -15,23 +15,40 @@ struct text_field : widget_base {
   
   using Self = text_field;
   
-  write_fn<std::string_view> write;
+  widget_action<std::string_view> write;
+  
+  private : 
+  
   std::string value_str;
-  bool editing = false;
+  glyph_positions glyph_pos;
+  unsigned edit_pos = 0;
+  bool show_caret : 1 = false;
+  bool editing : 1 = false;
+  
+  public : 
+  
+  bool is_being_edited() const { return editing; }
+  
+  void set_value(std::string new_value) {
+    value_str = new_value; 
+    edit_pos = value_str.size();
+  }
+  
+  const std::string& value() const { return value_str; }
   
   void on(mouse_event e, event_context& Ec) { 
     if (e.is_double_click()) {
       Ec.grab_keyboard_focus(this);
       editing = true;
+      Ec.animate(*this, [] (auto& s) { 
+        s.show_caret = !s.show_caret;
+        return s.editing; 
+      }, 1000);
     }
   }
   
   vec2f min_size() const { return min_size_field; }
   vec2f max_size() const { return {100.f, 15.f}; }
-  
-  vec2f expand_factor() const {
-    return {1, 0};
-  }
   
   void on(keyboard_event e, event_context& Ec) {
     if (e.is_up())
@@ -67,7 +84,11 @@ struct text_field : widget_base {
     p.stroke_style(colors::white);
     p.stroke(rounded_rectangle(size(), 3));
     p.text_align(text_align::x::left, text_align::y::center);
-    p.text(vec2f{5, size().y / 2}, value_str);
+    p.text({5, size().y / 2}, value_str);
+    
+    if (show_caret) {
+      p.line( )
+    }
   }
 };
 
@@ -97,6 +118,12 @@ struct text_field : view<text_field<Lens>> {
       w.value_str = val;
     return {};
   }
+  
+  void destroy(widget_ref wr, application_context& ctx) {
+    auto& w = wr.as<widget_t>();
+    if (w.is_begin_edited())
+      ctx.unanimate(wr);
+  }
 
   Lens lens;
 };
@@ -120,7 +147,7 @@ struct numeric_field : widget_base {
   double value;
   std::string value_str;
   bool accept_decimal;
-  write_fn<double> write;
+  widget_action<double> write;
   
   void on(mouse_event e, event_context& Ec) {
     if (e.is_double_click()) {
@@ -128,10 +155,8 @@ struct numeric_field : widget_base {
     }
   }
   
-  vec2f min_size() const { return min_size_field; }
-  vec2f max_size() const { return {100.f, 15.f}; }
-  
-  vec2f expand_factor() const { return {1, 0}; }
+  point min_size() const { return min_size_field; }
+  point max_size() const { return {100.f, 15.f}; }
   
   void update_from_str() {
     auto from_str = strtod(value_str.data(), nullptr);

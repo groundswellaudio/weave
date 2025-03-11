@@ -28,7 +28,7 @@ struct toggle_button : widget_base
   static constexpr float button_radius = 8;
   
   button_properties prop;
-  write_fn<bool> write;
+  widget_action<bool> write;
   bool value;
   
   void on(mouse_event e, event_context& ec) {
@@ -307,7 +307,7 @@ namespace weave::views
       return {};
     }
     
-    auto& size(vec2f sz) {
+    auto& size(point sz) {
       size_v = sz;
       return *this;
     }

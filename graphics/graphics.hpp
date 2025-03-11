@@ -307,10 +307,41 @@ struct painter
   }
 };
 
+struct glyph_positions {
+    
+  std::size_t size() const { return positions.size(); }
+  auto min() const { return positions.front().minx; }
+  auto max() const { return positions.back().maxx;  }
+  
+  float pos_from_index(unsigned idx) const {
+    if (idx == size())
+      return max();
+    return positions[idx].x;
+  }
+  
+  unsigned index_from_pos(float pos) const {
+    if (pos < min())
+      return 0;
+    if (pos > max())
+      return (unsigned)positions.size();
+    for (auto& p : positions)
+      if (pos >= p.minx && pos <= p.maxx)
+        return (unsigned)(&p - positions.data());
+    return (unsigned)positions.size();
+  }
+  
+  std::vector<NVGglyphPosition> positions;
+};
+
 struct graphics_context 
 {
   graphics_context();
   
+  void get_glyph_positions(glyph_positions& p, std::string_view text, point pos) const {
+    p.positions.resize(text.size());
+    nvgTextGlyphPositions(ctx, pos.x, pos.y, text.begin(), text.end(), p.positions.data(), (int)(p.positions.size()) );
+  }
+
   vec2f text_bounds(std::string_view str, int font_size) const {
     nvgFontSize(ctx, font_size);
     float bounds[4];

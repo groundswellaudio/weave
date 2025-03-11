@@ -71,11 +71,11 @@ struct view : view_sequence_base {
     return self.rebuild(old, seq_updater.next(), ctx, state);
   }
   
-  void seq_destroy(this auto& self, auto GetForDestroy) {
-    self.destroy( GetForDestroy() );
+  void seq_destroy(this auto& self, auto GetForDestroy, application_context& ctx) {
+    self.destroy( GetForDestroy(), ctx );
   }
   
-  void destroy(widget_ref w) {}
+  void destroy(widget_ref w, application_context& ctx) {}
 };
 
 template <class T>
