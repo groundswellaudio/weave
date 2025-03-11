@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include "util/util.hpp"
 
 namespace weave {
 
@@ -79,17 +80,45 @@ struct invocable_wrapper {
   Fn fn;
 };
 
+namespace detail {
+
+template <class T>
+struct is_atomic { static constexpr bool value = false; };
+
+template <class T>
+struct is_atomic<std::atomic<T>> { 
+  static constexpr bool value = true; 
+  using underlying = T; 
+};
+
+template <class V>
+auto&& unwrap_atomic(const V& v) { return v; }
+
+template <class T>
+auto unwrap_atomic(const std::atomic<T>& av) {
+  return av.load(std::memory_order_relaxed);
+}
+
+template <class T>
+static constexpr bool false_ = sizeof(T) > 1e10; 
+
+}
+
 template <class S>
 decltype(auto) apply_read(S& state, auto&& fn) {
-  if constexpr( requires { state.apply_read(fn); } )
-    return (state.apply_read(fn));
-  else
-    return (fn(state));
+  if constexpr( requires { state.apply_read(fn); } ) {
+    auto res = detail::unwrap_atomic(state.apply_read(fn));
+    static_assert( !detail::is_atomic<decltype(res)>::value );
+    return res;
+  }
+  else { 
+    return detail::unwrap_atomic(fn(state));
+  }
 }
 
 template <class S>
 void apply_write(S& state, auto&& fn) {
-  if constexpr ( requires {state.apply_write(fn);} )
+  if constexpr ( requires {state.apply_write(fn);} ) 
     state.apply_write(fn);
   else
     fn(state);
@@ -140,8 +169,8 @@ auto make_lens(L l) {
 }
 
 template <class A, class B>
-auto readwrite(A a, B b) {
-  return lens_readwrite{invocable_wrapper<A>{a}, invocable_wrapper<B>{b}};
+auto readwrite(A val, B b) {
+  return lens_readwrite{ [val] (ignore) { return val; }, invocable_wrapper<B>{b} };
 }
 
 template <class T>

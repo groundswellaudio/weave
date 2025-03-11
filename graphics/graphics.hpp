@@ -94,11 +94,19 @@ struct painter
     glDisable(GL_STENCIL_TEST);
   }
   
-  void scissor(vec2f pos, vec2f size){
+  struct scissor_raii {
+    painter& p; 
+    ~scissor_raii() { 
+      p.reset_scissor();
+    }
+  };
+  
+  [[nodiscard]] scissor_raii scissor(point pos, point size){
     nvgScissor(ctx, pos.x, pos.y, size.x, size.y);
+    return {*this};
   }
   
-  void intersect_scissor(vec2f pos, vec2f size) {
+  void intersect_scissor(point pos, point size) {
     nvgIntersectScissor(ctx, pos.x, pos.y, size.x, size.y);
   }
 
@@ -168,12 +176,12 @@ struct painter
     return *this;
   }
   
-  painter& move_to(vec2f p) {
+  painter& move_to(point p) {
     nvgMoveTo(ctx, p.x, p.y);
     return *this;
   }
 
-  painter& line_to(vec2f p) {
+  painter& line_to(point p) {
     nvgLineTo(ctx, p.x, p.y);
     return *this;
   }
@@ -213,16 +221,16 @@ struct painter
     nvgFillColor(ctx, impl::to_nvg_col(c));
   }
   
-  void fill_style(texture_handle t, vec2f top_left, vec2f size) {
+  void fill_style(texture_handle t, point top_left, point size) {
     auto p = nvgImagePattern(ctx, top_left.x, top_left.y, size.x, size.y, 0, t.id, 1.f);
     nvgFillPaint(ctx, p);
   }
   
-  void text(vec2f pos, std::string_view v) {
+  void text(point pos, std::string_view v) {
     nvgText(ctx, pos.x, pos.y - this->text_vert_offset, v.data(), v.end());
   }
   
-  void text_bounded(vec2f pos, float width, std::string_view str) {
+  void text_bounded(point pos, float width, std::string_view str) {
     if (str == "")
       return;
     float bounds[4];
@@ -237,8 +245,10 @@ struct painter
       nvgTextGlyphPositions(ctx, 0, 0, "...", nullptr, ellipsisPos, 3);
       auto ellipsis_width = ellipsisPos[2].maxx; */ 
       
+      nvgSave(ctx);
+      
       // apply the scissor horizontally
-      scissor({pos.x, pos.y - (float)1e6}, {width, 2 * 1e6});
+      intersect_scissor({pos.x, pos.y - (float)1e6}, {width, 2 * 1e6});
       
       auto ellipsis_width = font_size();
       
@@ -260,9 +270,8 @@ struct painter
       fill( c );
       fill( c.translated({-ellipsis_width / 3, 0}) );
       fill( c.translated({-2 * ellipsis_width / 3, 0}) );
-        
-      reset_scissor();
       
+      nvgRestore(ctx);
       // text( vec2f{positions[index].minx, pos.y}, "..." );
       
       return;
@@ -279,7 +288,7 @@ struct painter
     }
   };
   
-  [[nodiscard]] translation_raii translate(vec2f delta) {
+  [[nodiscard]] translation_raii translate(point delta) {
     nvgTranslate(ctx, delta.x, delta.y);
     return translation_raii{*this, delta}; 
   }

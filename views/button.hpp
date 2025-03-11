@@ -225,7 +225,7 @@ template <class PaintFn>
 struct graphic_toggle_button : widget_base {
   
   PaintFn paint_fn;
-  write_fn<bool> write;
+  widget_action<bool(bool)> write;
   bool flag;
   bool hovered = false;
   
@@ -239,10 +239,8 @@ struct graphic_toggle_button : widget_base {
       (hovered = true, ec.request_repaint());
     else if (e.is_exit())
       (hovered = false, ec.request_repaint());
-    else if (e.is_down()) {
-      flag = !flag;
-      write(ec, flag);
-    }
+    else if (e.is_down()) 
+      flag = write(ec, !flag);
   }
   
   void paint(painter& p) {
@@ -315,7 +313,7 @@ namespace weave::views
     }
     
     bool val;
-    vec2f size_v = {20, 20};
+    point size_v = {20, 20};
     PaintFn paint_fn;
     WriteFn write_fn;
   };
@@ -356,7 +354,7 @@ namespace weave::views
       };
     }
     
-    vec2f size_v = {20, 20};
+    point size_v = {20, 20};
     PaintFn paint_fn;
     Payload payload;
   };

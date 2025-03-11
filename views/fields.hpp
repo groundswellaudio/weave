@@ -62,10 +62,10 @@ struct text_field : widget_base {
   
   void paint(painter& p) {
     p.fill_style(editing ? colors::red : colors::black);
-    p.fill(area());
+    p.fill(rectangle(size()));
     p.fill_style(colors::white);
     p.stroke_style(colors::white);
-    p.stroke(rounded_rectangle(size()));
+    p.stroke(rounded_rectangle(size(), 3));
     p.text_align(text_align::x::left, text_align::y::center);
     p.text(vec2f{5, size().y / 2}, value_str);
   }

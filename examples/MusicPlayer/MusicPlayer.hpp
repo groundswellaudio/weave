@@ -5,10 +5,12 @@
 
 using namespace weave;
 
-void paint_play_button(painter& p, bool flag, vec2f sz) {
+void paint_play_button(painter& p, bool flag, point sz) {
   p.fill_style(colors::white);
-  if (!flag)
-    p.fill(triangle({0, 0}, {0, sz.y}, {sz.x, sz.y / 2}));
+  if (!flag) {
+    p.fill(triangle(circle(sz / 2, sz.x / 2), radians{0.f}));
+    // p.fill(triangle({0, 0}, {0, sz.y}, {sz.x, sz.y / 2}));
+  }
   else {
     auto rsz = vec2f{sz.x / 5, sz.y};
     p.fill( rectangle(rsz).translated({1 * sz.x / 5, 0}) );
@@ -17,16 +19,16 @@ void paint_play_button(painter& p, bool flag, vec2f sz) {
 }
 
 template <bool Direction>
-void paint_transport_button(painter& p, vec2f sz) {
+void paint_transport_button(painter& p, point sz) {
   p.fill_style(colors::white);
   
-  auto traii = p.translate({3, 3});
+  auto _ = p.translate({3, 3});
   sz -= 3;
   
   if (Direction) {
     auto tri = triangle({0, 0}, {0, sz.y}, sz / 2);
     p.fill( tri );
-    p.fill( tri.translated({sz.x, 0}) );
+    p.fill( tri.translated({sz.x / 2, 0}) );
   }
   else {
     auto a = vec2f{0, sz.y / 2};
@@ -71,22 +73,22 @@ auto top_panel(State& state)
 {
   using namespace views;
   
-  auto rw_device = readwrite( [] (State& s) { return s.player.current_device_index(); }, 
-                              [] (State& s, int id) { s.player.set_audio_device(id); });
+  auto device_val = readwrite( state.player.current_device_index(), 
+                               [] (State& s, int id) { s.player.set_audio_device(id); });
   
   return hstack {
-    combo_box(rw_device, audio_output_devices()), 
+    combo_box(device_val, audio_output_devices()), 
     hstack {
       graphic_button{&paint_transport_button<false>, &State::previous_track},
-      graphic_toggle_button{&paint_play_button, state.is_playing, &State::set_play}.size({20, 20}),
+      graphic_toggle_button{&paint_play_button, state.is_playing, &State::set_play}.size({25, 25}),
       graphic_button{&paint_transport_button<true>, &State::next_track}
-    },
+    }.align_center(),
     text{state.current_track_name()},
     slider{ [] (auto& s) -> auto& { return s.player.volume; } }
       .space(scalar_space::decibel())
       .range(-80, 0)
       .write_scaled(false)
-  }.interspace(30);
+  }.interspace(30).align_center();
 }
 
 using track_selection = widgets::table::selection_t;

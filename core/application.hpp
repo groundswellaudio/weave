@@ -410,7 +410,7 @@ void event_context::push_overlay_relative(widget_box widget) {
   auto abs_pos = absolute_position() + widget.position();
   auto winsz = ctx.window().size();
   auto new_pos = abs_pos;
-  new_pos -= max(new_pos + widget.size() - winsz, vec2f{0, 0});
+  new_pos -= max(new_pos + widget.size() - winsz, point{0, 0});
   widget.set_position(new_pos);
   push_overlay(std::move(widget));
 }
@@ -430,7 +430,7 @@ struct application
           [&, this] { return app_view->build(build_context{impl}, s); } }
   {
     impl.paint();
-    impl.root.debug_dump(3);
+    // impl.root.debug_dump(3);
   }
   
   void rebuild(State& state) {

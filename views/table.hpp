@@ -204,9 +204,8 @@ struct table : widget_base, scrollable_base {
     
     {
       auto _ = p.translate({0, first_row});
-      p.scissor({0, 0}, scroll_zone().size);
-      paint_body(p, size() - vec2f{0, first_row});
-      p.reset_scissor();
+      auto _ = p.scissor({0, 0}, scroll_zone().size);
+      paint_body(p, size() - point{0, first_row});
     }
     
     scrollable_base::paint(p);
@@ -324,7 +323,7 @@ struct table : widget_base, scrollable_base {
     float pos_x = 0;
     p.stroke_style(colors::black);
     
-    p.scissor({0, 0}, size());
+    auto _ = p.scissor({0, 0}, size());
     
     p.text_align(text_align::x::left, text_align::y::center);
     
@@ -347,8 +346,6 @@ struct table : widget_base, scrollable_base {
                           degrees{property_sort_order ? 90.f : -90.f});
       p.fill(tri);
     }
-    
-    p.reset_scissor();
   }
   
   void paint_body(painter& p, vec2f body_sz) {

@@ -8,10 +8,10 @@ namespace weave {
 struct slider_properties {
   bool operator==(const slider_properties&) const = default;
   float min = 0, max = 1;
-  
   rgba_u8 background_color = rgb_u8{30, 30, 30};
   rgba_u8 active_color = rgba_f{colors::cyan}.with_alpha(0.3);
   rgba_u8 text_color = colors::white;
+  unsigned short precision = 2; 
 };
 
 /// A function and its inverse
@@ -89,7 +89,7 @@ struct slider : widget_base
     ratio_val = new_ratio;
     
     auto scaled = scaled_value();
-    value_str = std::format("{:.5}", scaled);
+    value_str = std::format("{:.{}f}", scaled, prop.precision);
     return scaled;
   }
   
@@ -111,7 +111,7 @@ struct slider : widget_base
     space = s;
   }
   
-  /// Return the value displayed as a string
+  /// Return the value which is displayed as a string
   float scaled_value() const {
     auto min_inv = space.inverse(prop.min);
     return space(min_inv + (space.inverse(prop.max) - min_inv) * ratio_val);
@@ -178,7 +178,7 @@ struct slider : view<slider<Lens>> {
   
   template <class S>
   auto build(const build_context& b, S& state) {
-    val = lens.read(state);
+    auto val = lens.read(state);
     auto res = widget_t{{size}, properties};
     res.write = [l = lens] (event_context& c, float val) { l.write(c.state<S>(), val); };
     set_widget_value(res, val);
@@ -190,13 +190,13 @@ struct slider : view<slider<Lens>> {
   template <class S>
   rebuild_result rebuild(slider<Lens>& Old, widget_ref wb, build_context up, S& state) {
     auto& w = wb.as<widget_t>();
-    val = lens.read(state);
+    auto val = lens.read(state);
     if (properties != Old.properties) {
       w.prop = properties;
     }
     w.write_scaled = write_scaled_v;
     w.space = space_v;
-    if (val != Old.val) {
+    if (val != write_scaled_v ? w.scaled_value() : w.ratio_value()) {
       set_widget_value(w, val);
     }
     if (size != Old.size) {
@@ -232,11 +232,16 @@ struct slider : view<slider<Lens>> {
     return *this;
   }
   
+  /// Set the numbers of decimals to be displayed
+  auto& precision(unsigned prec) {
+    properties.precision = prec;
+    return *this;
+  }
+  
   void destroy(widget_ref w) {}
   
   slider_properties properties;
   Lens lens;
-  float val;
   vec2f size = {80, 15};
   scalar_space space_v;
   bool write_scaled_v = true;

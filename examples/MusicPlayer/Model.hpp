@@ -71,9 +71,10 @@ struct Database {
     auto& title() { return properties[0]; }
     auto& artist() { return properties[1]; }
     auto& album() { return properties[2]; }
+    auto& date_added() { return properties[3]; }
     
     std::string file_path;
-    std::string properties[3];
+    std::string properties[4];
   };
   
   struct Playlist {
@@ -122,7 +123,7 @@ struct Database {
   };
   
   static constexpr const char* properties_v[] = {
-    "Title", "Artist", "Album"
+    "Title", "Artist", "Album", "Date added"
   };
   
   std::vector<Track> tracks;
@@ -140,7 +141,11 @@ struct Database {
     auto Album = tag->album().to8Bit();
     if (Title == "")
       Title = ghc::filesystem::path(path).stem();
-    tracks.push_back( {path, {Title, Artist, Album}} );
+    auto Now = std::chrono::system_clock::now();
+    auto DateAdded = std::format("{} {:%R}", 
+      std::chrono::year_month_day(std::chrono::floor<std::chrono::days>(Now)), 
+      Now);
+    tracks.push_back( {path, {Title, Artist, Album, DateAdded}} );
     try_add_artist(Artist);
     try_add_album(tracks.back(), tracks.size() - 1);
     return true;
@@ -151,7 +156,6 @@ struct Database {
   
   auto& track(int index) { return tracks[index]; }
   
-  /// Accessor
   auto& playlists() const { 
     return playlists_v; 
   }

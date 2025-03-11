@@ -5,8 +5,6 @@
 
 namespace weave {
 
-struct layout_tag {};
-
 template <class Producer, class Consumer, class Destroyer> 
 struct view_seq_rebuild_ctx {
   Producer produce;
@@ -60,7 +58,7 @@ struct view : view_sequence_base {
   
   // must declare the following : 
   // build(build_context& c, auto& state) -> Widget
-  // rebuild(self& new, widget& w, build_context up, auto& state)
+  // rebuild(self& old, widget_ref w, build_context ctx, auto& state) -> rebuild_result
   
   void seq_build(this auto& self, auto Consumer, const build_context& ctx, auto& state) {
     Consumer(self.build(ctx, state));

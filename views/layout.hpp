@@ -11,7 +11,7 @@ namespace weave {
 
 struct stack_data {
   float interspace = 8;
-  vec2f margin {0, 0};
+  point margin {0, 0};
   float align_ratio = 0;
   rgba_u8 background_col {0, 0, 0, 0};
   bool fill_cross_axis = false;
@@ -244,6 +244,7 @@ namespace impl {
       res |= elem.seq_rebuild(get<elem_index.value>(Old.children), seq_updater, ctx, state);
     }, New.children);
     
+    // FIXME : this could be rewritten more efficiently with erase(remove(...))
     for (auto i : seq_updater.to_erase)
       w.children_vec.erase(w.children_vec.begin() + i);
     
@@ -271,15 +272,15 @@ struct stack : widget_base
   void paint(painter& p) {
     p.fill_style(data.background_col);
     p.fill(rectangle(size()));
-    p.stroke_style(colors::green);
-    p.stroke(rectangle(size()));
+    // p.stroke_style(colors::green);
+    //  p.stroke(rectangle(size()));
   }
   
   widget_size_info size_info() const {
     if (!children_vec.size())
       return { data.margin * 2, data.margin * 2 };
     
-    vec2f min {0, 0}, max{0, 0};
+    point min {0, 0}, max{0, 0};
     // vec2f factor {0, 0};
     for (auto& e : children_vec) {
       auto i = e.size_info();
@@ -305,7 +306,7 @@ struct stack : widget_base
     return std::all_of(children_vec.begin(), children_vec.end(), fn);
   }
   
-  auto layout(vec2f sz) {
+  auto layout(point sz) {
     impl::do_stack_layout(children_vec, data, Axis, sz);
     return sz;
   }
