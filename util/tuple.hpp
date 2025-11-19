@@ -1,7 +1,7 @@
 #pragma once
 
-#include <kumi/tuple.hpp>
-#include <kumi/utils.hpp>
+#include <kumi/kumi.hpp>
+//#include <kumi/utils.hpp>
 
 namespace weave {
   using kumi::tuple;

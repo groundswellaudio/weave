@@ -389,8 +389,6 @@ struct stack_base : view<stack_base<T, Ts...>>, stack<Ts...> {
   rebuild_result rebuild(stack_base<T, Ts...>& Old, widget_ref wb, const build_context& ctx, S& state) {
     return impl::rebuild_stack<T>(*this, Old, wb, ctx, state);
   }
-  
-  void destroy(widget_ref wb) {}
 };
 
 template <class... Ts>

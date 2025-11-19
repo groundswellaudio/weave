@@ -1,5 +1,7 @@
 #pragma once
-#include <SDL.h>
+
+#include <SDL3/SDL.h>
+#include "../util/vec.hpp"
 
 namespace weave {
 
@@ -22,7 +24,7 @@ struct window {
   ~window(){
     if (!win) return;
     SDL_DestroyWindow(win);
-    SDL_GL_DeleteContext(gl_ctx);
+    SDL_GL_DestroyContext(gl_ctx);
   }
   
   SDL_Window* get(){ return win; }
@@ -61,12 +63,12 @@ struct window {
   private :
   
   void init(const char* name, int x, int y) {
-    win    = SDL_CreateWindow(name, 0, 0, x, y, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
+    win    = SDL_CreateWindow(name, x, y, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
     gl_ctx = SDL_GL_CreateContext(win);
   }
   
   SDL_Window* win;
-  void* gl_ctx;
+  SDL_GLContext gl_ctx;
 };
 
 } // weave

@@ -4,7 +4,7 @@
 #define NANOVG_GL3_IMPLEMENTATION
 
 #include "nanovg_gl.h"
-#include <SDL.h>
+#include <SDL3/SDL.h>
 
 #include "misc/default_font_embed"
 

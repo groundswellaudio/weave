@@ -1,10 +1,12 @@
 #pragma once
 
-#include "spiral.hpp"
+#include "weave.hpp"
 
 #include <ranges>
 #include <random>
 #include <future>
+
+using namespace weave;
 
 template <class T>
 struct padded_image {
@@ -157,8 +159,8 @@ void patch_match_search(const I& examplar, I& generated, search_map& Map, int pa
     auto y = idx[0];
     auto x = idx[1];
     
-    float min_dist = Map(idx).m1;
-    vec2i origin = Map(idx).m0;
+    float min_dist = get<1>(Map(idx));
+    vec2i origin = get<0>(Map(idx));
     
     int ratio = 1;
     int max_size = std::min(examplar.shape()[0], examplar.shape()[1]);
@@ -331,6 +333,9 @@ void patch_match_update_distance(const I& source, const I& generated, search_map
     elem.m1 = patch_distance(source, elem.m0, generated, idx, patch_hs);
   });
 }
+
+template <class Pixel>
+struct distrib_type {};
 
 consteval type distrib_type(type scalar) {
   auto args = template_arguments{scalar};

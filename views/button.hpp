@@ -35,7 +35,7 @@ struct toggle_button : widget_base
     if (e.is_enter())
       set_mouse_cursor(mouse_cursor::hand);
     else if (e.is_exit())
-      set_mouse_cursor(mouse_cursor::arrow);
+      set_mouse_cursor();
     else if (e.is_down()) {
       write(ec, !value);
       value = !value;

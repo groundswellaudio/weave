@@ -27,6 +27,8 @@ struct text_field : widget_base {
   
   public : 
   
+  void set_editing(bool is_edited) { editing = is_edited; }
+  
   bool is_being_edited() const { return editing; }
   
   void set_value(std::string new_value) {
@@ -87,7 +89,7 @@ struct text_field : widget_base {
     p.text({5, size().y / 2}, value_str);
     
     if (show_caret) {
-      p.line( )
+      // p.line( )
     }
   }
 };
@@ -115,14 +117,14 @@ struct text_field : view<text_field<Lens>> {
     auto& w = elem.as<widget_t>();
     auto val = lens.read(state);
     if (!up.context().has_keyboard_focus(elem))
-      w.value_str = val;
+      w.set_value(val);
     return {};
   }
   
   void destroy(widget_ref wr, application_context& ctx) {
     auto& w = wr.as<widget_t>();
-    if (w.is_begin_edited())
-      ctx.unanimate(wr);
+    if (w.is_being_edited())
+      ctx.deanimate(wr);
   }
 
   Lens lens;

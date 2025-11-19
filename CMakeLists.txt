@@ -5,15 +5,20 @@ include(FetchContent)
 
 project(Weave)
 
+if (APPLE)
+    enable_language(OBJC)
+    enable_language(OBJCXX)
+endif()
+
 FetchContent_Declare(swl-variant
   GIT_REPOSITORY https://github.com/groundswellaudio/swl-variant.git
   GIT_TAG "origin/main")
 FetchContent_MakeAvailable(swl-variant)
 
-FetchContent_Declare(SDL2
+FetchContent_Declare(SDL3
   GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
-  GIT_TAG release-2.30.0)
-FetchContent_MakeAvailable(SDL2)
+  GIT_TAG release-3.2.26)
+FetchContent_MakeAvailable(SDL3)
 
 FetchContent_Declare(nanovg
   GIT_REPOSITORY https://github.com/memononen/nanovg.git)
@@ -44,12 +49,13 @@ FetchContent_MakeAvailable(kumi-tuple)
 
 include_directories(./deps/glad/include)
 include_directories(./)
-include_directories(${SDL2_SOURCE_DIR}/include)
+include_directories(${SDL3_SOURCE_DIR}/include)
 include_directories(${nanovg_SOURCE_DIR}/src)
 include_directories(${nfd_SOURCE_DIR}/include)
 include_directories(${miniaudio_SOURCE_DIR})
 include_directories(${dr_libs_SOURCE_DIR})
 include_directories(${stb_SOURCE_DIR})
+include_directories(${kumi-tuple_SOURCE_DIR}/include)
 
 if (CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
   add_executable(Weave main.cpp misc/mini_audio_impl.cpp graphics/graphics.cpp)
@@ -59,7 +65,7 @@ endif()
 
 target_include_directories(Weave PUBLIC 
   ./deps/glad/include
-  ${SDL2_SOURCE_DIR}/include 
+  ${SDL3_SOURCE_DIR}/include 
   ${nanovg_SOURCE_DIR}/src
   ${nfd_SOURCE_DIR}/include
   ${miniaudio_SOURCE_DIR}
@@ -71,5 +77,19 @@ target_include_directories(Weave PUBLIC
 target_sources(Weave PRIVATE ./deps/glad/src/glad.c)
 target_sources(Weave PRIVATE ${nanovg_SOURCE_DIR}/src/nanovg.c)
 
-target_link_libraries(Weave SDL2::SDL2main SDL2::SDL2-static)
-target_link_libraries(Weave nfd)
+if(APPLE)
+    find_library(FOUNDATION_LIBRARY Foundation)
+    find_library(COCOA_LIBRARY Cocoa)
+    
+    target_link_libraries(Weave PRIVATE
+        ${FOUNDATION_LIBRARY}
+        ${COCOA_LIBRARY}
+        "-lobjc"
+    )
+    target_link_options(Weave PRIVATE
+        "-Wl,-ld_classic"
+    )
+endif()
+
+target_link_libraries(Weave PRIVATE SDL3::SDL3)
+target_link_libraries(Weave PUBLIC nfd)

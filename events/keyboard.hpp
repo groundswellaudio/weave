@@ -10,7 +10,8 @@
 
 namespace weave {
 
-#include <SDL.h>
+#include <SDL3/SDL.h>
+#include <SDL3/SDL_keycode.h>
 
 // the identifier for a (virtual) key
 enum class keycode : unsigned char {
@@ -95,12 +96,12 @@ inline char to_character(keycode k) {
 // backend stuff
 namespace impl {
 
-  inline keycode from_sdl_keycode(SDL_Keysym s){
-    switch(s.sym)
+  inline keycode from_sdl_keycode(SDL_Keycode s){
+    switch(s)
     {
       #define N(NUM)  case SDLK_##NUM   : return keycode::n##NUM;
       #define K(N, C) case SDLK_##C     : return keycode::N;
-      #define L(N, C) case SDLK_##N     : return keycode::N;
+      #define L(N, C) case SDLK_##C     : return keycode::N;
       #define S(N, C, Z) case SDLK_##C  : return keycode::N;
         #include "keys.def"
       default :
@@ -108,13 +109,13 @@ namespace impl {
     }
   }
 
-  inline SDL_KeyCode to_sdl_keycode(keycode k)
+  inline SDL_Keycode to_sdl_keycode(keycode k)
   {
     switch(k)
     {
       #define N(NUM)  case keycode::n##NUM : return SDLK_##NUM;
       #define K(N, C) case keycode::N      : return SDLK_##C;
-      #define L(N, C) case keycode::N      : return SDLK_##N;
+      #define L(N, C) case keycode::N      : return SDLK_##C;
       #define S(N, C, Z) case keycode::N   : return SDLK_##C;
         #include "keys.def"
       default :
@@ -127,7 +128,7 @@ namespace impl {
 inline bool is_being_held(keycode k)
 {
   auto* state = SDL_GetKeyboardState(nullptr);
-  return state[SDL_GetScancodeFromKey(impl::to_sdl_keycode(k))];
+  return state[SDL_GetScancodeFromKey(impl::to_sdl_keycode(k), nullptr)];
 }
 
 } // weave

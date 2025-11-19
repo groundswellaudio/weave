@@ -93,8 +93,6 @@ struct text : view<text> {
     return res;
   }
   
-  void destroy(widget_ref w) {}
-  
   widget_t::properties prop;
   std::string_view str;
 };

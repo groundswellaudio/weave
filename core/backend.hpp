@@ -1,14 +1,18 @@
 
 #pragma once
 
-#include <SDL.h>
+#include <SDL3/SDL.h>
 #include <glad/glad.h>
 
 #include "events/mouse_events.hpp"
 #include "events/keyboard.hpp"
+#include "window.hpp"
+
 #include <iostream>
 
-namespace weave::impl {
+namespace weave {
+
+namespace impl {
 
 class sdl_backend
 {
@@ -16,8 +20,22 @@ class sdl_backend
   int last_mouse_down = 0;
   bool has_resized = false;
   
-  void init() {
-    if (SDL_Init(SDL_INIT_VIDEO) < 0)
+  public :
+  
+  bool want_quit = false;
+  
+  template <class Ctx>
+  static bool on_window_resize(void* data, SDL_Event* event)
+  {
+    if (event->type == SDL_EVENT_WINDOW_RESIZED)
+      ((Ctx*)data)->on_window_resize();
+    return true;
+  }
+  
+  template <class Ctx>
+  sdl_backend(Ctx* ctx)
+  {
+    if (!SDL_Init(SDL_INIT_VIDEO))
     {
       fprintf(stderr, "failed to initialize SDL, aborting.");
       exit(1);
@@ -30,26 +48,11 @@ class sdl_backend
     // setting up a stencil buffer is necessary for nanovg to work
     SDL_GL_SetAttribute( SDL_GL_STENCIL_SIZE, 1 );
     
-    SDL_StartTextInput();
-  }
-  
-  public :
-  
-  bool want_quit = false;
-  
-  template <class Ctx>
-  static int on_window_resize(void* data, SDL_Event* event)
-  {
-    if (event->type == SDL_WINDOWEVENT && event->window.event == SDL_WINDOWEVENT_RESIZED)
-      ((Ctx*)data)->on_window_resize();
-    return 1;
-  }
-  
-  template <class Ctx>
-  sdl_backend(Ctx* ctx)
-  {
-    init();
     SDL_AddEventWatch( &on_window_resize<Ctx>, ctx );
+  }
+  
+  void start_text_input(window& win) {
+    SDL_StartTextInput(win.get());
   }
   
   void load_opengl()
@@ -70,7 +73,7 @@ class sdl_backend
     
     switch(e.type)
     {
-      case SDL_MOUSEBUTTONDOWN :
+      case SDL_EVENT_MOUSE_BUTTON_DOWN :
       {
         auto time = e.button.timestamp;
         bool is_double_click = false;
@@ -87,7 +90,7 @@ class sdl_backend
         break;
       }
       
-      case SDL_MOUSEBUTTONUP :
+      case SDL_EVENT_MOUSE_BUTTON_UP :
       {
         mouse_is_dragging = false;
         auto p = pos(e.button.x, e.button.y);
@@ -95,7 +98,7 @@ class sdl_backend
         break;
       }
       
-      case SDL_MOUSEMOTION :
+      case SDL_EVENT_MOUSE_MOTION :
       {
         auto p = pos(e.motion.x, e.motion.y);
         auto delta = pos(e.motion.xrel, e.motion.yrel);
@@ -103,48 +106,37 @@ class sdl_backend
         break;
       }
       
-      case SDL_MOUSEWHEEL :
+      case SDL_EVENT_MOUSE_WHEEL :
       {
         auto delta = pos(e.wheel.x, e.wheel.y);
-        auto ev = mouse_event{pos(e.wheel.mouseX, e.wheel.mouseY), mouse_scroll{delta}};
+        auto ev = mouse_event{pos(e.wheel.mouse_x, e.wheel.mouse_y), mouse_scroll{delta}};
         vis(ev);
         break;
       }
     
-      case SDL_TEXTEDITING :
-      case SDL_TEXTINPUT :
+      case SDL_EVENT_TEXT_EDITING :
+      case SDL_EVENT_TEXT_INPUT :
       {
         break;
       }
       
-      case SDL_DROPFILE: 
+      case SDL_EVENT_DROP_FILE: 
       {
-        std::string file = e.drop.file;
-        SDL_free(e.drop.file);
+        std::string file = e.drop.data;
         vis( mouse_event{vec2f{0, 0}, file_drop(std::move(file))} );
         break;
       }
       
-      case SDL_DROPTEXT:
-      case SDL_DROPBEGIN:
-      case SDL_DROPCOMPLETE: 
-        break;
-      
-      case SDL_KEYDOWN :
-      case SDL_KEYUP :
+      case SDL_EVENT_KEY_DOWN :
+      case SDL_EVENT_KEY_UP :
       {
         auto& KE = e.key;
-        auto code = impl::from_sdl_keycode(KE.keysym);
-        vis( keyboard_event{code, KE.type == SDL_KEYDOWN} );
-        break;
-      }
-    
-      case SDL_WINDOWEVENT :
-      {
+        auto code = impl::from_sdl_keycode(KE.key);
+        vis( keyboard_event{code, KE.type == SDL_EVENT_KEY_DOWN} );
         break;
       }
       
-      case SDL_QUIT :
+      case SDL_EVENT_QUIT :
         want_quit = true;
         break;
       
@@ -181,3 +173,5 @@ class sdl_backend
 };
 
 } // impl
+
+} // weave

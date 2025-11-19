@@ -199,6 +199,12 @@ namespace impl {
     
     struct animation {
       
+      // Return false if the animation should stop
+      bool run(std::chrono::steady_clock::time_point now) {
+        last_call = now;
+        return call(widget);
+      }
+      
       widget_ref widget;
       std::function<bool(widget_ref)> call;
       int period_in_ms;
@@ -211,7 +217,7 @@ namespace impl {
     
     public :
     
-    template <class W, class Fn>
+    template <class Widget, class Fn>
     void animate(Widget& widget, Fn fn, int period_ms)
     {
       animations.push_back(
@@ -225,7 +231,7 @@ namespace impl {
     }
     
     void deanimate(widget_ref w) {
-      erase_if(animations, [widget] (auto& a) { return a.widget == widget;} );
+      erase_if(animations, [w] (auto& a) { return a.widget == w;} );
     }
   
     /// Return true if a repaint is needed 
@@ -247,8 +253,8 @@ namespace impl {
           return false;
         
         gotta_repaint = true;
-        a.last_call = now;
-        return not a.exec();
+        
+        return not a.run(now);
       });
       return gotta_repaint;
     }
@@ -299,8 +305,9 @@ struct application_context {
     win{win_prop}, 
     root{Ctor()}, 
     overlay{nullptr},
-    med{root.borrow()}
+    mouse{root.borrow()}
   {
+    backend.start_text_input(win);
     layout_root();
     auto size_info = root.size_info();
     win.set_min_size(size_info.min);
@@ -317,19 +324,19 @@ struct application_context {
   }
   
   void grab_mouse_focus(widget_ref new_focused, const event_context_parent_stack& parents) {
-    med.set_focused(new_focused, parents);
+    mouse.set_focused(new_focused, parents);
   }
   
   widget_ref push_overlay(widget_box w) 
   {
     overlay = std::move(w);
-    med.set_focused(overlay.borrow(), {});
+    mouse.set_focused(overlay.borrow(), {});
     return overlay.borrow();
   }
   
   void pop_overlay()
   {
-    med.set_focused(root.borrow(), {});
+    mouse.set_focused(root.borrow(), {});
     overlay.reset();
   }
   
@@ -342,7 +349,7 @@ struct application_context {
   }
   
   widget_ref current_mouse_focus() {
-    return med.current_focus();
+    return mouse.current_focus();
   }
   
   bool has_keyboard_focus(widget_ref r) const {
@@ -350,7 +357,7 @@ struct application_context {
   }
   
   void reset_mouse_focus() {
-    med.reset_focus(root.borrow());
+    mouse.reset_focus(root.borrow());
   }
   
   bool is_active(key_modifier mod) const {
@@ -429,9 +436,9 @@ struct application_context {
   struct window win;
   struct graphics_context gctx;
   widget_box root, overlay;
-  impl::mouse_event_dispatcher med;
+  impl::mouse_event_dispatcher mouse;
   impl::keyboard_event_dispatcher keyboard;
-  widget_animations animations;
+  impl::widget_animations animations;
 };
 
 auto event_context::lift_rebuild_request() {
@@ -505,22 +512,21 @@ struct application
   : view_ctor{ctor}, 
     app_view{view_ctor(s)},
     app_ctx{ prop, 
-          [&, this] { return app_view->build(build_context{impl}, s); } }
+          [&, this] { return app_view->build(build_context{app_ctx}, s); } }
   {
     app_ctx.paint();
-    // impl.root.debug_dump(3);
   }
   
   void rebuild(State& state) {
     debug_log("rebuilding");
     auto old_view = std::move(*app_view);
     app_view.emplace( view_ctor(state) );
-    auto bctx = build_context{impl};
-    app_view->rebuild(old_view, impl.root.borrow(), bctx, state);
-    app_ctx.med.update_absolute_position();
+    auto bctx = build_context{app_ctx};
+    app_view->rebuild(old_view, app_ctx.root.borrow(), bctx, state);
+    app_ctx.mouse.update_absolute_position();
     app_ctx.rebuild_requested = false;
     // Note : it would be nice to not have to do this on every rebuild ? 
-    auto size_info = impl.root.size_info();
+    auto size_info = app_ctx.root.size_info();
     app_ctx.win.set_min_size(size_info.min);
     app_ctx.win.set_max_size(size_info.max);
   }
@@ -532,12 +538,12 @@ struct application
       event_frame_result frame;
       app_ctx.backend.visit_event( [&, this] (auto&& e) {
         if constexpr ( std::is_same_v<std::remove_reference_t<decltype(e)>, keyboard_event> )
-          frame = impl.keyboard.on(e, &state, impl);
+          frame = app_ctx.keyboard.on(e, &state, app_ctx);
         else
-          frame = impl.med.on(e, &state, impl);
+          frame = app_ctx.mouse.on(e, &state, app_ctx);
       });
       
-      if (frame.rebuild_requested || impl.rebuild_requested) {
+      if (frame.rebuild_requested || app_ctx.rebuild_requested) {
         rebuild(state);
         frame.repaint_requested = true;
       }

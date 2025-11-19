@@ -258,10 +258,11 @@ struct table : widget_base, scrollable_base {
           ? size().x - get<1>(properties[col])
           : get<1>(properties[col + 1]) - get<1>(properties[col]);
         vec2f field_size {field_width, row_height};
-        edited_field.emplace( text_field{{field_size}} );
+        edited_field.emplace( text_field{} );
+        edited_field->set_size(field_size);
         edited_field->set_position( {get<1>(properties[col]), first_row + row * row_height - scroll_offset} );
-        edited_field->editing = true;
-        edited_field->value_str = cells[cell->y].prop[cell->x];
+        edited_field->set_editing(true);
+        edited_field->set_value(cells[cell->y].prop[cell->x]);
         edited_field->write = [this, cell] (event_context& Ec, auto&& str) { 
           cells[cell->y].prop[cell->x] = str;
           if (on_field_edit)
