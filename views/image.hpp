@@ -12,10 +12,19 @@ struct image : widget_base {
   vec2f corner_offset;
   
   widget_size_info size_info() const {
-    if (!texture)
-      return {{0, 0}, {0, 0}};
-    else
-      return {{100, 100 * aspect_ratio()}, max_size};
+    size_policy sp {size_policy::losslessly_shrinkable, size_policy::usefully_expansible};
+    widget_size_info res {{sp, sp}};
+    if (!texture) {
+      res.min = point{0, 0};
+      res.max = point{0, 0};
+      res.nominal_size = point{0, 0};
+    }
+    else {
+      res.min = point{100, 100 * aspect_ratio()};
+      res.max = max_size;
+      res.nominal_size = point{150, 150};
+    }
+    return res;
   }
   
   vec2f layout(vec2f sz) const {

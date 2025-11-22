@@ -500,6 +500,10 @@ void event_context::push_overlay_relative(widget_box widget) {
   push_overlay(std::move(widget));
 }
 
+graphics_context& build_context::graphics_context() const { 
+  return ctx.graphics_context(); 
+}
+
 template <class ViewCtor, class View, class State>
 struct application 
 {

@@ -77,7 +77,11 @@ struct table : widget_base, scrollable_base {
   table(vec2f sz) : widget_base{sz} {}
   
   widget_size_info size_info() const {
-    return {{properties.size() * 30.f, first_row + row_height * 3}, {800, 800}};
+    size_policy sp {size_policy::lossily_shrinkable, size_policy::usefully_expansible};
+    widget_size_info res {{sp, sp}};
+    res.min = point{100, first_row + row_height * 10};
+    res.nominal_size = point{properties.size() * 30.f, first_row + row_height * 15};
+    return res;
   }
   
   void set_properties(auto&& range) {

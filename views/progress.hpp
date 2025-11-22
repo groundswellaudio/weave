@@ -10,8 +10,17 @@ struct progress_bar : widget_base
   
   void on(ignore, ignore) {}
   
-  vec2f min_size() const { return {80, 8}; }
-  vec2f max_size() const { return {infinity<float>(), 8}; };
+  widget_size_info size_info() const {
+    vec2<size_policy> policy {
+      {size_policy::losslessly_shrinkable, size_policy::expansion_neutral},
+      {size_policy::losslessly_shrinkable, size_policy::not_expansible}
+    };
+    widget_size_info res {policy};
+    res.min = point{50, 10};
+    res.nominal_size = point{100, 15};
+    res.max.y = 15;
+    return res;
+  }
   
   void paint(painter& p) {
     p.stroke_style(colors::white);

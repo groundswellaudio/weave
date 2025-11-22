@@ -250,7 +250,8 @@ auto make_view(State& state)
                         }.align(1).fill()
                }.align_center()
                 .margin({10, 10})
-                .background( rgb_f(colors::gray) * 0.4 );
+                .background( rgb_f(colors::gray) * 0.4 )
+                .fill();
 }
 
 inline void run_app() {

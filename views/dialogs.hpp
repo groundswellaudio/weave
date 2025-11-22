@@ -24,6 +24,7 @@ struct popup_menu : widget_base {
   std::vector<element> elements;
   int hovered = -1;
   bool has_child = false;
+  float max_text_width = 0;
   
   public : 
   
@@ -43,16 +44,25 @@ struct popup_menu : widget_base {
         return {};
       }
     };
-    elements.push_back({std::string((Str&&)str), action, is_submenu_opener});
+    std::string elem_str = str;
+    elements.push_back({elem_str, action, is_submenu_opener});
+    max_text_width = std::max((float)elem_str.size(), max_text_width);
   }
   
-  vec2f min_size() const { return size(); }
-  vec2f max_size() const { return size(); }
+  widget_size_info size_info() const {
+    size_policy sp {size_policy::not_shrinkable, size_policy::not_expansible};
+    widget_size_info res {sp};
+    res.min.y = elements.size() * row_size + margin.y * 2;
+    res.min.x = max_text_width * 13 + margin.x * 2;
+    res.max = res.min;
+    res.nominal_size = res.min;
+    return res;
+  }
   
   void update_size(graphics_context& gctx) {
-    auto r = std::views::transform(elements, [] (auto& e) -> auto& { return e.name; });
-    auto max_width = max_text_width(r, gctx, font_size);
-    set_size(vec2f{max_width, elements.size() * row_size} + margin * 2);
+    // auto r = std::views::transform(elements, [] (auto& e) -> auto& { return e.name; });
+    //auto max_width = max_text_width(r, gctx, font_size);
+    set_size(vec2f{max_text_width, elements.size() * row_size} + margin * 2);
   }
   
   void close_children(event_context& ec);
@@ -115,8 +125,14 @@ struct popup_menu : widget_base {
 
 struct popup_menu_stack : widget_base {
   
-  vec2f min_size() const { return size(); }
-  vec2f max_size() const { return size(); }
+  widget_size_info size_info() const {
+    size_policy sp {size_policy::not_shrinkable, size_policy::not_expansible};
+    widget_size_info res {{sp, sp}};
+    res.min = size();
+    res.max = size();
+    res.nominal_size = size();
+    return res;
+  }
   
   void push(popup_menu&& m) {
     menus.push_back(std::move(m));

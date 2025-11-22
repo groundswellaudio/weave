@@ -42,10 +42,13 @@ struct view_sequence_base {
 };
 
 struct application_context; 
+struct graphics_context;
 
 struct build_context 
 {
+  graphics_context& graphics_context() const;
   auto& context() const { return ctx; }
+  
   application_context& ctx;
 };
 

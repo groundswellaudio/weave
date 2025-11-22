@@ -27,16 +27,21 @@ struct combo_box : widget_base {
   write_fn<int> write;
   int active = 0;
   bool hovered = false;
+  float max_width = 0;
   
   public : 
   
   combo_box(point size, std::vector<std::string> choices)
   : widget_base{size}, choices{std::move(choices)} {}
   
-  float max_width;
-  
-  vec2f min_size() const { return {30, 15}; }
-  vec2f max_size() const { return {max_width, 15.f}; }
+  widget_size_info size_info() const {
+    widget_size_info res {{size_policy::lossily_shrinkable, size_policy::expansion_neutral}, 
+                          {size_policy::not_shrinkable, size_policy::expansion_neutral}};
+    res.min = vec2f{30, 15};
+    res.max.y = 30;
+    res.nominal_size = point{max_width + 2 * margin, 15.f};
+    return res;
+  }
   
   void select(event_context& ec, int choice) {
     active = choice;

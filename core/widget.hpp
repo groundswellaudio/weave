@@ -31,15 +31,37 @@ struct input_event : variant<mouse_event, keyboard_event> {
   auto& keyboard() { return get<1>(*this); }
 };
 
-struct widget_size_info {
-  vec2f min {0, 0};
-  vec2f max {infinity<float>(), infinity<float>()};
-  // vec2f expand_factor {1, 1};
-};
+struct size_policy {
+  
+  enum shrink_policy {
+    losslessly_shrinkable,
+    lossily_shrinkable,
+    not_shrinkable
+  };
+  
+  enum expand_policy {
+    usefully_expansible, 
+    expansion_neutral,
+    not_expansible
+  };
+  
+  bool is_usefully_expansible() const { return expand == usefully_expansible; }
+  bool is_expansion_neutral() const { return expand == expansion_neutral; }
+  bool is_not_expansible() const { return expand == not_expansible; }
+  
+  bool is_lossily_shrinkable() const { return shrink == lossily_shrinkable; }
+  bool is_losslessly_shrinkable() const { return shrink == losslessly_shrinkable; }
+  bool is_not_shrinkable() const { return shrink == not_shrinkable; }
+  
+  shrink_policy shrink;
+  expand_policy expand;
+}; 
 
-struct layout_context {
-  vec2f min{0, 0};
-  vec2f max{1000000, 1000000};
+struct widget_size_info {
+  vec<size_policy, 2> policy;
+  point min {0, 0};
+  point max {infinity<float>(), infinity<float>()};
+  point nominal_size {0, 0};
 };
 
 template <class T>
@@ -102,9 +124,10 @@ struct widget_base {
     return p.x <= pos.x && p.y <= pos.y && p.x + sz.x >= pos.x && p.y + sz.y >= pos.y;
   }
   
+  /* 
   widget_size_info size_info(this auto& self) {
     return {self.min_size(), self.max_size()};
-  }
+  } */ 
    
   vec2f do_layout(this auto& self, vec2f sz) {
     if constexpr (requires {self.layout(sz);}) {

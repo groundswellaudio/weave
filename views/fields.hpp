@@ -49,8 +49,16 @@ struct text_field : widget_base {
     }
   }
   
-  vec2f min_size() const { return min_size_field; }
-  vec2f max_size() const { return {100.f, 15.f}; }
+  widget_size_info size_info() const {
+    vec2<size_policy> policy {
+      {size_policy::lossily_shrinkable, size_policy::usefully_expansible},
+      {size_policy::not_shrinkable, size_policy::expansion_neutral}
+    };
+    widget_size_info res {policy, min_size_field};
+    res.nominal_size = point{100, 15};
+    res.max.y = 15;
+    return res;
+  }
   
   void on(keyboard_event e, event_context& Ec) {
     if (e.is_up())
@@ -157,8 +165,16 @@ struct numeric_field : widget_base {
     }
   }
   
-  point min_size() const { return min_size_field; }
-  point max_size() const { return {100.f, 15.f}; }
+  widget_size_info size_info() const {
+    vec2<size_policy> policy {
+      {size_policy::lossily_shrinkable, size_policy::usefully_expansible},
+      {size_policy::not_shrinkable, size_policy::expansion_neutral}
+    };
+    widget_size_info res {policy, min_size_field};
+    res.nominal_size = point{100, 15};
+    res.max.y = 15;
+    return res;
+  }
   
   void update_from_str() {
     auto from_str = strtod(value_str.data(), nullptr);
@@ -279,6 +295,17 @@ struct numeric_dial : widget_base
   float mult_mod;
   float value;
   write_fn<float> write;
+  
+  widget_size_info size_info() const {
+    vec2<size_policy> policy {
+      {size_policy::lossily_shrinkable, size_policy::expansion_neutral},
+      {size_policy::not_shrinkable, size_policy::expansion_neutral}
+    };
+    widget_size_info res {policy, min_size_field};
+    res.nominal_size = point{75, 15};
+    res.max.y = 15;
+    return res;
+  }
   
   void on(mouse_event e, event_context& ec) {
     if (e.is_down())

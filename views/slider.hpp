@@ -77,10 +77,14 @@ struct slider : widget_base
   
   using EvCtx = event_context;
   
-  vec2f min_size() const { return {30, 15}; }
-  vec2f max_size() const { return {100, 15}; }
-  
-  // vec2f expand_factor() const { return {1, 0}; }
+  widget_size_info size_info() const {
+    vec2<size_policy> policy {{size_policy::lossily_shrinkable, size_policy::usefully_expansible}, 
+                              {size_policy::not_shrinkable, size_policy::expansion_neutral}};
+    widget_size_info res {policy};
+    res.min = point{30, 15};
+    res.nominal_size = point{50, 15};
+    return res;
+  }
   
   /// Set the ratio value and return the scaled value
   float set_ratio(float new_ratio) {

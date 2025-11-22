@@ -13,6 +13,13 @@ struct shape {
 template <>
 struct shape<rectangle> : widget_base {
   
+  widget_size_info size_info() const {
+    size_policy sp {size_policy::losslessly_shrinkable, size_policy::expansion_neutral};
+    widget_size_info res {{sp, sp}};
+    res.nominal_size = nominal_size;
+    return res;
+  }
+  
   void paint(painter& p) {
     if (stroke) {
       p.stroke_style(color);
@@ -24,6 +31,7 @@ struct shape<rectangle> : widget_base {
     }
   }
   
+  point nominal_size;
   rgba_u8 color;
   short stroke_width;
   bool stroke = false;

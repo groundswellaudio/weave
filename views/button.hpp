@@ -43,7 +43,11 @@ struct toggle_button : widget_base
   }
   
   widget_size_info size_info() const {
-    return {{20, 15}};
+    size_policy sp {size_policy::lossily_shrinkable, size_policy::expansion_neutral};
+    widget_size_info res {{sp, sp}};
+    res.min = vec2f{10, 10};
+    res.nominal_size = vec2f{prop.str.size() * prop.font_size, 15};
+    return res;
   }
   
   void paint(painter& p) 
@@ -73,18 +77,45 @@ struct toggle_button : widget_base
 };
 
 struct trigger_button : widget_base {
-  
-  std::string_view str;
-  float font_size;
+
   widget_action<void()> on_click;
   bool disabled = false;
-  bool hovered = false;
-  float text_width = 20;
   
   static constexpr point margin = {10, 4};
   
-  vec2f min_size() const { return point{10, font_size} + 2 * margin; }
-  vec2f max_size() const { return point{text_width, font_size} + 2 * margin; }
+  private : 
+  
+  float font_size_v = 13;
+  std::string str;
+  bool hovered = false;
+  float text_width = 0;
+  
+  public : 
+  
+  const auto& string() const { return str; }
+  
+  void set_string(std::string new_text, const graphics_context& ctx) {
+    str = std::move(new_text);
+    text_width = ctx.text_bounds(str, font_size()).x;
+  }
+  
+  float font_size() const {
+    return font_size_v;
+  }
+  
+  void set_font_size(float new_size, const graphics_context& ctx) {
+    font_size_v = new_size;
+    text_width = ctx.text_bounds(str, font_size()).x;
+  }
+   
+  widget_size_info size_info() const {
+    vec2<size_policy> sp {{size_policy::lossily_shrinkable, size_policy::expansion_neutral},
+                          {size_policy::not_shrinkable, size_policy::expansion_neutral}};
+    widget_size_info res {sp};
+    res.min = vec2f{15, 15};
+    res.nominal_size = vec2f{margin.x * 2 + text_width, 15};
+    return res;
+  }
   
   void on(mouse_event e, event_context& ec) {
     if (disabled)
@@ -114,7 +145,7 @@ struct trigger_button : widget_base {
       p.fill(rounded_rectangle(size()));
     }
     
-    p.font_size(font_size);
+    p.font_size(font_size());
     p.fill_style(!disabled ? rgba{colors::white} : rgba{colors::white}.with_alpha(110));
     p.text_align(text_align::x::center, text_align::y::center);
     p.text( {sz.x / 2, sz.y / 2.f}, str ); 
@@ -167,35 +198,33 @@ struct button : view<button<Fn>> {
   auto build(const build_context& b, State& s) {
     auto sz = text_bounds(b.context());
     decltype(widget_t::on_click) action = [f = fn] (auto& ec) { context_invoke<State>(f, ec); };
-    auto size = sz + vec2f{button_margin, button_margin} * 2;
-    auto res = widget_t{{size}};
-    res.text_width = size.x;
-    res.str = str;
+    auto size = sz + point{button_margin, button_margin} * 2;
+    auto res = widget_t{};
+    res.set_size(size);
+    auto& gctx = b.context().graphics_context();
+    res.set_font_size(font_size, gctx);
+    res.set_string(std::string(str), gctx);
     res.on_click = std::move(action);
-    res.font_size = font_size;
     res.disabled = disabled;
     return res;
   }
   
   template <class State>
-  rebuild_result rebuild(button<Fn>& Old, widget_ref w, auto&& up, State& s) {
+  rebuild_result rebuild(button<Fn>& Old, widget_ref w, auto&& ctx, State& s) {
     auto& b = w.as<widget_t>();
     rebuild_result res;
     b.set_disabled(disabled);
     bool update_bounds = false; 
-    if (b.str != str) {
-      b.str = str;
+    if (b.string() != str) {
+      b.set_string(std::string(str), ctx.context().graphics_context());
       update_bounds = true;
     }
-    if (font_size != b.font_size) {
-      b.font_size = font_size;
+    if (font_size != b.font_size()) {
+      b.set_font_size(font_size, ctx.context().graphics_context());
       update_bounds = true;
     }
-    if (update_bounds) {
-      auto sz = text_bounds(up.context());
-      b.text_width = sz.x;
+    if (update_bounds) 
       res |= rebuild_result::size_change;
-    }
     b.on_click = [f = fn] (auto& ec) { context_invoke<State>(f, ec); };
     return {};
   }
@@ -229,10 +258,16 @@ struct graphic_toggle_button : widget_base {
   bool flag;
   bool hovered = false;
   
-  vec2f min_size() const { return size(); }
-  vec2f max_size() const { return size(); }
-  
-  // vec2f expand_factor() const { return {0, 0}; }
+  widget_size_info size_info() const {
+    vec2<size_policy> policy {
+      {size_policy::lossily_shrinkable, size_policy::usefully_expansible},
+      {size_policy::lossily_shrinkable, size_policy::usefully_expansible}
+    };
+    widget_size_info res {policy};
+    res.min = point{15, 15};
+    res.nominal_size = point{30, 30};
+    return res;
+  }
   
   void on(mouse_event e, event_context& ec) {
     if (e.is_enter())
@@ -259,9 +294,17 @@ struct graphic_trigger_button : widget_base {
   widget_action<void()> on_click;
   
   bool hovered = false;
-  
-  vec2f min_size() const { return size(); }
-  vec2f max_size() const { return size(); }
+
+  widget_size_info size_info() const {
+    vec2<size_policy> policy {
+      {size_policy::lossily_shrinkable, size_policy::usefully_expansible},
+      {size_policy::lossily_shrinkable, size_policy::usefully_expansible}
+    };
+    widget_size_info res {policy};
+    res.min = point{15, 15};
+    res.nominal_size = point{30, 30};
+    return res;
+  }
   
   void on(mouse_event e, event_context& ec) {
     if (e.is_enter())

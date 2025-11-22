@@ -13,12 +13,46 @@ struct text : widget_base
     float font_size = 11;
   };
   
+  private : 
+  
+  static constexpr float x_margin = 5;
+  
   std::string str;
   properties prop;
-  float text_width = 20;
+  float text_width = 0;
   
-  vec2f min_size() const { return {20, prop.font_size + 2}; }
-  vec2f max_size() const { return {text_width + 20, prop.font_size + 2}; }
+  public : 
+  
+  const auto& string() const { return str; }
+  
+  void set_string(std::string_view new_str, const graphics_context& ctx) {
+    set_string(std::string{new_str}, ctx);
+  }
+  
+  void set_string(std::string new_text, const graphics_context& ctx) {
+    str = std::move(new_text);
+    text_width = ctx.text_bounds(str, font_size()).x;
+  }
+  
+  float font_size() const {
+    return prop.font_size;
+  }
+  
+  void set_font_size(float new_size, const graphics_context& ctx) {
+    prop.font_size = new_size;
+    text_width = ctx.text_bounds(str, font_size()).x;
+  }
+  
+  widget_size_info size_info() const {
+    vec2<size_policy> policy {
+      {size_policy::lossily_shrinkable, size_policy::expansion_neutral},
+      {size_policy::not_shrinkable, size_policy::expansion_neutral}
+    };
+    widget_size_info res {policy};
+    res.min = point{30, prop.font_size + 2 * 5};
+    res.nominal_size = point{text_width + 2 * x_margin, prop.font_size + 2 * 5};
+    return res;
+  }
   
   void on(ignore, ignore) 
   {
@@ -28,7 +62,7 @@ struct text : widget_base
     p.font_size(prop.font_size);
     p.fill_style(prop.color);
     p.text_align(text_align::x::left, text_align::y::center);
-    p.text({0, size().y / 2}, str);
+    p.text({x_margin, size().y / 2}, str);
   }
 };
 
@@ -75,19 +109,19 @@ struct text : view<text> {
   
   using widget_t = widgets::text;
   
-  auto build(auto&& b, ignore) {
-    auto& gctx = b.context().graphics_context();
-    auto box = bounds(gctx);
-    return widget_t{{box}, std::string(str), prop, box.x};
+  auto build(const build_context& b, ignore) {
+    auto& gctx = b.graphics_context();
+    auto res = widget_t{};
+    res.set_string(str, gctx);
+    return res;
   }
   
   rebuild_result rebuild(text Old, widget_ref w, auto& up, ignore) {
     auto& wb = w.as<widget_t>();
     rebuild_result res {};
-    if (str != wb.str) {
-      auto new_bounds = bounds(up.context().graphics_context());
-      wb.set_size(new_bounds);
-      wb.str = str;
+    if (str != wb.string()) {
+      std::string tmp {str};
+      wb.set_string(tmp, up.context().graphics_context());
       res |= rebuild_result::size_change;
     }
     return res;

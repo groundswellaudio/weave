@@ -92,123 +92,164 @@ struct stack_updater : view_sequence_updater<stack_updater> {
 
 namespace impl {
   
-  /* 
-  vec2f do_stack_layout(std::vector<widget_box>& children, stack_data data, int axis, layout_context lc) {
-    layout_context child_ctx;
-    child_ctx.max = lc.max;
-    
-    float pos = data.margin[axis];
-    float sz = 0;
-    for (auto& n : children) {
-      auto child_pos = data.margin;
-      child_pos[axis] = pos;
-      n.set_position(child_pos);
-      auto child_size = n.layout(child_ctx);
-      pos += child_size[axis] + data.interspace;
-      child_ctx.max[axis] -= child_size[axis] + data.interspace;
-      sz = std::max(sz, child_size[1 - axis]);
-    }
-    
-    if (data.fill_cross_axis) {
-      layout_context ctx;
-      ctx.min[1 - axis] = std::max(sz, lc.min[1 - axis]);
-      // Unfortunately, we have to call layout here again
-      for (auto& n : children) {
-        ctx.max = n.size();
-        ctx.max[1 - axis] = ctx.min[1 - axis];
-        n.layout(ctx);
-      }
-    }
-    
-    // Cross axis alignment 
-    if (data.align_ratio != 0) {
-      for (auto& n : children) {
-        vec2f child_pos;
-        child_pos[axis] = n.position()[axis];
-        child_pos[1 - axis] = data.margin[1 - axis] 
-                              + data.align_ratio * 
-                                (sz - n.size()[1-axis]); // we haven't added margin to sz yet, no need to substract it
-        n.set_position(child_pos);
-      }
-    }
-    
-    vec2f res;
-    res[axis] = pos + data.margin[axis];
-    res[1 - axis] = sz + 2 * data.margin[1 - axis];
-    res = max(lc.min, res);
-    return res;
-  } */ 
-  
-  void do_stack_layout(std::vector<widget_box>& children, stack_data data, int axis, 
-                        vec2f this_sz)
+  // Called after the sizing has been done
+  void place_stack_layout_elements(std::vector<widget_box>& children, stack_data data, int axis, 
+                                  vec2f this_size)
   {
-    vec2f min {0, 0};
-    float axis_expand_norm = 0;
-    for (auto& e : children) {
-      auto size_info = e.size_info();
-      min[axis] += size_info.min[axis];
-      min[axis] += data.interspace;
-      min[1 - axis] = std::max(min[1 - axis], size_info.min[1 - axis]);
-      axis_expand_norm += (std::min(size_info.max[axis], this_sz[axis]) - size_info.min[axis]);
+    float axis_pos = data.margin[axis];
+    
+    for (auto& c : children)
+    {
+      point pos;
+      pos[axis] = axis_pos;
+      pos[1 - axis] = data.margin[1 - axis] + data.align_ratio * 
+                                (this_size[1-axis] - c.size()[1-axis] - 2 * data.margin[1 - axis]);
+      c.set_position(pos);
+      
+      axis_pos += c.size()[axis];
+      axis_pos += data.interspace;
     }
     
-    min[axis] -= data.interspace;
-    min += 2 * data.margin;
-
-    auto layout_children = [&] (auto sizer) {
-      float axis_pos = data.margin[axis];
-      for (auto& e : children) {
-        auto child_sz = sizer(e);
-        child_sz = e.layout(child_sz);
-        vec2f child_pos;
-        child_pos[axis] = axis_pos;
-        child_pos[1 - axis] = data.margin[1 - axis];
-        e.set_position(child_pos);
-        axis_pos += child_sz[axis];
-        axis_pos += data.interspace;
+    axis_pos -= data.interspace;
+    axis_pos += data.margin[axis];
+    
+    //assert( axis_pos == this_size[axis] && "incoherent final size in stack layout" );
+  }
+  
+  void stack_layout(std::vector<widget_box>& children, stack_data data, int axis, 
+                        vec2f this_size)
+  {
+    // 2 cases : 
+    //   - the nominal size of all widgets is below the total size, -> we have extra space to allocate : let ES be that space
+    //   - the nominal size is above the total size -> we have to decide which widgets to shrink, let ES be abs(SUM(NS) - total_size)
+    
+    // First case : 
+    //  for each widget w : 
+    // three case : 1/ it can be extended and use the extra space (e.g. length of a slider), 
+    //              2/ it can be extended but the extra space past the nominal size is not needed (e.g. width of a text button)
+    //              3/ it cannot be extended past the nominal size 
+    // let S(1) be the set of widget in the first category, if not empty, then let RS = ES and for each w in S(1)
+    // assign s.size[axis] <= min(w.nominal_size[axis] + ES[axis] / size(S(1)), w.max_size[axis])
+    // assign RS -= (w.size[axis] - w.nominal_size[axis]) 
+    
+    // if after that RS > 0 and S(2) is not empty, then divide RS evenly between S(2)
+    
+    // Second case : 
+    // for each widget w : 
+    //   three case : 1/ it can be shrunk without losing display information (e.g. the length of a slider)
+    //                2/ it can be shrunk with some loss of information (e.g. textbox)
+    //                3/ it cannot be shrunk past the nominal size
+    
+    // let RS = ES, for each w in S(1) do : 
+    // w.size[axis] <= max(w.nominal_size[axis] - ES / size(S(1)), w.min_size[axis])
+    // RS -= w.nominal_size[axis] - w.size[axis]
+    
+    // if after that RS > 0 and S(2) is not empty, do for each w in S(2)
+    // w.size[axis] <= max(w.nominal_size[axis] - RS / size(S(2)), w.min_size[axis])
+    
+    std::vector<widget_size_info> size_infos; 
+    for (auto& c : children)
+      size_infos.push_back(c.size_info());
+    
+    auto nominal_size_axis = data.margin[axis] * 2 + data.interspace * (children.size() - 1);
+    for (auto& si : size_infos)
+      nominal_size_axis += si.nominal_size[axis];
+    
+    auto cross_axis_size = [this_size, axis, data] (widget_size_info i) {
+      if (data.fill_cross_axis && !i.policy[1 - axis].is_not_expansible())
+        return std::min(i.max[1 - axis], this_size[1 - axis] - 2 * data.margin[1 - axis]);
+      if (i.policy[1 - axis].is_expansion_neutral() || i.policy[1 - axis].is_not_expansible())
+        return i.nominal_size[1 - axis];
+      return std::min(i.max[1 - axis], this_size[1 - axis] - 2 * data.margin[1 - axis]);
+    };
+    
+    if (nominal_size_axis < this_size[axis]) 
+    {
+      // we have extra space to allocate
+      auto extra_space = this_size[axis] - nominal_size_axis;
+      
+      std::vector<widget_ref> s1;
+      for (auto k : iota(size_infos.size()))
+        if (size_infos[k].policy[axis].is_usefully_expansible())
+          s1.push_back(children[k].borrow());
+      
+      auto rs = extra_space;
+      for (auto w : s1) 
+      {
+        vec2f w_size;
+        auto size_info = w.size_info();
+        w_size[axis] = std::min(size_info.nominal_size[axis] + extra_space / s1.size(), size_info.max[axis]);
+        w_size[1 - axis] = cross_axis_size(size_info);
+        w.set_size(w_size);
+        rs -= (w_size[axis] - size_info.nominal_size[axis]);
       }
-    };
-    
-    auto cross_axis_size = [data, this_sz, axis] (widget_size_info info) {
-      // auto cross_axis_expand = info.expand_factor[1 - axis];
-      if (data.fill_cross_axis)
-        return this_sz[1 - axis];
-      else
-        return std::min(this_sz[1 - axis], info.max[1 - axis]);
-    };
-    
-    auto axis_leftover = this_sz[axis] - min[axis];
-    if (axis_leftover == 0 || axis_expand_norm == 0) {
-      layout_children( [&] (auto& e) {
-        auto info = e.size_info();
-        vec2f child_size = info.min;
-        child_size[1 - axis] = cross_axis_size(info);
-        return child_size;
-      });
+      
+      std::vector<widget_ref> s2;
+      for (auto k : iota(size_infos.size()))
+        if (size_infos[k].policy[axis].is_expansion_neutral())
+          s2.push_back(children[k].borrow());
+      
+      for (auto w : s2)
+      {
+        vec2f w_size;
+        auto size_info = w.size_info();
+        w_size[axis] = std::min(size_info.nominal_size[axis] + rs / s2.size(), size_info.max[axis]);
+        w_size[1 - axis] = cross_axis_size(size_info); 
+        w.set_size(w_size);
+      }
     }
     else {
-      // Divide the difference between size[axis] and min[axis] according to their expand 
-      // factor
-      layout_children( [&] (auto& e) {
-        auto info = e.size_info();
-        vec2f child_size = info.min;
-        child_size[axis] += (std::min(info.max[axis], this_sz[axis]) - info.min[axis]) * axis_leftover / axis_expand_norm;
-        child_size[1 - axis] = cross_axis_size(info);
-        return child_size;
-      });
-    }
-    
-    // Cross axis alignment 
-    if (data.align_ratio != 0) {
-      for (auto& n : children) {
-        vec2f child_pos;
-        child_pos[axis] = n.position()[axis];
-        child_pos[1 - axis] = data.margin[1 - axis] 
-                              + data.align_ratio * 
-                                (this_sz[1 - axis] - n.size()[1-axis] - 2 * data.margin[1 - axis]); 
-        n.set_position(child_pos);
+      auto space_to_remove = nominal_size_axis - this_size[axis];
+      
+      std::vector<widget_ref> s1;
+      for (auto k : iota(size_infos.size()))
+        if (size_infos[k].policy[axis].is_losslessly_shrinkable())
+          s1.push_back(children[k].borrow());
+      
+      auto rs = space_to_remove;
+      
+      for (auto w : s1) 
+      {
+        vec2f w_size;
+        auto size_info = w.size_info();
+        w_size[axis] = std::max(size_info.nominal_size[axis] - space_to_remove / s1.size(), size_info.min[axis]);
+        w_size[1 - axis] = cross_axis_size(size_info);
+        w.set_size(w_size);
+        rs -= (size_info.nominal_size[axis] - w_size[axis]);
+      }
+      
+      if (rs > 0) {
+        std::vector<widget_ref> s2;
+        for (auto k : iota(size_infos.size()))
+          if (size_infos[k].policy[axis].is_lossily_shrinkable())
+            s2.push_back(children[k].borrow());
+        
+        for (auto w : s2) {
+          vec2f w_size;
+          auto size_info = w.size_info();
+          w_size[axis] = std::max(size_info.nominal_size[axis] - rs / s2.size(), size_info.min[axis]);
+          w_size[1 - axis] = cross_axis_size(size_info);
+          w.set_size(w_size);
+        }
+      }
+      
+      for (int k : iota(size_infos.size())) 
+      {
+        if (size_infos[k].policy[axis].is_not_shrinkable())
+        {
+          vec2f w_size;
+          auto size_info = size_infos[k];
+          w_size[axis] = size_info.nominal_size[axis];
+          w_size[1 - axis] = cross_axis_size(size_info);
+          children[k].set_size(w_size);
+        }
       }
     }
+    
+    place_stack_layout_elements(children, data, axis, this_size);
+    
+    for (auto& c : children)
+      c.layout(c.size());
   }
   
   template <class T, class V, class S>
@@ -265,7 +306,6 @@ struct stack : widget_base
 {
   stack_data data;
   std::vector<widget_box> children_vec;
-  layout_context old_bc;
   
   stack(stack_data d) : data{d} {}
   
@@ -277,27 +317,45 @@ struct stack : widget_base
   }
   
   widget_size_info size_info() const {
-    if (!children_vec.size())
-      return { data.margin * 2, data.margin * 2 };
+    size_policy sp {size_policy::not_shrinkable, size_policy::not_expansible};
+    vec2<size_policy> policy {sp, sp};
     
-    point min {0, 0}, max{0, 0};
-    // vec2f factor {0, 0};
+    point min {0, 0}, max{0, 0}, nominal_size{0, 0};
+    
+    if (!children_vec.size()) {
+      return widget_size_info{policy, min, max, nominal_size};
+    }
+      
     for (auto& e : children_vec) {
       auto i = e.size_info();
       min[Axis] += i.min[Axis];
       min[1 - Axis] = std::max(min[1 - Axis], i.min[1 - Axis]);
       max[Axis] += i.max[Axis];
       max[1 - Axis] = std::max(max[1 - Axis], i.max[1 - Axis]);
-      /* 
-      factor[Axis] += i.expand_factor[Axis];
-      factor[1 - Axis] = std::max(i.expand_factor[1 - Axis], factor[1 - Axis]); */ 
+      nominal_size[Axis] += i.nominal_size[Axis];
+      
+      if (i.nominal_size[1 - Axis] > nominal_size[1 - Axis]) {
+        nominal_size[1 - Axis] = i.nominal_size[1 - Axis];
+        policy[1 - Axis] = i.policy[1 - Axis];
+      }
+      
+      if (i.policy[Axis].is_lossily_shrinkable() && policy[Axis].shrink == size_policy::not_shrinkable)
+        policy[Axis].shrink = size_policy::lossily_shrinkable;
+      else if (i.policy[Axis].is_losslessly_shrinkable())
+        policy[Axis].shrink = size_policy::losslessly_shrinkable;
+      
+      if (i.policy[Axis].is_expansion_neutral() && policy[Axis].expand == size_policy::not_expansible)
+        policy[Axis].expand = size_policy::expansion_neutral;
+      else if (i.policy[Axis].is_usefully_expansible())
+        policy[Axis].expand = size_policy::usefully_expansible;
     }
     
     min[Axis] += (children_vec.size() - 1) * data.interspace;
     max[Axis] += (children_vec.size() - 1) * data.interspace;
     min += data.margin * 2.f;
     max += data.margin * 2.f;
-    return {min, max};
+    nominal_size += data.margin * 2.f + (children_vec.size() - 1) * data.interspace;
+    return widget_size_info{policy, min, max, nominal_size};
   }
   
   void on(ignore, ignore) {}
@@ -307,7 +365,7 @@ struct stack : widget_base
   }
   
   auto layout(point sz) {
-    impl::do_stack_layout(children_vec, data, Axis, sz);
+    impl::stack_layout(children_vec, data, Axis, sz);
     return sz;
   }
 };
@@ -318,21 +376,25 @@ using vstack = stack<1>;
 struct flow : widget_base {
   
   widget_size_info size_info() const {
-    return {{200, 200}};
+    size_policy sp {size_policy::lossily_shrinkable, size_policy::usefully_expansible};
+    widget_size_info res {{sp, sp}};
+    res.min = point{50, 50};
+    res.nominal_size = {150, 150};
+    return res;
   }
   
   point layout(point sz) {
     point pos = {0, 0};
     float row_h = 0;
     
+    /* 
     widget_size_info row_sz_info;
     
     for (auto& c : children_vec) {
       auto i = c.size_info();
       row_sz_info.min[0] += i.min[0];
       row_sz_info.min[1] = std::max(row_sz_info.min[1], i.min[1]);
-      
-    }
+    } */ 
     
     /* 
     for (auto& c : children_vec) {
