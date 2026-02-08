@@ -198,51 +198,57 @@ namespace impl {
         w.set_size(w_size);
       }
     }
-    else {
+    else 
+    {
       auto space_to_remove = nominal_size_axis - this_size[axis];
-      
-      std::vector<widget_ref> s1;
-      for (auto k : iota(size_infos.size()))
-        if (size_infos[k].policy[axis].is_losslessly_shrinkable())
-          s1.push_back(children[k].borrow());
-      
       auto rs = space_to_remove;
       
-      for (auto w : s1) 
-      {
+      int s1_size = 0;
+      
+      for (auto k : iota(size_infos.size()))
+        if (size_infos[k].policy[axis].is_losslessly_shrinkable())
+          ++s1_size;
+          
+      for (auto k : iota(size_infos.size()))
+      { 
+        if (!size_infos[k].policy[axis].is_losslessly_shrinkable())
+          continue;
+        auto w = children[k].borrow();
+        auto size_info = size_infos[k];
         vec2f w_size;
-        auto size_info = w.size_info();
-        w_size[axis] = std::max(size_info.nominal_size[axis] - space_to_remove / s1.size(), size_info.min[axis]);
+        w_size[axis] = std::max(size_info.nominal_size[axis] - space_to_remove / s1_size, size_info.min[axis]);
         w_size[1 - axis] = cross_axis_size(size_info);
         w.set_size(w_size);
         rs -= (size_info.nominal_size[axis] - w_size[axis]);
       }
       
-      if (rs > 0) {
-        std::vector<widget_ref> s2;
-        for (auto k : iota(size_infos.size()))
-          if (size_infos[k].policy[axis].is_lossily_shrinkable())
-            s2.push_back(children[k].borrow());
-        
-        for (auto w : s2) {
-          vec2f w_size;
-          auto size_info = w.size_info();
-          w_size[axis] = std::max(size_info.nominal_size[axis] - rs / s2.size(), size_info.min[axis]);
-          w_size[1 - axis] = cross_axis_size(size_info);
+      int s2_size = 0;
+      
+      for (auto k : iota(size_infos.size())) 
+        if (size_infos[k].policy[axis].is_lossily_shrinkable())
+          ++s2_size;
+          
+      for (auto k : iota(size_infos.size())) 
+      {
+        if (!size_infos[k].policy[axis].is_lossily_shrinkable())
+          continue;
+        auto w = children[k].borrow();
+        vec2f w_size;
+        auto size_info = size_infos[k];
+        w_size[axis] = std::max(size_info.nominal_size[axis] - rs / s2_size, size_info.min[axis]);
+        w_size[1 - axis] = cross_axis_size(size_info);
           w.set_size(w_size);
-        }
       }
       
       for (int k : iota(size_infos.size())) 
       {
-        if (size_infos[k].policy[axis].is_not_shrinkable())
-        {
-          vec2f w_size;
-          auto size_info = size_infos[k];
-          w_size[axis] = size_info.nominal_size[axis];
-          w_size[1 - axis] = cross_axis_size(size_info);
-          children[k].set_size(w_size);
-        }
+        if (!size_infos[k].policy[axis].is_not_shrinkable())
+          continue;
+        vec2f w_size;
+        auto size_info = size_infos[k];
+        w_size[axis] = size_info.nominal_size[axis];
+        w_size[1 - axis] = cross_axis_size(size_info);
+        children[k].set_size(w_size);
       }
     }
     

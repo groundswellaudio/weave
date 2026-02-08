@@ -6,6 +6,7 @@
 
 #include "views_core.hpp"
 #include "../cursor.hpp"
+#include "modifiers.hpp"
 
 namespace weave {
 
@@ -157,7 +158,7 @@ struct trigger_button : widget_base {
 namespace weave::views {
 
 template <class Lens>
-struct toggle_button : view<toggle_button<Lens>> {
+struct toggle_button : view<toggle_button<Lens>>, view_modifiers {
   
   using widget_t = widgets::toggle_button;
   
@@ -181,7 +182,7 @@ struct toggle_button : view<toggle_button<Lens>> {
 
 /// The view of a trigger button.
 template <class Fn>
-struct button : view<button<Fn>> {
+struct button : view<button<Fn>>, view_modifiers {
   
   using widget_t = widgets::trigger_button;
   
@@ -329,14 +330,16 @@ struct graphic_trigger_button : widget_base {
 namespace weave::views 
 {
   template <class PaintFn, class WriteFn>
-  struct graphic_toggle_button : view<graphic_toggle_button<PaintFn, WriteFn>> {
+  struct graphic_toggle_button : view<graphic_toggle_button<PaintFn, WriteFn>>, view_modifiers {
+    
+    using widget_t = widgets::graphic_toggle_button<PaintFn>;
     
     graphic_toggle_button (PaintFn P, bool val, WriteFn W) 
     : val{val}, paint_fn{P}, write_fn{W} {}
     
     template <class S>
     auto build(const build_context& b, S& state) {
-      widgets::graphic_toggle_button<PaintFn> res {{size_v}, paint_fn, {}, val};
+      widget_t res {{size_v}, paint_fn, {}, val};
       res.write = [w = write_fn] (event_context& ec, bool v) -> bool {
         return context_invoke<S>(w, ec, v);
       };
@@ -345,7 +348,7 @@ namespace weave::views
     }
     
     rebuild_result rebuild(auto& Old, widget_ref w, ignore, ignore) {
-      auto& wb = w.as<widgets::graphic_toggle_button<PaintFn>>();
+      auto& wb = w.as<widget_t>();
       wb.flag = val;
       return {};
     }
@@ -362,7 +365,7 @@ namespace weave::views
   };
   
   template <class PaintFn, class Payload>
-  struct graphic_button : view<graphic_button<PaintFn, Payload>> {
+  struct graphic_button : view<graphic_button<PaintFn, Payload>>, view_modifiers {
     
     graphic_button (PaintFn P, Payload W) 
     : paint_fn{P}, payload{W} {}

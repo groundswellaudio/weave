@@ -28,6 +28,20 @@ struct event_listener : W {
   }
 };
 
+template <class W>
+struct with_fixed_size : W {
+  
+  widget_size_info size_info() const {
+    size_policy sp {size_policy::not_shrinkable, size_policy::not_expansible};
+    widget_size_info res{{sp, sp}};
+    res.min = W::size();
+    res.max = W::size();
+    res.nominal_size = W::size();
+    return res;
+  }
+  
+};
+
 } // widgets
 
 namespace weave::views {
@@ -65,9 +79,35 @@ inline bool is_mouse_down(input_event e) {
   return e.is_mouse() && e.mouse().is_down();
 }
 
+template <class V>
+struct with_fixed_size : V {
+  
+  using widget_t = widgets::with_fixed_size<typename V::widget_t>; 
+  
+  auto build(const build_context& ctx, auto& state) {
+    auto res = widget_t{ V::build(ctx, state) };
+    res.set_size(fixed_size);
+    return res;
+  }
+  
+  rebuild_result rebuild(const with_fixed_size<V>& Old, widget_ref r, const build_context& ctx, auto& state) {
+    auto& wb = r.as<widget_t>();
+    V::rebuild(Old, widget_ref{&static_cast<typename V::widget_t&>(wb)}, ctx, state);
+    if (fixed_size != Old.fixed_size) { 
+      wb.set_size(fixed_size);
+      return rebuild_result::size_change;
+    }
+    return {};
+  }
+   
+  point fixed_size;
+};
+
 /// Common extensions for views.
 struct view_modifiers {
 
+  private : 
+  
   struct one_keydown_filter {
     std::optional<keyboard_event> operator()(input_event e) const { 
       if (e.is_keyboard() && e.keyboard().is_down() && e.keyboard().key == key)
@@ -95,6 +135,8 @@ struct view_modifiers {
     return {};
   }
   
+  public : 
+  
   auto on_click(this auto&& self, auto action) {
     return event_listener{self, &click_filter, action};
   }
@@ -109,6 +151,10 @@ struct view_modifiers {
   
   auto on_file_drop(this auto&& self, auto action) {
     return event_listener{self, &file_drop_filter, action};
+  }
+  
+  auto with_fixed_size(this auto&& self, point size) {
+    return views::with_fixed_size{self, size};
   }
 };
 

@@ -79,9 +79,9 @@ auto top_panel(State& state)
   return hstack {
     combo_box(device_val, audio_output_devices()), 
     hstack {
-      graphic_button{&paint_transport_button<false>, &State::previous_track},
-      graphic_toggle_button{&paint_play_button, state.is_playing, &State::set_play}.size({25, 25}),
-      graphic_button{&paint_transport_button<true>, &State::next_track}
+      graphic_button{&paint_transport_button<false>, &State::previous_track}.with_fixed_size({30, 30}),
+      graphic_toggle_button{&paint_play_button, state.is_playing, &State::set_play}.with_fixed_size({30, 30}),
+      graphic_button{&paint_transport_button<true>, &State::next_track}.with_fixed_size({30, 30})
     }.align_center(),
     text{state.current_track_name()},
     slider{ [] (auto& s) -> auto& { return s.player.volume; } }
