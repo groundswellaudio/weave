@@ -77,12 +77,11 @@ struct slider : widget_base
   
   using EvCtx = event_context;
   
-  widget_size_info size_info() const {
-    vec2<size_policy> policy {{size_policy::lossily_shrinkable, size_policy::usefully_expansible}, 
-                              {size_policy::not_shrinkable, size_policy::expansion_neutral}};
-    widget_size_info res {policy};
+  auto size_info() const {
+    widget_size_info res;
     res.min = point{30, 15};
     res.nominal_size = point{50, 15};
+    res.flex_factor = point{1, 0};
     return res;
   }
   

@@ -11,9 +11,8 @@ struct image : widget_base {
   vec2f max_size;
   vec2f corner_offset;
   
-  widget_size_info size_info() const {
-    size_policy sp {size_policy::losslessly_shrinkable, size_policy::usefully_expansible};
-    widget_size_info res {{sp, sp}};
+  auto size_info() const {
+    widget_size_info res;
     if (!texture) {
       res.min = point{0, 0};
       res.max = point{0, 0};
@@ -24,10 +23,11 @@ struct image : widget_base {
       res.max = max_size;
       res.nominal_size = point{150, 150};
     }
+    res.flex_factor = point{1, 1};
     return res;
   }
   
-  vec2f layout(vec2f sz) const {
+  point layout(point sz) const {
     if (!texture)
       return {0, 0};
     if (aspect_ratio() * sz[0] < sz[1])

@@ -35,11 +35,11 @@ struct combo_box : widget_base {
   : widget_base{size}, choices{std::move(choices)} {}
   
   widget_size_info size_info() const {
-    widget_size_info res {{size_policy::lossily_shrinkable, size_policy::expansion_neutral}, 
-                          {size_policy::not_shrinkable, size_policy::expansion_neutral}};
-    res.min = vec2f{30, 15};
+    widget_size_info res;
+    res.min = point{30, 15};
     res.max.y = 30;
     res.nominal_size = point{max_width + 2 * margin, 15.f};
+    res.flex_factor = point{0.3, 0};
     return res;
   }
   
@@ -107,7 +107,7 @@ struct combo_box : view<combo_box<Lens, Range>> {
   
   template <class S>
   auto build_impl(const build_context& builder, S& state) {
-    auto size = vec2f{50, 20};
+    auto size = point{50, 20};
     auto&& vec = make_string_vec();
     auto w = max_text_width(vec, builder.context().graphics_context(), 11);
     auto res = widget_t{{w + 2 * widget_t::margin, 20}, std::forward<StringVec>(vec)};

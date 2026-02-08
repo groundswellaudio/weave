@@ -44,10 +44,10 @@ struct toggle_button : widget_base
   }
   
   widget_size_info size_info() const {
-    size_policy sp {size_policy::lossily_shrinkable, size_policy::expansion_neutral};
-    widget_size_info res {{sp, sp}};
-    res.min = vec2f{10, 10};
-    res.nominal_size = vec2f{prop.str.size() * prop.font_size, 15};
+    widget_size_info res;
+    res.min = point{10, 10};
+    res.nominal_size = point{prop.str.size() * prop.font_size, 15};
+    res.flex_factor = point{0.3, 0};
     return res;
   }
   
@@ -109,12 +109,11 @@ struct trigger_button : widget_base {
     text_width = ctx.text_bounds(str, font_size()).x;
   }
    
-  widget_size_info size_info() const {
-    vec2<size_policy> sp {{size_policy::lossily_shrinkable, size_policy::expansion_neutral},
-                          {size_policy::not_shrinkable, size_policy::expansion_neutral}};
-    widget_size_info res {sp};
-    res.min = vec2f{15, 15};
-    res.nominal_size = vec2f{margin.x * 2 + text_width, 15};
+  auto size_info() const {
+    widget_size_info res;
+    res.min = point{15, 15};
+    res.nominal_size = point{margin.x * 2 + text_width, 15};
+    res.flex_factor = point{0.3, 0};
     return res;
   }
   
@@ -260,13 +259,10 @@ struct graphic_toggle_button : widget_base {
   bool hovered = false;
   
   widget_size_info size_info() const {
-    vec2<size_policy> policy {
-      {size_policy::lossily_shrinkable, size_policy::usefully_expansible},
-      {size_policy::lossily_shrinkable, size_policy::usefully_expansible}
-    };
-    widget_size_info res {policy};
+    widget_size_info res;
     res.min = point{15, 15};
     res.nominal_size = point{30, 30};
+    res.flex_factor = point{1, 1};
     return res;
   }
   
@@ -297,13 +293,10 @@ struct graphic_trigger_button : widget_base {
   bool hovered = false;
 
   widget_size_info size_info() const {
-    vec2<size_policy> policy {
-      {size_policy::lossily_shrinkable, size_policy::usefully_expansible},
-      {size_policy::lossily_shrinkable, size_policy::usefully_expansible}
-    };
-    widget_size_info res {policy};
+    widget_size_info res;
     res.min = point{15, 15};
     res.nominal_size = point{30, 30};
+    res.flex_factor = point{1, 1};
     return res;
   }
   

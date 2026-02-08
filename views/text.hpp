@@ -43,14 +43,11 @@ struct text : widget_base
     text_width = ctx.text_bounds(str, font_size()).x;
   }
   
-  widget_size_info size_info() const {
-    vec2<size_policy> policy {
-      {size_policy::lossily_shrinkable, size_policy::expansion_neutral},
-      {size_policy::not_shrinkable, size_policy::expansion_neutral}
-    };
-    widget_size_info res {policy};
+  auto size_info() const {
+    widget_size_info res;
     res.min = point{30, prop.font_size + 2 * 5};
     res.nominal_size = point{text_width + 2 * x_margin, prop.font_size + 2 * 5};
+    res.flex_factor = point{0.1, 0};
     return res;
   }
   

@@ -31,37 +31,11 @@ struct input_event : variant<mouse_event, keyboard_event> {
   auto& keyboard() { return get<1>(*this); }
 };
 
-struct size_policy {
-  
-  enum shrink_policy {
-    losslessly_shrinkable,
-    lossily_shrinkable,
-    not_shrinkable
-  };
-  
-  enum expand_policy {
-    usefully_expansible, 
-    expansion_neutral,
-    not_expansible
-  };
-  
-  bool is_usefully_expansible() const { return expand == usefully_expansible; }
-  bool is_expansion_neutral() const { return expand == expansion_neutral; }
-  bool is_not_expansible() const { return expand == not_expansible; }
-  
-  bool is_lossily_shrinkable() const { return shrink == lossily_shrinkable; }
-  bool is_losslessly_shrinkable() const { return shrink == losslessly_shrinkable; }
-  bool is_not_shrinkable() const { return shrink == not_shrinkable; }
-  
-  shrink_policy shrink;
-  expand_policy expand;
-}; 
-
 struct widget_size_info {
-  vec<size_policy, 2> policy;
+  point nominal_size {0, 0};
   point min {0, 0};
   point max {infinity<float>(), infinity<float>()};
-  point nominal_size {0, 0};
+  point flex_factor{1, 1};
 };
 
 template <class T>
@@ -98,7 +72,8 @@ struct widget_base {
       type_str.remove_prefix(sizeof("weave::widgets::") - 1);
     std::cerr << type_str << " " << self.position() << " " << self.size();
     auto info = self.size_info();
-    std::cerr << " minmax " << info.min << " " << info.max;
+    std::cerr << "min " << info.min << " max " << info.max << " flex " << info.flex_factor
+    << " nominal_size " << info.nominal_size;
     if constexpr ( widget_has_children<T> ) {
       self.traverse_children( [indent] (auto& elem) {
         std::cerr << '\n';

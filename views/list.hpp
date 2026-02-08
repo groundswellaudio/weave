@@ -29,12 +29,12 @@ struct list : widget_base {
     }
   }
   
-  widget_size_info size_info() const { 
-    widget_size_info size_info { {size_policy::lossily_shrinkable, size_policy::expansion_neutral},
-                                 {size_policy::lossily_shrinkable, size_policy::expansion_neutral} };
-    size_info.min = point{50, row_size * 3};
-    size_info.nominal_size = point{100, cells.size() * row_size + margin * 2};
-    return size_info;
+  auto size_info() const { 
+    widget_size_info res;
+    res.min = point{50, row_size * 3};
+    res.nominal_size = point{100, cells.size() * row_size + margin * 2};
+    res.flex_factor = point{1, 1};
+    return res;
   }
   
   vec2f min_size() const { return {50, row_size * 3}; }

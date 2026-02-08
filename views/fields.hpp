@@ -50,13 +50,11 @@ struct text_field : widget_base {
   }
   
   widget_size_info size_info() const {
-    vec2<size_policy> policy {
-      {size_policy::lossily_shrinkable, size_policy::usefully_expansible},
-      {size_policy::not_shrinkable, size_policy::expansion_neutral}
-    };
-    widget_size_info res {policy, min_size_field};
+    widget_size_info res;
+    res.min = min_size_field;
     res.nominal_size = point{100, 15};
     res.max.y = 15;
+    res.flex_factor = point{1, 0};
     return res;
   }
   
@@ -166,13 +164,11 @@ struct numeric_field : widget_base {
   }
   
   widget_size_info size_info() const {
-    vec2<size_policy> policy {
-      {size_policy::lossily_shrinkable, size_policy::usefully_expansible},
-      {size_policy::not_shrinkable, size_policy::expansion_neutral}
-    };
-    widget_size_info res {policy, min_size_field};
+    widget_size_info res;
+    res.min = min_size_field;
     res.nominal_size = point{100, 15};
     res.max.y = 15;
+    res.flex_factor = point{1, 0};
     return res;
   }
   
@@ -297,13 +293,11 @@ struct numeric_dial : widget_base
   write_fn<float> write;
   
   widget_size_info size_info() const {
-    vec2<size_policy> policy {
-      {size_policy::lossily_shrinkable, size_policy::expansion_neutral},
-      {size_policy::not_shrinkable, size_policy::expansion_neutral}
-    };
-    widget_size_info res {policy, min_size_field};
+    widget_size_info res;
+    res.min = min_size_field;
     res.nominal_size = point{75, 15};
     res.max.y = 15;
+    res.flex_factor = point{1, 0};
     return res;
   }
   

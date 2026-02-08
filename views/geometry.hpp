@@ -13,9 +13,9 @@ struct shape {
 template <>
 struct shape<rectangle> : widget_base {
   
-  widget_size_info size_info() const {
-    size_policy sp {size_policy::losslessly_shrinkable, size_policy::expansion_neutral};
-    widget_size_info res {{sp, sp}};
+  auto size_info() const {
+    widget_size_info res;
+    res.flex_factor = point{0, 0};
     res.nominal_size = nominal_size;
     return res;
   }

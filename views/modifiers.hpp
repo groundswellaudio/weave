@@ -32,11 +32,11 @@ template <class W>
 struct with_fixed_size : W {
   
   widget_size_info size_info() const {
-    size_policy sp {size_policy::not_shrinkable, size_policy::not_expansible};
-    widget_size_info res{{sp, sp}};
+    widget_size_info res;
     res.min = W::size();
     res.max = W::size();
     res.nominal_size = W::size();
+    res.flex_factor = point{0, 0};
     return res;
   }
   

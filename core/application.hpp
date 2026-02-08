@@ -387,6 +387,7 @@ struct application_context {
       auto pos = w.position();
       auto sz = w.size();
       
+      // FIXME : this is a rectangle intersection!
       auto new_scissor_pos = max(scissor_pos, pos);
       new_scissor_pos = min(scissor_pos + scissor_sz, new_scissor_pos);
       
@@ -396,8 +397,10 @@ struct application_context {
       
       // p.stroke_style(colors::red);
       // p.stroke_rect(new_scissor_pos, new_scissor_sz);
-      //p.scissor(new_scissor_pos, new_scissor_sz);
+      p.scissor(new_scissor_pos, new_scissor_sz);
       auto traii = p.translate(pos);
+      //p.stroke_style(colors::red);
+      //p.stroke(rectangle{point{0, 0}, w.size()});
       w.paint(p);
       for (auto& w : w.children())
         self(w, new_scissor_pos - pos, new_scissor_sz);

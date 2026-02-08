@@ -88,7 +88,8 @@ auto top_panel(State& state)
       .space(scalar_space::decibel())
       .range(-80, 0)
       .write_scaled(false)
-  }.interspace(30).align_center();
+  }.interspace(30).align_center()
+  .margin({20, 10});
 }
 
 using track_selection = widgets::table::selection_t;

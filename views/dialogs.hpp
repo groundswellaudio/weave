@@ -50,12 +50,12 @@ struct popup_menu : widget_base {
   }
   
   widget_size_info size_info() const {
-    size_policy sp {size_policy::not_shrinkable, size_policy::not_expansible};
-    widget_size_info res {sp};
+    widget_size_info res;
     res.min.y = elements.size() * row_size + margin.y * 2;
     res.min.x = max_text_width * 13 + margin.x * 2;
     res.max = res.min;
     res.nominal_size = res.min;
+    res.flex_factor = point{0, 0};
     return res;
   }
   
@@ -126,8 +126,7 @@ struct popup_menu : widget_base {
 struct popup_menu_stack : widget_base {
   
   widget_size_info size_info() const {
-    size_policy sp {size_policy::not_shrinkable, size_policy::not_expansible};
-    widget_size_info res {{sp, sp}};
+    widget_size_info res;
     res.min = size();
     res.max = size();
     res.nominal_size = size();

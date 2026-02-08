@@ -10,15 +10,12 @@ struct progress_bar : widget_base
   
   void on(ignore, ignore) {}
   
-  widget_size_info size_info() const {
-    vec2<size_policy> policy {
-      {size_policy::losslessly_shrinkable, size_policy::expansion_neutral},
-      {size_policy::losslessly_shrinkable, size_policy::not_expansible}
-    };
-    widget_size_info res {policy};
+  auto size_info() const {
+    widget_size_info res;
     res.min = point{50, 10};
     res.nominal_size = point{100, 15};
     res.max.y = 15;
+    res.flex_factor = point{1, 0};
     return res;
   }
   
