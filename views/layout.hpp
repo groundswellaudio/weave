@@ -376,7 +376,8 @@ struct stack : widget_base
     res.max[Axis] += (children_vec.size() - 1) * data.interspace;
     min += data.margin * 2.f;
     max += data.margin * 2.f;
-    res.nominal_size += data.margin * 2.f + (children_vec.size() - 1) * data.interspace;
+    res.nominal_size[Axis] += data.margin[Axis] * 2.f + (children_vec.size() - 1) * data.interspace;
+    res.nominal_size[1 - Axis] += data.margin[1 - Axis] * 2.f;
     // Average the flex factor cross axis
     res.flex_factor[1 - Axis] /= children_vec.size();
     return res;
