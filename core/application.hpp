@@ -397,8 +397,9 @@ struct application_context {
       
       // p.stroke_style(colors::red);
       // p.stroke_rect(new_scissor_pos, new_scissor_sz);
-      p.scissor(new_scissor_pos, new_scissor_sz);
+      //auto s = p.scissor(new_scissor_pos, new_scissor_sz);
       auto traii = p.translate(pos);
+      auto _ = p.scissor(point{0, 0}, w.size());
       //p.stroke_style(colors::red);
       //p.stroke(rectangle{point{0, 0}, w.size()});
       w.paint(p);

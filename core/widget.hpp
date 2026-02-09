@@ -36,6 +36,7 @@ struct widget_size_info {
   point min {0, 0};
   point max {infinity<float>(), infinity<float>()};
   point flex_factor{1, 1};
+  optional<float> aspect_ratio = {}; // the ratio of width / height 
 };
 
 template <class T>
@@ -59,6 +60,7 @@ struct widget_base {
   
   void set_size(vec2f v) {
     assert( std::abs(v.x) < 1e10 && std::abs(v.y) < 1e10 && "aberrant size value" );
+    assert( v.x >= 0 && v.y >= 0 && "negative size value" );
     assert( !std::isnan(v.x) && !std::isnan(v.y) && "NaN in widget size?" );
     sz = v;
   }

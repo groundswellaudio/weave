@@ -244,15 +244,15 @@ auto make_view(State& state)
   bool update_cover = std::exchange(state.current_cover_updated, false);
   
   return vstack{ top_panel(state),
-                 hstack{ 
+                  hstack{ 
                         library_view{}, 
                         views::image(state.current_cover, update_cover)
                         .fit({600, 600})
-                        }.align(1).fill()
+                        }.align(1).fill() 
                }.align_center()
                 .margin({10, 10})
                 .background( rgb_f(colors::gray) * 0.4 )
-                .fill();
+                .fill(); 
 }
 
 inline void run_app() {

@@ -22,6 +22,7 @@ struct image : widget_base {
       res.min = point{100, 100 * aspect_ratio()};
       res.max = max_size;
       res.nominal_size = point{150, 150};
+      res.aspect_ratio = 1;
     }
     res.flex_factor = point{1, 1};
     return res;

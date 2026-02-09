@@ -123,35 +123,47 @@ namespace impl {
     while (true)
     {
       float remaining_space = 0;
-    
+      std::vector<widget_ref> unconstrained;
+      
       for (auto i : iota(children.size())) 
       {
-        std::vector<widget_ref> unconstrained;
-        
-        auto sz_axis = children[i].size()[axis];
+        auto sz = children[i].size();
+        auto sz_axis = sz[axis];
         auto sz_max_axis = sz_infos[i].max[axis];
-        if (sz_axis > sz_max_axis) {
+        if (sz_axis >= sz_max_axis) {
           remaining_space += (sz_axis - sz_max_axis);
           auto sz = children[i].size();
           sz[axis] = sz_max_axis; 
           children[i].set_size(sz);
         }
+        // If we arrive at a conflict with the aspect ratio, modify the axis size to fit the cross axis one
+        else if (sz_infos[i].aspect_ratio && *sz_infos[i].aspect_ratio * sz.x != sz.y) {
+          auto old_sz_axis = sz_axis;
+          if (axis == 0)
+            sz.x = sz.y / *sz_infos[i].aspect_ratio;
+          else
+            sz.y = sz.x * *sz_infos[i].aspect_ratio;
+          children[i].set_size(sz);
+          remaining_space += old_sz_axis - sz[axis]; 
+        }
         else
           unconstrained.push_back(children[i].borrow());
+      }
+      
+      if (remaining_space == 0)
+        return;
+      
+      float sum_unconstrained_flex = 0;
+      
+      for (auto u : unconstrained)
+        sum_unconstrained_flex += u.size_info().flex_factor[axis];
         
-        if (remaining_space == 0)
-          return;
-        
-        float sum_unconstrained_flex = 0;
-        
-        for (auto u : unconstrained)
-          sum_unconstrained_flex += u.size_info().flex_factor[axis];
-          
-        for (auto u : unconstrained) {
-          auto sz = u.size();
-          sz[axis] += remaining_space * u.size_info().flex_factor[axis] / sum_unconstrained_flex;
-          u.set_size(sz);
-        }
+      for (auto u : unconstrained) {
+        auto sz = u.size();
+        auto szi = u.size_info();
+        sz[axis] += remaining_space * szi.flex_factor[axis] / sum_unconstrained_flex;
+        sz[axis] = std::min(szi.max[axis], sz[axis]);
+        u.set_size(sz);
       }
     }
   }
@@ -178,20 +190,20 @@ namespace impl {
         }
         else
           unconstrained.push_back(children[i].borrow());
+      }
+      
+      if (space_to_remove == 0)
+        return;
+      
+      float sum_unconstrained_inv_flex = 0;
+      
+      for (auto u : unconstrained)
+        sum_unconstrained_inv_flex += 1.f / u.size_info().flex_factor[axis];
         
-        if (space_to_remove == 0)
-          return;
-        
-        float sum_unconstrained_inv_flex = 0;
-        
-        for (auto u : unconstrained)
-          sum_unconstrained_inv_flex += 1.f / u.size_info().flex_factor[axis];
-          
-        for (auto u : unconstrained) {
-          auto sz = u.size();
-          sz[axis] -= space_to_remove / (u.size_info().flex_factor[axis] * sum_unconstrained_inv_flex);
-          u.set_size(sz);
-        }
+      for (auto u : unconstrained) {
+        auto sz = u.size();
+        sz[axis] -= space_to_remove / (u.size_info().flex_factor[axis] * sum_unconstrained_inv_flex);
+        u.set_size(sz);
       }
     }
   }
@@ -249,12 +261,14 @@ namespace impl {
       
       for (auto i : iota(children.size())) 
       {   
-        auto axis_sz = sz_infos[i].nominal_size[axis] 
-                          - space_to_remove * 1.f / (sz_infos[i].flex_factor[axis] * sum_inv_flex);
+        auto axis_sz =
+          sz_infos[i].flex_factor[axis] == 0.f ? sz_infos[i].nominal_size[axis]
+                                               : 
+          sz_infos[i].nominal_size[axis] 
+            - space_to_remove * 1.f / (sz_infos[i].flex_factor[axis] * sum_inv_flex);
+        axis_sz = std::max(sz_infos[i].min[axis], axis_sz);
         vec2f sz; 
         sz[axis] = axis_sz;
-        if (sz_infos[i].flex_factor[axis] == 0.f)
-          sz[axis] = sz_infos[i].nominal_size[axis];
         sz[1 - axis] = sz_infos[i].flex_factor[1 - axis] != 0 
           ? (this_size[1 - axis] - 2 * data.margin[1 - axis])
           : sz_infos[i].nominal_size[1 - axis];
