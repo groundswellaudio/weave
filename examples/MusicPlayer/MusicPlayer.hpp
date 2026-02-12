@@ -83,7 +83,13 @@ auto top_panel(State& state)
       graphic_toggle_button{&paint_play_button, state.is_playing, &State::set_play}.with_fixed_size({30, 30}),
       graphic_button{&paint_transport_button<true>, &State::next_track}.with_fixed_size({30, 30})
     }.align_center(),
-    text{state.current_track_name()},
+    either{ state.current_track(), 
+        [] (auto& t) { 
+          return text{"{} - {}", t.artist(), t.title()};
+        }, 
+        [] () { 
+          return text{"Not playing."};
+        }}, 
     slider{ [] (auto& s) -> auto& { return s.player.volume; } }
       .space(scalar_space::decibel())
       .range(-80, 0)

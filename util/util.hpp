@@ -5,6 +5,7 @@
 #include <limits>
 #include <source_location>
 #include <string_view>
+#include "fwd.hpp"
 
 namespace weave {
 

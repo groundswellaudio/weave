@@ -55,9 +55,11 @@ struct build_context
 template <class T>
 concept is_view_sequence = std::is_base_of_v<view_sequence_base, T>;
 
+struct view_base {};
+
 /// The base for a View. Any View is also a ViewSequence, so we implement this here
 template <class T>
-struct view : view_sequence_base {
+struct view : view_sequence_base, view_base {
   
   // must declare the following : 
   // build(build_context& c, auto& state) -> Widget
@@ -80,6 +82,9 @@ struct view : view_sequence_base {
   
   void destroy(widget_ref w, application_context& ctx) {}
 };
+
+template <class T>
+concept is_view = std::is_base_of_v<view_base, T>;
 
 template <class T>
 struct view_sequence_updater {

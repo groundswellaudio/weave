@@ -68,10 +68,10 @@ struct Database {
   
   struct Track {
     
-    auto& title() { return properties[0]; }
-    auto& artist() { return properties[1]; }
-    auto& album() { return properties[2]; }
-    auto& date_added() { return properties[3]; }
+    auto& title(this auto& self) { return self.properties[0]; }
+    auto& artist(this auto& self) { return self.properties[1]; }
+    auto& album(this auto& self) { return self.properties[2]; }
+    auto& date_added(this auto& self) { return self.properties[3]; }
     
     std::string file_path;
     std::string properties[4];
@@ -154,7 +154,7 @@ struct Database {
   bool empty() const { return tracks.empty(); }
   auto num_tracks() const { return tracks.size(); }
   
-  auto& track(int index) { return tracks[index]; }
+  auto& track(this auto& self, int index) { return self.tracks[index]; }
   
   auto& playlists() const { 
     return playlists_v; 
@@ -248,21 +248,21 @@ struct State : weave::app_state {
   void play() {
     if (database.empty())
       return;
-    if (!current_track) {
-      current_track = 0;
+    if (!current_track_id) {
+      current_track_id = 0;
     }
     if (is_playing)
       pause();
-    if (buffer_track_id != current_track)
+    if (buffer_track_id != current_track_id)
     {
-      auto id = *current_track;
+      auto id = *current_track_id;
       auto& path = database.track(id).file_path;
       auto buf = read_audio_file(path);
       if (!buf)
         return;
       player.buffer = *buf;
       player.head = 0;
-      buffer_track_id = *current_track;
+      buffer_track_id = *current_track_id;
       auto cover = read_file_cover(path);
       if (cover) {
         current_cover = std::move(*cover);
@@ -281,20 +281,20 @@ struct State : weave::app_state {
   }
   
   void next_track() {
-    current_track = *current_track + 1;
-    if (*current_track > database.num_tracks())
-      current_track = std::nullopt;
+    current_track_id = *current_track_id + 1;
+    if (*current_track_id > database.num_tracks())
+      current_track_id = std::nullopt;
     else
       play();
   }
   
   void previous_track() {
-    if (current_track && *current_track != 0)
-      play_track(*current_track - 1);
+    if (current_track_id && *current_track_id != 0)
+      play_track(*current_track_id - 1);
   }
   
   void play_track(int id) {
-    current_track = id;
+    current_track_id = id;
     play();
   }
   
@@ -303,9 +303,15 @@ struct State : weave::app_state {
       table_mutated = true;
   }
   
+  const Database::Track* current_track() const {
+    if (current_track_id)
+      return &database.track(*current_track_id);
+    return nullptr;
+  }
+  
   std::string_view current_track_name() {
-    if (current_track)
-      return database.track(*current_track).properties[0];
+    if (current_track())
+      return current_track()->title();
     return "No track playing";
   }
   
@@ -332,7 +338,7 @@ struct State : weave::app_state {
   }
   
   TrackPlayer player;
-  std::optional<int> current_track;
+  std::optional<int> current_track_id;
   int buffer_track_id = -1;
   bool is_playing = false;
   

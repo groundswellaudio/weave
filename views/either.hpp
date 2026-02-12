@@ -92,6 +92,15 @@ namespace impl {
   variant<Ts...> map_variant(auto&& var, Fns... fns) {
     return visit( [&fns...] (auto&& v) { return variant<Ts...>{overloaded{fns...}(v)}; }, var );
   }
+  
+  template <class... Ts, class T, class F, class G>
+  variant<Ts...> map_ptr(T* ptr, F f, G g) {
+    if (ptr)
+      return variant<Ts...>{in_place_index<0>, f(*ptr)};
+    else
+      return variant<Ts...>{in_place_index<1>, g()};
+  }
+  
 }
 
 template <class... Ts>
@@ -105,6 +114,9 @@ struct either : view_sequence_base {
   either(unsigned index, Ts... vs) : body{impl::make_variant<Ts...>(index, (Ts&&)vs...)} 
   {
   }
+  
+  template <class T, class A, class B>
+  either(T* ptr, A fna, B fnb) : body{impl::map_ptr<Ts...>(ptr, fna, fnb)} {}
   
   void seq_build(auto consumer, auto&& ctx, auto& state) {
     visit( [&] (auto& elem) {
@@ -143,5 +155,8 @@ either(int index, Ts... ts) -> either<Ts...>;
 
 template <class... Vs, class... Fn>
 either(variant<Vs...>, Fn... fns) -> either<std::invoke_result_t<Fn, Vs>...>;
+
+template <class T, class A, class B>
+either(T* ptr, A a, B b) -> either<std::invoke_result_t<A, T&>, std::invoke_result_t<B>>;
 
 } // views

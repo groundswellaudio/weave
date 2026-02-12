@@ -357,7 +357,7 @@ struct stack : widget_base
     if (!children_vec.size()) {
       return widget_size_info{min, max, nominal_size};
     }
-      
+    
     for (auto& e : children_vec) {
       auto i = e.size_info();
       res.min[Axis] += i.min[Axis];

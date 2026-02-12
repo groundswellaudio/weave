@@ -2,6 +2,7 @@
 
 #include "views_core.hpp"
 #include <string_view>
+#include <format>
 
 namespace weave::widgets {
 
@@ -93,9 +94,12 @@ struct with_label : W {
 
 namespace weave::views {
 
-struct text : view<text> {
+template <class... Args>
+struct text : view<text<Args...>> {
   
-  text(std::string_view str) : str{str} {}
+  text(std::string_view str, Args... args) : str{str}, fmt_args{args...} {}
+  
+  //text(std::string_view str) : str{str} {}
   
   text(text&&) = default;
   text(const text&) = default;
@@ -106,19 +110,24 @@ struct text : view<text> {
   
   using widget_t = widgets::text;
   
+  auto make_string() const {
+    std::string string;
+    apply([&string, this] (auto&&... elems) { string = std::vformat(str, std::make_format_args(elems...)); }, fmt_args);
+    return string;
+  }
+  
   auto build(const build_context& b, ignore) {
     auto& gctx = b.graphics_context();
     auto res = widget_t{};
-    res.set_string(str, gctx);
+    res.set_string(make_string(), gctx);
     return res;
   }
   
   rebuild_result rebuild(text Old, widget_ref w, auto& up, ignore) {
     auto& wb = w.as<widget_t>();
     rebuild_result res {};
-    if (str != wb.string()) {
-      std::string tmp {str};
-      wb.set_string(tmp, up.context().graphics_context());
+    if (str != Old.str || fmt_args != Old.fmt_args) {
+      wb.set_string(make_string(), up.context().graphics_context());
       res |= rebuild_result::size_change;
     }
     return res;
@@ -126,7 +135,11 @@ struct text : view<text> {
   
   widget_t::properties prop;
   std::string_view str;
+  tuple<Args...> fmt_args;
 };
+
+template <class T, class... Ts>
+text(T&& str, Ts&&... ts) -> text<Ts...>;
 
 template <class V>
 struct with_label {
