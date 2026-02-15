@@ -9,6 +9,7 @@
 #include "window.hpp"
 
 #include <iostream>
+#include <chrono>
 
 namespace weave {
 
@@ -17,7 +18,7 @@ namespace impl {
 class sdl_backend
 {
   bool mouse_is_dragging = false;
-  int last_mouse_down = 0;
+  std::chrono::time_point<std::chrono::steady_clock> last_mouse_down;
   bool has_resized = false;
   
   public :
@@ -75,10 +76,12 @@ class sdl_backend
     {
       case SDL_EVENT_MOUSE_BUTTON_DOWN :
       {
-        auto time = e.button.timestamp;
+        using namespace std::chrono_literals;
+        auto time = std::chrono::steady_clock::now();
         bool is_double_click = false;
-        if (time - last_mouse_down < 250) {
-          last_mouse_down = 0;
+        if (std::chrono::duration_cast<std::chrono::milliseconds>(time - last_mouse_down) 
+              < 250ms) {
+          last_mouse_down = time;
           is_double_click = true;
         } else {
           last_mouse_down = time;
@@ -138,6 +141,17 @@ class sdl_backend
       
       case SDL_EVENT_QUIT :
         want_quit = true;
+        break;
+      
+      case SDL_EVENT_WINDOW_FOCUS_GAINED:
+      case SDL_EVENT_WINDOW_FOCUS_LOST:
+      case SDL_EVENT_WINDOW_SHOWN:
+      case SDL_EVENT_WINDOW_EXPOSED:
+      case SDL_EVENT_WINDOW_OCCLUDED:
+      case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+      case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
+      case SDL_EVENT_WINDOW_MOUSE_ENTER:
+      case SDL_EVENT_CLIPBOARD_UPDATE:
         break;
       
       default :
