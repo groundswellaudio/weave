@@ -120,7 +120,7 @@ struct widget_base {
   
   std::optional<widget_ref> find_child_at(this auto& self, vec2f pos);
   
-  vec2f sz, pos = {0, 0};
+  vec2f sz = {0, 0}, pos = {0, 0};
 };
 
 template <class T>
@@ -259,6 +259,8 @@ class widget_ref {
   void debug_dump(int indent = 0) const {
     vptr->debug_dump(data, indent);
   }
+  
+  widget_base* raw_pointer() const { return data; }
 };
 
 struct widget_box : widget_ref {

@@ -104,6 +104,12 @@ auto track_info_menu(State& state, track_selection selected) {
   return views::text{"todo"};
   /* 
   return vstack {
+    with_label{"Title", text_field{}},
+    with_label{"Artist", text_field{}}
+  }; */ 
+  
+  /* 
+  return vstack {
     for_each( Database::track_properties(), [id, k = 0, selected] (auto key) mutable {
       auto setter = [id, key, selected] (auto& s, auto&& str) {
         traverse( selected, [&] (auto id) {

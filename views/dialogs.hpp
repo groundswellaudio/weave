@@ -71,7 +71,7 @@ struct popup_menu : widget_base {
   {
     if (e.is_down())
     {
-      if (!contains(e.position)) {
+      if (!rectangle(size()).contains(e.position)) {
         ec.pop_overlay();
       }
       else if (hovered != -1 && !elements[hovered].is_submenu_opener)
@@ -153,9 +153,10 @@ void popup_menu::close_children(event_context& ec) {
   auto& p = ec.parent().as<popup_menu_stack>();
   auto idx = this - p.menus.data();
   assert( p.menus.size() > 1 && "popup menu stack contains only one element" );
-  p.menus.erase(p.menus.begin() + idx + 1, p.menus.end());
   ec.request_repaint();
   has_child = false;
+  // careful here : we change the address of this
+  p.menus.erase(p.menus.begin() + idx + 1, p.menus.end());
 }
 
 void popup_menu::open_child(event_context& ec, int idx) {
@@ -163,10 +164,11 @@ void popup_menu::open_child(event_context& ec, int idx) {
   auto& p = ec.parent().as<popup_menu_stack>();
   auto w = *elements[idx].action(ec);
   w.set_position({position().x + size().x, position().y + idx * row_size});
-  p.push( std::move(w) );
-  ec.grab_mouse_focus( &p );
+  ec.grab_mouse_focus(this);
   ec.request_repaint();
   has_child = true;
+  // careful here : we change the address of this 
+  p.push( std::move(w) );
 }
 
 inline void enter_popup_menu(event_context& ec, popup_menu m) {

@@ -40,6 +40,14 @@ struct table : widget_base, scrollable_base {
       for (auto i : iota(x, y))
         fn(i);
     }
+    
+    int size() const {
+      if (x == -1)
+        return 0;
+      if (y == -1)
+        return 1;
+      return y - x;
+    }
   };
   
   private : 
