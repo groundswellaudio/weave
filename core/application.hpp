@@ -504,6 +504,10 @@ void event_context::push_overlay_relative(widget_box widget) {
   push_overlay(std::move(widget));
 }
 
+graphics_context& event_context::graphics_context() const {
+  return ctx.graphics_context();
+}
+
 graphics_context& build_context::graphics_context() const { 
   return ctx.graphics_context(); 
 }

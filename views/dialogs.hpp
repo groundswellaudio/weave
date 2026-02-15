@@ -24,12 +24,12 @@ struct popup_menu : widget_base {
   std::vector<element> elements;
   int hovered = -1;
   bool has_child = false;
-  float max_text_width = 0;
+  float text_width = 0;
   
   public : 
   
   template <class Str, class Fn>
-  void add_element(Str&& str, Fn fn) {
+  void add_element(Str&& str, Fn fn, graphics_context& gctx) {
     constexpr bool is_submenu_opener = std::is_same_v<popup_menu, 
       decltype(std::invoke(fn, std::declval<event_context&>()))
     >;
@@ -46,23 +46,18 @@ struct popup_menu : widget_base {
     };
     std::string elem_str = str;
     elements.push_back({elem_str, action, is_submenu_opener});
-    max_text_width = std::max((float)elem_str.size(), max_text_width);
+    text_width = std::max( gctx.text_bounds(elem_str, font_size).x, text_width );
+    set_size(point{text_width + margin.x * 2, elements.size() * row_size + margin.y * 2});
   }
   
   widget_size_info size_info() const {
     widget_size_info res;
     res.min.y = elements.size() * row_size + margin.y * 2;
-    res.min.x = max_text_width * 13 + margin.x * 2;
+    res.min.x = text_width + margin.x * 2;
     res.max = res.min;
     res.nominal_size = res.min;
     res.flex_factor = point{0, 0};
     return res;
-  }
-  
-  void update_size(graphics_context& gctx) {
-    // auto r = std::views::transform(elements, [] (auto& e) -> auto& { return e.name; });
-    //auto max_width = max_text_width(r, gctx, font_size);
-    set_size(vec2f{max_text_width, elements.size() * row_size} + margin * 2);
   }
   
   void close_children(event_context& ec);
@@ -76,7 +71,10 @@ struct popup_menu : widget_base {
   {
     if (e.is_down())
     {
-      if (hovered != -1 && !elements[hovered].is_submenu_opener)
+      if (!contains(e.position)) {
+        ec.pop_overlay();
+      }
+      else if (hovered != -1 && !elements[hovered].is_submenu_opener)
         elements[hovered].action(ec);
     }
     else if (e.is_move()) 
@@ -165,7 +163,6 @@ void popup_menu::open_child(event_context& ec, int idx) {
   auto& p = ec.parent().as<popup_menu_stack>();
   auto w = *elements[idx].action(ec);
   w.set_position({position().x + size().x, position().y + idx * row_size});
-  w.update_size(ec.context().graphics_context());
   p.push( std::move(w) );
   ec.grab_mouse_focus( &p );
   ec.request_repaint();
@@ -173,7 +170,6 @@ void popup_menu::open_child(event_context& ec, int idx) {
 }
 
 inline void enter_popup_menu(event_context& ec, popup_menu m) {
-  m.update_size(ec.context().graphics_context());
   if (m.can_open_submenu()) {
     ec.push_overlay( popup_menu_stack{{ec.context().window().size()}, {m}} );
   }

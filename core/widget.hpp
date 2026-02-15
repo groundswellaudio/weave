@@ -339,6 +339,8 @@ struct event_frame_result {
   bool repaint_requested = false;
 };
 
+struct graphics_context;
+
 struct event_context {
 
   /// Returns a thread safe callable that signal that a rebuild is needed
@@ -380,6 +382,8 @@ struct event_context {
   void reset_mouse_focus();
   
   auto& context() const { return ctx; }
+  
+  graphics_context& graphics_context() const; 
   
   template <class S>
   S& state() const { return *static_cast<S*>(state_ptr); }

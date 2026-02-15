@@ -55,8 +55,8 @@ struct combo_box : widget_base {
     popup_menu m;
     int k = 0;
     for (auto& c : choices) 
-      m.add_element(c, [this, p = k++] (event_context& ec) { this->select(ec, p); });
-    m.update_size(ec.context().graphics_context());
+      m.add_element(c, [this, p = k++] (event_context& ec) { this->select(ec, p); }, 
+                    ec.graphics_context());
     m.set_position(vec2f{0, size().y});
     enter_popup_menu_relative(ec, std::move(m), this);
     hovered = false;
@@ -75,6 +75,13 @@ struct combo_box : widget_base {
     p.text_align(text_align::x::center, text_align::y::center);
     p.font_size(11);
     p.text_bounded( size() / 2, size().x, choices[active] );
+    
+    // the little v at the right
+    p.begin_path();
+    p.move_to(point{size().x - 6 - 5, size().y / 2});
+    p.line_to(point{size().x - 3 - 5, size().y * 0.75f});
+    p.line_to(point{size().x - 5, size().y / 2});
+    p.stroke_path(1);
   }
 };
 

@@ -130,13 +130,13 @@ auto song_table_popup_menu(event_context& ec, track_selection selected) {
         selected.traverse([&] (auto id) {
           ec.state<State>().add_to_playlist(pid, id);
         });
-      });
+      }, ec.graphics_context());
     }
     return m;
   };
   
-  menu.add_element("Info", info);
-  menu.add_element("Add to playlist", add_to_playlist);
+  menu.add_element("Info", info, ec.graphics_context());
+  menu.add_element("Add to playlist", add_to_playlist, ec.graphics_context());
   return menu;
 }
 
