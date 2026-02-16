@@ -25,28 +25,44 @@ struct text_field : widget_base {
   bool show_caret : 1 = false;
   bool editing : 1 = false;
   
+  void update_glyph_pos(graphics_context& gc) {
+    gc.get_glyph_positions(glyph_pos, value_str, {5, size().y / 2});
+  }
+  
   public : 
   
-  void set_editing(bool is_edited) { editing = is_edited; }
+  void enter_editing(event_context& ec) { 
+    editing = true;
+    ec.grab_keyboard_focus(this);
+    ec.animate(*this, [] (auto& s) { 
+      s.show_caret = !s.show_caret;
+      return s.editing; 
+    }, 1000);
+  }
+  
+  void exit_editing(event_context& ec) {
+    ec.release_keyboard_focus();
+    ec.deanimate(this);
+    editing = false;
+    show_caret = false;
+    ec.request_repaint();
+  }
   
   bool is_being_edited() const { return editing; }
   
-  void set_value(std::string new_value) {
+  void set_value(std::string new_value, graphics_context& gc) {
     value_str = new_value; 
     edit_pos = value_str.size();
+    update_glyph_pos(gc);
   }
   
   const std::string& value() const { return value_str; }
   
   void on(mouse_event e, event_context& Ec) { 
-    if (e.is_double_click()) {
-      Ec.grab_keyboard_focus(this);
-      editing = true;
-      Ec.animate(*this, [] (auto& s) { 
-        s.show_caret = !s.show_caret;
-        return s.editing; 
-      }, 1000);
-    }
+    if (e.is_double_click()) 
+      enter_editing(Ec);
+    if (e.is_exit()) 
+      exit_editing(Ec);
   }
   
   widget_size_info size_info() const {
@@ -65,6 +81,7 @@ struct text_field : widget_base {
     if (auto C = to_character(e.key))
     {
       value_str.push_back(C);
+      update_glyph_pos(Ec.graphics_context());
       Ec.request_repaint();
       return;
     }
@@ -72,11 +89,11 @@ struct text_field : widget_base {
     switch(e.key) {
       case keycode::backspace:
         value_str.pop_back();
+        update_glyph_pos(Ec.graphics_context());
         Ec.request_repaint();
         break;
       case keycode::enter: 
-        Ec.release_keyboard_focus();
-        editing = false;
+        exit_editing(Ec);
         write(Ec, value_str);
         break;
       
@@ -86,7 +103,7 @@ struct text_field : widget_base {
   }
   
   void paint(painter& p) {
-    p.fill_style(editing ? colors::red : colors::black);
+    p.fill_style(editing ? rgb_u8{40, 40, 40} : colors::black);
     p.fill(rectangle(size()));
     p.fill_style(colors::white);
     p.stroke_style(colors::white);
@@ -95,7 +112,8 @@ struct text_field : widget_base {
     p.text({5, size().y / 2}, value_str);
     
     if (show_caret) {
-      // p.line( )
+      auto px = glyph_pos.pos_from_index(edit_pos);
+      p.line( point{px, 0}, point{px, size().y}, 2 );
     }
   }
 };

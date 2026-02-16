@@ -428,9 +428,7 @@ struct application_context {
   private : 
   
   void layout_root() {
-    std::cerr << "\n window size " << win.size() << std::endl;
     root.layout(win.size());
-    root.debug_dump(3);
     auto size_info = root.size_info();
     win.set_min_size(size_info.min);
     win.set_max_size(size_info.max);
@@ -559,6 +557,8 @@ struct application
         rebuild(state);
         frame.repaint_requested = true;
       }
+      
+      frame.repaint_requested = frame.repaint_requested || app_ctx.animations.run();
       
       if (frame.repaint_requested)
         app_ctx.paint(); 

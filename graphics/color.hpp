@@ -83,6 +83,8 @@ struct rgb {
     return {data[0] / x, data[1] / x, data[2] / x};
   }
   
+  constexpr rgba<T> with_alpha(T x) const;
+  
   // [:color_operators()];
   
   T data[3];
@@ -169,6 +171,11 @@ template <class V>
 constexpr rgb<T>::operator rgba<V>() const {
   return {*this, rgb<V>::norm()};
 }
+
+template <class T>
+constexpr rgba<T> rgb<T>::with_alpha(T alpha) const {
+    return {*this, alpha};
+  }
 
 template <class T, class X = distance_return_type<T>>
 constexpr X distance_squared(const rgba<T>& a, const rgba<T>& b) 

@@ -209,8 +209,7 @@ struct painter
     begin_path();
     move_to(a);
     line_to(b);
-    nvgStrokeWidth(ctx, thick);
-    nvgStroke(ctx);
+    stroke_path(thick);
   }
 
   void stroke_style(const color& c) {
@@ -310,11 +309,11 @@ struct painter
 struct glyph_positions {
     
   std::size_t size() const { return positions.size(); }
-  auto min() const { return positions.front().minx; }
-  auto max() const { return positions.back().maxx;  }
+  auto min() const { return !size() ? 0 : positions.front().minx; }
+  auto max() const { return !size() ? 0 : positions.back().maxx;  }
   
   float pos_from_index(unsigned idx) const {
-    if (idx == size())
+    if (idx >= size())
       return max();
     return positions[idx].x;
   }
