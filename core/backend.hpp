@@ -118,8 +118,11 @@ class sdl_backend
       }
     
       case SDL_EVENT_TEXT_EDITING :
+        break;
       case SDL_EVENT_TEXT_INPUT :
       {
+        auto ev = keyboard_event{std::string(e.text.text)};
+        vis(ev);
         break;
       }
       
@@ -135,7 +138,7 @@ class sdl_backend
       {
         auto& KE = e.key;
         auto code = impl::from_sdl_keycode(KE.key);
-        vis( keyboard_event{code, KE.type == SDL_EVENT_KEY_DOWN} );
+        vis( keyboard_event{tuple<keycode, bool>{code, KE.type == SDL_EVENT_KEY_DOWN}} );
         break;
       }
       

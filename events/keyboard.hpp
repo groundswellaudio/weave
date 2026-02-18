@@ -8,10 +8,12 @@
 
 #pragma once
 
-namespace weave {
-
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_keycode.h>
+#include <util/tuple.hpp>
+#include <util/variant.hpp>
+
+namespace weave {
 
 // the identifier for a (virtual) key
 enum class keycode : unsigned char {
@@ -54,11 +56,18 @@ constexpr bool operator&(key_modifier a, key_modifier b) {
 }
 
 struct keyboard_event {
-  keycode key;
-  bool is_press;
+  variant<tuple<keycode, bool>, std::string> data;
   
-  bool is_down() const { return is_press; }
-  bool is_up() const { return !is_press; }
+  bool is_key() const { return data.index() == 0; }
+  keycode key() const { assert( is_key() ); return get<0>(get<0>(data)); }
+  bool is_down() const { return data.index() == 0 && get<1>(get<0>(data)); }
+  bool is_up() const { return data.index() == 0 && !get<1>(get<0>(data)); }
+  bool is_text_input() const { return data.index() == 1; }
+  
+  const std::string& text_input() const {
+    assert( is_text_input() && "keyboard event not text input" );
+    return get<1>(data);
+  }
 };
 
 inline bool is_number(keycode k){

@@ -110,7 +110,7 @@ struct view_modifiers {
   
   struct one_keydown_filter {
     std::optional<keyboard_event> operator()(input_event e) const { 
-      if (e.is_keyboard() && e.keyboard().is_down() && e.keyboard().key == key)
+      if (e.is_keyboard() && e.keyboard().is_down() && e.keyboard().key() == key)
         return e.keyboard();
       return {};
     }

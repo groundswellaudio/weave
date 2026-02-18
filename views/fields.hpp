@@ -21,7 +21,7 @@ struct text_field : widget_base {
   
   std::string value_str;
   glyph_positions glyph_pos;
-  unsigned edit_pos = 0;
+  unsigned cursor_index[2] = {unsigned(-1), 0}; // left-right, cursor_index[1] is the caret
   bool show_caret : 1 = false;
   bool editing : 1 = false;
   
@@ -29,6 +29,32 @@ struct text_field : widget_base {
     gc.get_glyph_positions(glyph_pos, value_str, {5, size().y / 2});
   }
   
+  void set_caret_position_from(point pos)
+  {
+    if (value_str.size() == 0)
+      return;
+    // this set the right cursor
+    cursor_index[1] = glyph_pos.index_from_pos(pos.x);
+  }
+  
+  void set_selection_from(point pos)
+  {
+    if (value_str.size() == 0)
+      return;
+    
+    auto idx = glyph_pos.index_from_pos(pos.x);
+    
+    if (idx > cursor_index[1])
+      cursor_index[1] = idx;
+    else if (idx < cursor_index[0])
+      cursor_index[0] = idx;
+  }
+  
+  auto& caret()             { return cursor_index[1]; }
+	const auto& caret() const { return cursor_index[1]; }
+	
+	bool has_selection() const { return cursor_index[0] != unsigned(-1); }
+	
   public : 
   
   void enter_editing(event_context& ec) { 
@@ -37,7 +63,9 @@ struct text_field : widget_base {
     ec.animate(*this, [] (auto& s) { 
       s.show_caret = !s.show_caret;
       return s.editing; 
-    }, 1000);
+    }, 800);
+    cursor_index[1] = value_str.size();
+    cursor_index[0] = -1;
   }
   
   void exit_editing(event_context& ec) {
@@ -52,7 +80,7 @@ struct text_field : widget_base {
   
   void set_value(std::string new_value, graphics_context& gc) {
     value_str = new_value; 
-    edit_pos = value_str.size();
+    cursor_index[1] = value_str.size();
     update_glyph_pos(gc);
   }
   
@@ -61,8 +89,17 @@ struct text_field : widget_base {
   void on(mouse_event e, event_context& Ec) { 
     if (e.is_double_click()) 
       enter_editing(Ec);
-    if (e.is_exit()) 
+    else if (e.is_down()) {
+      cursor_index[0] = -1;
+      set_caret_position_from(e.position);
+      Ec.request_repaint();
+    }
+    else if (e.is_exit()) 
       exit_editing(Ec);
+    else if (e.is_drag()) {
+      set_selection_from(e.position);
+      Ec.request_repaint();
+    }
   }
   
   widget_size_info size_info() const {
@@ -78,25 +115,69 @@ struct text_field : widget_base {
     if (e.is_up())
       return;
     
-    if (auto C = to_character(e.key))
-    {
-      value_str.push_back(C);
+    if (e.is_text_input()) {
+      if (has_selection()) // replace selection with input
+      {
+        value_str.replace( value_str.begin() + cursor_index[0], value_str.begin() + cursor_index[1],
+                e.text_input().begin(), e.text_input().end() );
+        cursor_index[1] = cursor_index[0] + 1;
+        cursor_index[0] = (unsigned)(-1);
+      }
+      else // insert after caret
+      {
+        auto input = e.text_input();
+        value_str.insert( value_str.begin() + caret(), input.begin(), input.end() );
+        caret() += input.size();
+      }
       update_glyph_pos(Ec.graphics_context());
       Ec.request_repaint();
       return;
     }
     
-    switch(e.key) {
-      case keycode::backspace:
-        value_str.pop_back();
-        update_glyph_pos(Ec.graphics_context());
+    switch(e.key()) {
+      case keycode::backspace: {
+        if (caret() == 0)
+          return;
+        if (has_selection())
+        {
+          value_str.erase(value_str.begin() + cursor_index[0], value_str.begin() + cursor_index[1]);
+          cursor_index[1] = cursor_index[0];
+          cursor_index[0] = unsigned(-1);
+        }
+        else
+        {
+          value_str.erase( value_str.begin() + caret() - 1 );
+          --caret();
+        }
         Ec.request_repaint();
         break;
+      }
       case keycode::enter: 
         exit_editing(Ec);
         write(Ec, value_str);
         break;
-      
+      case keycode::arrow_left:
+        if (has_selection()) {
+          cursor_index[1] = cursor_index[0];
+          cursor_index[0] = unsigned(-1);
+        }
+        else {
+          if (caret() == 0)
+            return;
+          --caret();
+        }
+        Ec.request_repaint();
+        break;
+      case keycode::arrow_right:
+        if (has_selection())
+          cursor_index[0] = unsigned(-1);
+        else {
+          if (caret() == value_str.size())
+            return;
+          ++caret();
+        }
+        Ec.request_repaint();
+        break;
       default: 
         break;
     }
@@ -111,8 +192,16 @@ struct text_field : widget_base {
     p.text_align(text_align::x::left, text_align::y::center);
     p.text({5, size().y / 2}, value_str);
     
+    if (has_selection()) {
+      auto cursor_pos_l = glyph_pos.pos_from_index(cursor_index[0]);
+      auto cursor_pos_r = glyph_pos.pos_from_index(cursor_index[1]);
+      rectangle r { {cursor_pos_l, 0}, {cursor_pos_r - cursor_pos_l, size().y} };
+      p.fill_style( rgba_f{colors::cyan}.with_alpha(0.3) );
+      p.fill(r);
+    }
+    
     if (show_caret) {
-      auto px = glyph_pos.pos_from_index(edit_pos);
+      auto px = glyph_pos.pos_from_index(caret());
       p.line( point{px, 0}, point{px, size().y}, 2 );
     }
   }
@@ -205,13 +294,13 @@ struct numeric_field : widget_base {
     if (e.is_up())
       return;
     
-    if (is_number(e.key)) {
-      value_str.push_back( to_character(e.key) );
+    if (is_number(e.key())) {
+      value_str.push_back( to_character(e.key()) );
       Ec.request_repaint();
       return;
     }
     
-    if (to_character(e.key) == '.' && accept_decimal)
+    if (to_character(e.key()) == '.' && accept_decimal)
     {
       if (value_str.find('.') == std::string::npos) {
         value_str.push_back('.');
@@ -220,7 +309,7 @@ struct numeric_field : widget_base {
       return;
     }
     
-    switch(e.key) {
+    switch(e.key()) {
       case keycode::backspace:
         value_str.pop_back();
         Ec.request_repaint();
