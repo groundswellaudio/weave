@@ -3,7 +3,9 @@
 weave is a declarative UI library for C++, inspired by the likes of ImGUI, SwiftUI, and xilem.
 
 Its goal is to provide a terse, declarative API (like ImGUI) for designing user interfaces, 
-while offering the extensibility of traditional UI libraries. 
+while offering the extensibility of traditional UI libraries.
+
+![A screenshot of the music player](./screenshot.png)
 
 ## Hello world
 
