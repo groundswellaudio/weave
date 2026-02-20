@@ -113,10 +113,10 @@ struct combo_box : view<combo_box<Lens, Range>> {
   }
   
   template <class S>
-  auto build_impl(const build_context& builder, S& state) {
+  auto build_impl(const build_context& ctx, S& state) {
     auto size = point{50, 20};
     auto&& vec = make_string_vec();
-    auto w = max_text_width(vec, builder.context().graphics_context(), 11);
+    auto w = max_text_width(vec, ctx.graphics_context(), 11);
     auto res = widget_t{{w + 2 * widget_t::margin, 20}, std::forward<StringVec>(vec)};
     res.max_width = w + 20; 
     return res;
@@ -141,7 +141,7 @@ struct combo_box : view<combo_box<Lens, Range>> {
     if (new_choices != wb.choices) {
       wb.choices = std::move(new_choices);
       auto old_width = wb.max_width;
-      wb.max_width = max_text_width(wb.choices, ctx.context().graphics_context(), 11) 
+      wb.max_width = max_text_width(wb.choices, ctx.graphics_context(), 11) 
                           + 20;
       if (old_width != wb.max_width)
         return rebuild_result::size_change;

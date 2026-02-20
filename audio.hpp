@@ -124,6 +124,11 @@ struct audio_renderer
     device.pContext = nullptr;
   }
   
+  // In hertz
+  float samplerate() const {
+    return device.sampleRate;
+  }
+  
   void start_audio_render(audio_buffer_format fmt = {})
   {
     start_audio_device(fmt, device_index);

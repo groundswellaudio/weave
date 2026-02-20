@@ -123,11 +123,11 @@ struct text : view<text<Args...>> {
     return res;
   }
   
-  rebuild_result rebuild(text Old, widget_ref w, auto& up, ignore) {
+  rebuild_result rebuild(text Old, widget_ref w, const build_context& up, ignore) {
     auto& wb = w.as<widget_t>();
     rebuild_result res {};
     if (str != Old.str || fmt_args != Old.fmt_args) {
-      wb.set_string(make_string(), up.context().graphics_context());
+      wb.set_string(make_string(), up.graphics_context());
       res |= rebuild_result::size_change;
     }
     return res;

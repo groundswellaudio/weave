@@ -5,6 +5,85 @@
 
 using namespace weave;
 
+struct transport_bar_widget : widget_base {
+  
+  // the bar is in the last 10pix
+  static constexpr float header = 15;
+  static constexpr float bar_thickness = 8;
+  
+  float ratio_value = 0;
+  unsigned max_value = 0;
+  write_fn<float> write;
+  
+  void on(mouse_event e, event_context& ec) {
+    if (e.position.y > header && e.is_down() || e.is_drag()) {
+      // write_value(e.position.x / size().x);
+      ratio_value = e.position.x / size().x;
+      write(ec, ratio_value);
+    }
+  }
+  
+  auto size_info() const {
+    widget_size_info res;
+    res.min = point{100, 30};
+    res.max = point{infinity<float>(), 30};
+    res.nominal_size = point{120, 30};
+    res.flex_factor = point{1, 0};
+    return res;
+  }
+  
+  void set_value(float val) {
+    ratio_value = val;
+  }
+  
+  void paint(painter& p) const {
+    unsigned elapsed = ratio_value * max_value;
+    unsigned remaining = max_value - elapsed; 
+    
+    p.fill_style(colors::white);
+    p.font_size(11);
+    
+    p.text_align(text_align::x::left, text_align::y::center);
+    p.text( point{5, header / 2}, std::format("{:02}:{:02}", elapsed / 60, elapsed % 60) );
+    
+    // Workaround text align right not working yet
+    //p.text_align(text_align::x::right, text_align::y::center);
+    p.text( point{size().x - 33, header / 2}, std::format("-{:02}:{:02}", remaining / 60, remaining % 60));
+    
+    p.fill_style(colors::gray);
+    p.fill(rounded_rectangle(rectangle({0, header}, {size().x, bar_thickness}), 5)); 
+    p.fill_style( rgba_f{colors::cyan} );
+    rectangle r { {0, header}, {ratio_value * size().x, bar_thickness} };
+    p.fill(rounded_rectangle(r, 5));
+  }
+};
+
+template <class Fn>
+struct transport_bar_view : view<transport_bar_view<Fn>>, views::view_modifiers {
+  
+  using widget_t = transport_bar_widget;
+  
+  transport_bar_view(Fn fn, int length) : write_fn{fn}, track_length{length} {}
+
+  template <class S>
+  auto build(const build_context& ctx, S& state) {
+    auto res = widget_t{};
+    res.write = [fn = write_fn] (event_context& ec, auto val) {
+      context_invoke<S>(fn, ec, val);
+    };
+    res.max_value = track_length; 
+    return res;
+  }
+  
+  rebuild_result rebuild(transport_bar_view<Fn> old, widget_ref r, const build_context& ctx, ignore) {
+    r.as<widget_t>().max_value = track_length;
+    return {};
+  }
+  
+  Fn write_fn;
+  int track_length; 
+};
+
 void paint_play_button(painter& p, bool flag, point sz) {
   p.fill_style(colors::white);
   if (!flag) {
@@ -76,20 +155,29 @@ auto top_panel(State& state)
   auto device_val = readwrite( state.player.current_device_index(), 
                                [] (State& s, int id) { s.player.set_audio_device(id); });
   
+  auto transport_buttons = hstack {
+      graphic_button{&paint_transport_button<false>, &State::previous_track}.with_fixed_size({30, 30}),
+      graphic_toggle_button{&paint_play_button, state.is_playing(), &State::set_play}.with_fixed_size({30, 30}),
+      graphic_button{&paint_transport_button<true>, &State::next_track}.with_fixed_size({30, 30})
+    }.align_center();
+  
+  auto transport_bar = transport_bar_view{ [] (State& s, float val) { s.set_track_position(val); }, 
+                                          state.current_track_length() }
+    .animate_when(state.is_playing(), 1000, 
+    [] (auto& w, animation_context& ctx) { 
+      w.set_value(ctx.state<State>().current_track_position());
+      return true;
+    });
+  
   return hstack {
     combo_box(device_val, audio_output_devices()), 
-    hstack {
-      graphic_button{&paint_transport_button<false>, &State::previous_track}.with_fixed_size({30, 30}),
-      graphic_toggle_button{&paint_play_button, state.is_playing, &State::set_play}.with_fixed_size({30, 30}),
-      graphic_button{&paint_transport_button<true>, &State::next_track}.with_fixed_size({30, 30})
+    transport_buttons,
+    vstack{ either{ state.current_track(), 
+              [] (auto& t) { return text{"{} - {}", t.artist(), t.title()}; }, 
+              [] () { return text{"Not playing."}; }
+            },
+            transport_bar 
     }.align_center(),
-    either{ state.current_track(), 
-        [] (auto& t) { 
-          return text{"{} - {}", t.artist(), t.title()};
-        }, 
-        [] () { 
-          return text{"Not playing."};
-        }}, 
     slider{ [] (auto& s) -> auto& { return s.player.volume; } }
       .space(scalar_space::decibel())
       .range(-80, 0)

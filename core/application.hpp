@@ -21,6 +21,14 @@
 
 namespace weave {
 
+struct animation_context {
+  
+  template <class T>
+  T& state() { return *static_cast<T*>(state_ptr); }
+  
+  void* state_ptr;
+};
+
 namespace impl {
 
   struct mouse_event_dispatcher 
@@ -147,7 +155,7 @@ namespace impl {
       return res;
     }
     
-    vec2f focused_absolute_position() const {
+    point focused_absolute_position() const {
       return focused_absolute_pos;
     }
     
@@ -163,7 +171,7 @@ namespace impl {
     private : 
     
     widget_ref focused;
-    vec2f focused_absolute_pos = {0, 0};
+    point focused_absolute_pos = {0, 0};
     event_context_parent_stack parents;
     optional<widget_ref> top_parent_listener = {};
   };
@@ -200,13 +208,13 @@ namespace impl {
     struct animation {
       
       // Return false if the animation should stop
-      bool run(std::chrono::steady_clock::time_point now) {
+      bool run(std::chrono::steady_clock::time_point now, void* state_ptr) {
         last_call = now;
-        return call(widget);
+        return call(widget, state_ptr);
       }
       
       widget_ref widget;
-      std::function<bool(widget_ref)> call;
+      std::function<bool(widget_ref, void*)> call;
       int period_in_ms;
       std::chrono::steady_clock::time_point last_call;
     };
@@ -223,7 +231,10 @@ namespace impl {
       animations.push_back(
           animation{
             &widget,
-            [fn] (widget_ref w) -> bool { return fn(w.as<Widget>()); },
+            [fn] (widget_ref w, void* state) -> bool { 
+              auto ctx = animation_context{state};
+              return fn(w.as<Widget>(), ctx); 
+            },
             period_ms,
             std::chrono::steady_clock::now()
           }
@@ -235,7 +246,7 @@ namespace impl {
     }
   
     /// Return true if a repaint is needed 
-    bool run()
+    bool run(void* state_ptr)
     {
       if (animations.size() == 0)
         return false;
@@ -245,7 +256,7 @@ namespace impl {
       
       bool gotta_repaint = false;
       
-      erase_if( animations, [now, &gotta_repaint] (auto& a)
+      erase_if( animations, [now, &gotta_repaint, state_ptr] (auto& a)
       {
         const auto time_since_last = int(duration_cast<milliseconds>(now - a.last_call).count());
         
@@ -254,7 +265,7 @@ namespace impl {
         
         gotta_repaint = true;
         
-        return not a.run(now);
+        return not a.run(now, state_ptr);
       });
       return gotta_repaint;
     }
@@ -558,7 +569,7 @@ struct application
         frame.repaint_requested = true;
       }
       
-      frame.repaint_requested = frame.repaint_requested || app_ctx.animations.run();
+      frame.repaint_requested = frame.repaint_requested || app_ctx.animations.run(&state);
       
       if (frame.repaint_requested)
         app_ctx.paint(); 

@@ -41,7 +41,7 @@ struct TrackPlayer : weave::audio_renderer<TrackPlayer>
   
   std::atomic<float> volume = 1.f;
   weave::audio_buffer buffer;
-  int head = -1;
+  std::atomic<int> head = -1;
   std::atomic<bool> done_reading = false;
 };
 
@@ -237,12 +237,24 @@ inline bool is_audio_file(fs::path path) {
 
 struct State : weave::app_state {
   
+  bool is_playing() const {
+    return is_playing_v;
+  }
+  
+  float current_track_position() const {
+    return (float)player.head / player.buffer.size();
+  }
+  
+  void set_track_position(float ratio) {
+    player.head = ratio * player.buffer.size();
+  }
+  
   bool set_play(bool Play) {
     if (Play)
       play();
     else
       pause();
-    return is_playing;
+    return is_playing();
   }
   
   void play() {
@@ -251,7 +263,7 @@ struct State : weave::app_state {
     if (!current_track_id) {
       current_track_id = 0;
     }
-    if (is_playing)
+    if (is_playing())
       pause();
     if (buffer_track_id != current_track_id)
     {
@@ -272,12 +284,12 @@ struct State : weave::app_state {
     }
     
     player.start_audio_render();
-    is_playing = true;
+    is_playing_v = true;
   }
   
   void pause() {
     player.stop_audio_render();
-    is_playing = false;
+    is_playing_v = false;
   }
   
   void next_track() {
@@ -315,6 +327,11 @@ struct State : weave::app_state {
     return "No track playing";
   }
   
+  // in seconds
+  int current_track_length() const {
+    return player.buffer.size() / (player.buffer.num_channels * player.samplerate());
+  }
+  
   void check_done_reading() {
     if (player.done_reading) {
       next_track();
@@ -340,7 +357,7 @@ struct State : weave::app_state {
   TrackPlayer player;
   std::optional<int> current_track_id;
   int buffer_track_id = -1;
-  bool is_playing = false;
+  bool is_playing_v = false;
   
   Database database;
   bool table_mutated = false;

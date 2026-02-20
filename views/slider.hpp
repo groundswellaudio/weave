@@ -81,7 +81,7 @@ struct slider : widget_base
     widget_size_info res;
     res.min = point{30, 15};
     res.nominal_size = point{50, 15};
-    res.flex_factor = point{1, 0};
+    res.flex_factor = point{0.5, 0};
     return res;
   }
   

@@ -99,10 +99,10 @@ struct image : view<image<ImgT, Proj>>, view_modifiers {
     return *this;
   }
   
-  auto build(auto&& b, ignore) {
+  auto build(const build_context& ctx, ignore) {
     optional<texture_handle> texture;
     if (!img.empty())
-      texture = make_texture(b.context());
+      texture = make_texture(ctx.graphics_context());
     auto wsize = get_display_size();
     return widget_t{{wsize}, texture, wsize, corner_offset};
   }
@@ -111,11 +111,11 @@ struct image : view<image<ImgT, Proj>>, view_modifiers {
     auto& w = elem.as<widget_t>();
     if (!w.texture) {
       if (!img.empty())
-        w.texture = make_texture(up.context());
+        w.texture = make_texture(up.graphics_context());
     }
     else if (refresh) {
       debug_log("refreshing image");
-      auto& gctx = up.context().graphics_context();
+      auto& gctx = up.graphics_context();
       gctx.delete_texture(*w.texture);
       
       if (img.empty()) {
@@ -124,7 +124,7 @@ struct image : view<image<ImgT, Proj>>, view_modifiers {
         return rebuild_result::size_change;
       }
       
-      w.texture = make_texture(up.context());
+      w.texture = make_texture(up.graphics_context());
     }
     auto new_size = get_display_size();
     if (w.size() == new_size)
@@ -136,16 +136,16 @@ struct image : view<image<ImgT, Proj>>, view_modifiers {
   
   private : 
   
-  texture_handle make_texture(application_context& ctx) {
+  texture_handle make_texture(graphics_context& ctx) {
     if constexpr (std::is_same_v<ImgT, weave::image<rgba<unsigned char>>>) 
-      return ctx.graphics_context().create_texture(img, img.shape());
+      return ctx.create_texture(img, img.shape());
     else {
       weave::image<rgba<unsigned char>> tex;
       tex.reshape(img.shape());
       for (int y : iota(tex.shape()[0]))
         for (int x : iota(tex.shape()[1]))
           tex(y, x) = static_cast<rgba<unsigned char>>(image_proj(img(y, x)));
-      return ctx.graphics_context().create_texture(tex, tex.shape());
+      return ctx.create_texture(tex, tex.shape());
     }
   }
   

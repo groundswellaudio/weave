@@ -40,7 +40,7 @@ struct maybe : view_sequence_base {
     }
     else
     {
-      Old.view.seq_destroy(seq_updater.destroy_fn(), ctx.context());
+      Old.view.seq_destroy(seq_updater.destroy_fn(), ctx.application_context());
     }
     return {};
   }
@@ -132,7 +132,7 @@ struct either : view_sequence_base {
     }
     else {
       visit( [&] (auto& elem) {
-        elem.seq_destroy(updater.destroy_fn(), ctx.context());
+        elem.seq_destroy(updater.destroy_fn(), ctx.application_context());
       }, Old.body);
       visit( [&] (auto& elem) {
         elem.seq_build(updater.consume_fn(), ctx, state);

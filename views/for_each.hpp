@@ -40,7 +40,7 @@ struct for_each : view_sequence_base {
       for (; k < elements.size(); ++k)
         res |= elements[k].seq_rebuild(Old.elements[k], seq_updater, ctx, state);
       for (; k < Old.elements.size(); ++k)
-        Old.elements[k].seq_destroy( seq_updater.destroy_fn(), ctx.context() );
+        Old.elements[k].seq_destroy( seq_updater.destroy_fn(), ctx.application_context() );
     }
     
     return res;

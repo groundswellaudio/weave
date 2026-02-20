@@ -196,12 +196,9 @@ struct button : view<button<Fn>>, view_modifiers {
   
   template <class State>
   auto build(const build_context& b, State& s) {
-    auto sz = text_bounds(b.context());
     decltype(widget_t::on_click) action = [f = fn] (auto& ec) { context_invoke<State>(f, ec); };
-    auto size = sz + point{button_margin, button_margin} * 2;
     auto res = widget_t{};
-    res.set_size(size);
-    auto& gctx = b.context().graphics_context();
+    auto& gctx = b.graphics_context();
     res.set_font_size(font_size, gctx);
     res.set_string(std::string(str), gctx);
     res.on_click = std::move(action);
@@ -216,11 +213,11 @@ struct button : view<button<Fn>>, view_modifiers {
     b.set_disabled(disabled);
     bool update_bounds = false; 
     if (b.string() != str) {
-      b.set_string(std::string(str), ctx.context().graphics_context());
+      b.set_string(std::string(str), ctx.graphics_context());
       update_bounds = true;
     }
     if (font_size != b.font_size()) {
-      b.set_font_size(font_size, ctx.context().graphics_context());
+      b.set_font_size(font_size, ctx.graphics_context());
       update_bounds = true;
     }
     if (update_bounds) 

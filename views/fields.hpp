@@ -60,7 +60,7 @@ struct text_field : widget_base {
   void enter_editing(event_context& ec) { 
     editing = true;
     ec.grab_keyboard_focus(this);
-    ec.animate(*this, [] (auto& s) { 
+    ec.animate(*this, [] (auto& s, ignore) { 
       s.show_caret = !s.show_caret;
       return s.editing; 
     }, 800);
@@ -229,7 +229,7 @@ struct text_field : view<text_field<Lens>> {
   rebuild_result rebuild(text_field<Lens>& old, widget_ref elem, const build_context& up, auto& state) {
     auto& w = elem.as<widget_t>();
     auto val = lens.read(state);
-    if (!up.context().has_keyboard_focus(elem))
+    if (!up.application_context().has_keyboard_focus(elem))
       w.set_value(val);
     return {};
   }
@@ -363,7 +363,7 @@ struct numeric_field : view<numeric_field<Lens>> {
   rebuild_result rebuild(numeric_field<Lens>& old, widget_ref elem, const build_context& up, auto& state) {
     auto& w = elem.as<widget_t>();
     auto val = lens.read(state);
-    if (!up.context().has_keyboard_focus(elem))
+    if (!up.application_context().has_keyboard_focus(elem))
     {
       w.value = val;
       w.update_str();

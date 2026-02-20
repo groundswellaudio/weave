@@ -103,6 +103,33 @@ struct with_fixed_size : V {
   point fixed_size;
 };
 
+template <class V, class Fn>
+struct animated : V {
+  
+  using widget_t = typename V::widget_t;
+  
+  rebuild_result rebuild(const animated<V, Fn>& Old, widget_ref r, const build_context& ctx, auto& state) {
+    auto& w = r.as<widget_t>();
+    auto& app_ctx = ctx.application_context();
+    if (flag != Old.flag) {
+      if (flag)
+        app_ctx.animate(w, fn, period_ms);
+      else
+        app_ctx.deanimate(r);
+    }
+    return V::rebuild(Old, r, ctx, state);
+  }
+  
+  void destroy(widget_ref r, application_context& ctx) {
+    if (flag)
+      ctx.deanimate(r);
+  }
+  
+  bool flag; 
+  Fn fn;
+  int period_ms;
+};
+
 /// Common extensions for views.
 struct view_modifiers {
 
@@ -155,6 +182,10 @@ struct view_modifiers {
   
   auto with_fixed_size(this auto&& self, point size) {
     return views::with_fixed_size{self, size};
+  }
+  
+  auto animate_when(this auto&& self, bool flag, int period_ms, auto fn) {
+    return animated{self, flag, fn, period_ms};
   }
 };
 

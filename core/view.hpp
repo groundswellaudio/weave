@@ -47,9 +47,9 @@ struct graphics_context;
 struct build_context 
 {
   graphics_context& graphics_context() const;
-  auto& context() const { return ctx; }
+  auto& application_context() const { return ctx; }
   
-  application_context& ctx;
+  struct application_context& ctx;
 };
 
 template <class T>

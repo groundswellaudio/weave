@@ -93,7 +93,7 @@ struct list : view<list<T>> {
   auto build(const build_context& b, ignore) {
     widget_t res;
     set_cells(res);
-    res.update_size(b.context().graphics_context());
+    res.update_size(b.graphics_context());
     res.on_select_cell = select_cell;
     return res;
   }
