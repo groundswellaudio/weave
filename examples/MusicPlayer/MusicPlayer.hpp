@@ -152,9 +152,6 @@ auto top_panel(State& state)
 {
   using namespace views;
   
-  auto device_val = readwrite( state.player.current_device_index(), 
-                               [] (State& s, int id) { s.player.set_audio_device(id); });
-  
   auto transport_buttons = hstack {
       graphic_button{&paint_transport_button<false>, &State::previous_track}.with_fixed_size({30, 30}),
       graphic_toggle_button{&paint_play_button, state.is_playing(), &State::set_play}.with_fixed_size({30, 30}),
@@ -169,12 +166,15 @@ auto top_panel(State& state)
       return true;
     });
   
+  auto device_val = readwrite( state.player.current_device_index(), 
+                               [] (State& s, int id) { s.player.set_audio_device(id); });
+  
   return hstack {
     combo_box(device_val, audio_output_devices()), 
     transport_buttons,
     vstack{ either{ state.current_track(), 
-              [] (auto& t) { return text{"{} - {}", t.artist(), t.title()}; }, 
-              [] () { return text{"Not playing."}; }
+              [] (auto& t) { return text{"{} - {}", t.artist(), t.title()}.align_center(); }, 
+              [] () { return text{"Not playing."}.align_center(); }
             },
             transport_bar 
     }.align_center(),

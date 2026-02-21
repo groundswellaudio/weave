@@ -21,8 +21,13 @@ struct text : widget_base
   std::string str;
   properties prop;
   float text_width = 0;
+  text_align::x align;
   
   public : 
+  
+  void set_alignment(text_align::x val) {
+    align = val;
+  }
   
   const auto& string() const { return str; }
   
@@ -59,8 +64,11 @@ struct text : widget_base
   void paint(painter& p) {
     p.font_size(prop.font_size);
     p.fill_style(prop.color);
-    p.text_align(text_align::x::left, text_align::y::center);
-    p.text({x_margin, size().y / 2}, str);
+    p.text_align(align, text_align::y::center);
+    float pos_x = align == text_align::x::center 
+                  ? size().x / 2 : align == text_align::x::right
+                  ? size().x - x_margin : x_margin;
+    p.text({pos_x, size().y / 2}, str);
   }
 };
 
@@ -120,6 +128,7 @@ struct text : view<text<Args...>> {
     auto& gctx = b.graphics_context();
     auto res = widget_t{};
     res.set_string(make_string(), gctx);
+    res.set_alignment(align_x);
     return res;
   }
   
@@ -130,12 +139,24 @@ struct text : view<text<Args...>> {
       wb.set_string(make_string(), up.graphics_context());
       res |= rebuild_result::size_change;
     }
+    wb.set_alignment(align_x);
     return res;
+  }
+  
+  auto&& align_center(this auto&& self) {
+    self.align_x = text_align::x::center;
+    return WEAVE_FWD(self);
+  }
+  
+  auto&& align_right(this auto&& self) {
+    self.align_x = text_align::x::right;
+    return WEAVE_FWD(self);
   }
   
   widget_t::properties prop;
   std::string_view str;
   tuple<Args...> fmt_args;
+  text_align::x align_x = text_align::x::left;
 };
 
 template <class T, class... Ts>
