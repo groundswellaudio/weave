@@ -151,6 +151,30 @@ struct Database {
     return true;
   }
   
+  void set_artist_name(int track_id, std::string_view str) {
+    auto& t = tracks[track_id];
+    t.artist() = str;
+    TagLib::FileRef file{t.file_path.c_str()};
+    file.tag()->setArtist(std::string{str});
+    file.save();
+  }
+  
+  void set_track_title(int track_id, std::string_view str) {
+    auto& t = tracks[track_id];
+    t.title() = str;
+    TagLib::FileRef file{t.file_path.c_str()};
+    file.tag()->setTitle(std::string{str});
+    file.save();
+  }
+  
+  void set_album_name(int track_id, std::string_view str) {
+    auto& t = tracks[track_id];
+    t.album() = str;
+    TagLib::FileRef file{t.file_path.c_str()};
+    file.tag()->setAlbum(std::string{str});
+    file.save();
+  }
+  
   bool empty() const { return tracks.empty(); }
   auto num_tracks() const { return tracks.size(); }
   
@@ -237,6 +261,24 @@ inline bool is_audio_file(fs::path path) {
 
 struct State : weave::app_state {
   
+  template <class IdRange>
+  void set_artist_name(IdRange ids, std::string_view str) {
+    for (auto i : ids)
+      database.set_artist_name(i, str);
+  }
+  
+  template <class IdRange>
+  void set_tracks_title(IdRange ids, std::string_view str) {
+    for (auto i : ids)
+      database.set_track_title(i, str);
+  }
+  
+  template <class IdRange>
+  void set_album_name(IdRange ids, std::string_view str) {
+    for (auto i : ids)
+      database.set_album_name(i, str);
+  }
+  
   bool is_playing() const {
     return is_playing_v;
   }
@@ -313,6 +355,10 @@ struct State : weave::app_state {
   void load_track(const std::string& path) {  
     if (database.add_track_from_file(path))    
       table_mutated = true;
+  }
+  
+  auto& track(this auto& self, int id) {
+    return self.database.track(id);
   }
   
   const Database::Track* current_track() const {

@@ -17,3 +17,4 @@
 #include "list.hpp"
 #include "selectable.hpp"
 #include "composite.hpp"
+#include "zstack.hpp"

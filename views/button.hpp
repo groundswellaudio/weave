@@ -46,7 +46,7 @@ struct toggle_button : widget_base
   widget_size_info size_info() const {
     widget_size_info res;
     res.min = point{10, 10};
-    res.nominal_size = point{prop.str.size() * prop.font_size, 15};
+    res.nominal = point{prop.str.size() * prop.font_size, 15};
     res.flex_factor = point{0.3, 0};
     return res;
   }
@@ -112,7 +112,7 @@ struct trigger_button : widget_base {
   auto size_info() const {
     widget_size_info res;
     res.min = point{15, 15};
-    res.nominal_size = point{margin.x * 2 + text_width, 15};
+    res.nominal = point{margin.x * 2 + text_width, 15};
     res.flex_factor = point{0.3, 0};
     return res;
   }
@@ -258,7 +258,7 @@ struct graphic_toggle_button : widget_base {
   widget_size_info size_info() const {
     widget_size_info res;
     res.min = point{15, 15};
-    res.nominal_size = point{30, 30};
+    res.nominal = point{30, 30};
     res.flex_factor = point{1, 1};
     return res;
   }
@@ -292,7 +292,7 @@ struct graphic_trigger_button : widget_base {
   widget_size_info size_info() const {
     widget_size_info res;
     res.min = point{15, 15};
-    res.nominal_size = point{30, 30};
+    res.nominal = point{30, 30};
     res.flex_factor = point{1, 1};
     return res;
   }

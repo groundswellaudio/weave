@@ -29,26 +29,7 @@ struct table : widget_base, scrollable_base {
     requires complete_type<table_model<T>>
   friend struct views::table;
   
-  struct selection_t : vec2i {
-    void traverse(auto&& fn) const {
-      if (x == -1)
-        return;
-      if (y == -1) {
-        fn(x);
-        return;
-      }
-      for (auto i : iota(x, y))
-        fn(i);
-    }
-    
-    int size() const {
-      if (x == -1)
-        return 0;
-      if (y == -1)
-        return 1;
-      return y - x;
-    }
-  };
+  using selection_t = std::vector<unsigned>; 
   
   private : 
   
@@ -61,7 +42,7 @@ struct table : widget_base, scrollable_base {
     bool selected = false;
   };
   
-  selection_t selection {-1, -1};
+  selection_t selection;
   std::vector<tuple<std::string, float>> properties;
   std::vector<cell> cells;
   std::optional<vec2i> focused_cell;
@@ -82,12 +63,12 @@ struct table : widget_base, scrollable_base {
   
   public : 
   
-  table(vec2f sz) : widget_base{sz} {}
+  table(point sz) : widget_base{sz} {}
   
   auto size_info() const {
     widget_size_info res;
     res.min = point{100, first_row + row_height * 10};
-    res.nominal_size = point{properties.size() * 30.f, first_row + row_height * 15};
+    res.nominal = point{properties.size() * 30.f, first_row + row_height * 15};
     res.flex_factor = point{1, 1};
     return res;
   }
@@ -120,7 +101,7 @@ struct table : widget_base, scrollable_base {
   }
   
   void sort_by_property(int property_index, bool less = true) {
-    std::sort( cells.begin(), cells.end(), [property_index, less] (auto& a, auto& b) {
+    std::stable_sort( cells.begin(), cells.end(), [property_index, less] (auto& a, auto& b) {
       return less ? a.prop[property_index] < b.prop[property_index]
                   : a.prop[property_index] > b.prop[property_index];
     });
@@ -128,7 +109,7 @@ struct table : widget_base, scrollable_base {
     property_sort_order = less;
   }
   
-  std::optional<vec2i> find_cell_at(vec2f pos) const {
+  std::optional<vec2i> find_cell_at(point pos) const {
     int selected_row = (scroll_offset + pos.y - first_row) / row_height;
     if (selected_row >= cells.size())
       return {};
@@ -258,38 +239,44 @@ struct table : widget_base, scrollable_base {
       return;
     }
     bool select_range = Ec.context().is_active(key_modifier::shift);
-    if (select_range) {
-      auto i = selection.x;
-      selection.x = std::min(i, row);
-      selection.y = std::max(i, row);
+    if (select_range && selection.size()) {
+      auto i = selection.front();
+      selection.erase(selection.begin() + 1, selection.end());
+      auto di = row <= i ? 1 : -1;
+      for (int idx = row; idx != i; idx += di)
+        selection.push_back(idx);
     }
     else {
       if (focused_cell == cell) {
-      // Clicking on a single item again : edit the field
-        auto field_width = (col == properties.size() - 1) 
-          ? size().x - get<1>(properties[col])
-          : get<1>(properties[col + 1]) - get<1>(properties[col]);
-        vec2f field_size {field_width, row_height};
-        edited_field.emplace( text_field{} );
-        edited_field->set_size(field_size);
-        edited_field->set_position( {get<1>(properties[col]), first_row + row * row_height - scroll_offset} );
-        edited_field->enter_editing(Ec);
-        edited_field->set_value(cells[cell->y].prop[cell->x], Ec.graphics_context());
-        edited_field->write = [this, cell] (event_context& Ec, auto&& str) { 
-          cells[cell->y].prop[cell->x] = str;
-          if (on_field_edit)
-            on_field_edit(Ec, *cell, str);
-          edited_field.reset(); 
-        };
-        Ec.with_parent(this).grab_mouse_focus(&*edited_field);
-        Ec.with_parent(this).grab_keyboard_focus(&*edited_field);
+        // Clicking on a single item again : edit the field
+        enter_edit_field(col, row, Ec);
       }
       else {
-        selection.x = row;
-        selection.y = -1;
+        selection.clear();
+        selection.push_back(row);
       }
       focused_cell = *cell;
     }
+  }
+  
+  void enter_edit_field(int col, int row, event_context& Ec) {
+    auto field_width = (col == properties.size() - 1) 
+      ? size().x - get<1>(properties[col])
+      : get<1>(properties[col + 1]) - get<1>(properties[col]);
+    point field_size {field_width, row_height};
+    edited_field.emplace( text_field{} );
+    edited_field->set_size(field_size);
+    edited_field->set_position( {get<1>(properties[col]), first_row + row * row_height - scroll_offset} );
+    edited_field->enter_editing(Ec);
+    edited_field->set_value(cells[row].prop[col], Ec.graphics_context());
+    edited_field->write = [this, col, row] (event_context& Ec, auto&& str) { 
+      cells[row].prop[col] = str;
+      if (on_field_edit)
+        on_field_edit(Ec, {col, row}, str);
+      edited_field.reset(); 
+    };
+    Ec.with_parent(this).grab_mouse_focus(&*edited_field);
+    Ec.with_parent(this).grab_keyboard_focus(&*edited_field);
   }
   
   void handle_mouse_down_header(vec2f p) {
@@ -317,17 +304,6 @@ struct table : widget_base, scrollable_base {
     }
     // if we reach here, we have a click on the last tab
     sort_by(properties.size() - 1);
-  }
-  
-  void paint_selection_overlay(painter& p) {
-    if (selection.x != -1) {
-      p.fill_style(rgba{colors::cyan}.with_alpha(70));
-      auto pos_y = selection.x * row + first_row;
-      if (selection.y != -1)
-        p.fill( rectangle({0, pos_y}, {size().x, (selection.y - selection.x + 1) * row}) );
-      else
-        p.fill( rectangle({0, pos_y}, {size().x, row}) );
-    }
   }
   
   void paint_header(painter& p) {
@@ -388,13 +364,12 @@ struct table : widget_base, scrollable_base {
       }
     }
     
-    if (selection.x != -1 && selection.x >= cells_begin && selection.x < cells_end) {
+    if (selection.size()) {
       p.fill_style(rgba{colors::cyan}.with_alpha(70));
-      auto pos_y = selection.x * row - scroll_offset;
-      if (selection.y != -1)
-        p.fill( rectangle({0, pos_y}, {size().x, (selection.y - selection.x + 1) * row}) );
-      else
+      for (auto i : selection) {
+        auto pos_y = i * row - scroll_offset;
         p.fill( rectangle({0, pos_y}, {size().x, row}) );
+      }
     }
   }
 };

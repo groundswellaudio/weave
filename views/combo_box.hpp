@@ -38,7 +38,7 @@ struct combo_box : widget_base {
     widget_size_info res;
     res.min = point{30, 15};
     res.max.y = 30;
-    res.nominal_size = point{max_width + 2 * margin, 15.f};
+    res.nominal = point{max_width + 2 * margin, 15.f};
     res.flex_factor = point{0.1, 0};
     return res;
   }

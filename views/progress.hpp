@@ -13,7 +13,7 @@ struct progress_bar : widget_base
   auto size_info() const {
     widget_size_info res;
     res.min = point{50, 10};
-    res.nominal_size = point{100, 15};
+    res.nominal = point{100, 15};
     res.max.y = 15;
     res.flex_factor = point{1, 0};
     return res;

@@ -219,11 +219,17 @@ namespace impl {
     
     for (auto szi : sz_infos)
     {
-      sum_nominal += szi.nominal_size[axis];
+      sum_nominal += szi.nominal[axis];
     }
     
     sum_nominal += data.interspace * (children.size() - 1);
     sum_nominal += data.margin[axis] * 2;
+    
+    auto cross_axis_size = [&] (int i) {
+      return sz_infos[i].flex_factor[1 - axis] != 0 
+               ? (this_size[1 - axis] - 2 * data.margin[1 - axis])
+               : sz_infos[i].nominal[1 - axis];
+    };
     
     if (sum_nominal < this_size[axis]) 
     {
@@ -236,19 +242,26 @@ namespace impl {
       {
         for (auto i : iota(children.size())) 
         {
-          auto axis_sz = sz_infos[i].nominal_size[axis] 
+          auto axis_sz = sz_infos[i].nominal[axis] 
                             + remaining_space * sz_infos[i].flex_factor[axis] / sum_flex;
           vec2f sz; 
           sz[axis] = axis_sz;
-          sz[1 - axis] = sz_infos[i].flex_factor[1 - axis] != 0 
-            ? (this_size[1 - axis] - 2 * data.margin[1 - axis])
-            : sz_infos[i].nominal_size[1 - axis];
+          sz[1 - axis] = cross_axis_size(i);
+          children[i].set_size(sz);
+        }
+      }
+      else 
+      {
+        // None of the children are extensible, just set them to nominal size
+        for (auto i : iota(children.size())) {
+          point sz;
+          sz[axis] = sz_infos[i].nominal[axis];
+          sz[1 - axis] = cross_axis_size(i);
           children[i].set_size(sz);
         }
       }
       
       resolve_max_constraints(children, sz_infos, axis, this_size);
-      
     }
     else 
     {
@@ -262,16 +275,14 @@ namespace impl {
       for (auto i : iota(children.size())) 
       {   
         auto axis_sz =
-          sz_infos[i].flex_factor[axis] == 0.f ? sz_infos[i].nominal_size[axis]
+          sz_infos[i].flex_factor[axis] == 0.f ? sz_infos[i].nominal[axis]
                                                : 
-          sz_infos[i].nominal_size[axis] 
+          sz_infos[i].nominal[axis] 
             - space_to_remove * 1.f / (sz_infos[i].flex_factor[axis] * sum_inv_flex);
         axis_sz = std::max(sz_infos[i].min[axis], axis_sz);
         vec2f sz; 
         sz[axis] = axis_sz;
-        sz[1 - axis] = sz_infos[i].flex_factor[1 - axis] != 0 
-          ? (this_size[1 - axis] - 2 * data.margin[1 - axis])
-          : sz_infos[i].nominal_size[1 - axis];
+        sz[1 - axis] = cross_axis_size(i);
         children[i].set_size(sz);
       }
       
@@ -364,20 +375,20 @@ struct stack : widget_base
       res.min[1 - Axis] = std::max(res.min[1 - Axis], i.min[1 - Axis]);
       res.max[Axis] += i.max[Axis];
       res.max[1 - Axis] = std::max(res.max[1 - Axis], i.max[1 - Axis]);
-      res.nominal_size[Axis] += i.nominal_size[Axis];
+      res.nominal[Axis] += i.nominal[Axis];
       
       res.flex_factor += i.flex_factor;
       
-      res.nominal_size[1 - Axis] = std::max(res.nominal_size[1 - Axis], 
-                                            i.nominal_size[1 - Axis]);
+      res.nominal[1 - Axis] = std::max(res.nominal[1 - Axis], 
+                                            i.nominal[1 - Axis]);
     }
     
     res.min[Axis] += (children_vec.size() - 1) * data.interspace;
     res.max[Axis] += (children_vec.size() - 1) * data.interspace;
     min += data.margin * 2.f;
     max += data.margin * 2.f;
-    res.nominal_size[Axis] += data.margin[Axis] * 2.f + (children_vec.size() - 1) * data.interspace;
-    res.nominal_size[1 - Axis] += data.margin[1 - Axis] * 2.f;
+    res.nominal[Axis] += data.margin[Axis] * 2.f + (children_vec.size() - 1) * data.interspace;
+    res.nominal[1 - Axis] += data.margin[1 - Axis] * 2.f;
     // Average the flex factor cross axis
     res.flex_factor[1 - Axis] /= children_vec.size();
     return res;
@@ -403,7 +414,7 @@ struct flow : widget_base {
   auto size_info() const {
     widget_size_info res;
     res.min = point{50, 50};
-    res.nominal_size = {150, 150};
+    res.nominal = {150, 150};
     res.flex_factor = point{1, 1};
     return res;
   }

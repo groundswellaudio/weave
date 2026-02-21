@@ -32,7 +32,7 @@ struct list : widget_base {
   auto size_info() const { 
     widget_size_info res;
     res.min = point{50, row_size * 3};
-    res.nominal_size = point{100, cells.size() * row_size + margin * 2};
+    res.nominal = point{100, cells.size() * row_size + margin * 2};
     res.flex_factor = point{1, 1};
     return res;
   }

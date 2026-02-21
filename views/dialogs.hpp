@@ -7,6 +7,8 @@
 
 namespace weave::widgets {
 
+struct popup_menu_stack;
+
 struct popup_menu : widget_base {
   
   static constexpr float row_size = 20;
@@ -15,7 +17,7 @@ struct popup_menu : widget_base {
   
   struct element {
     std::string name;
-    widget_action<optional<popup_menu>()> action;
+    widget_action<optional<popup_menu>(popup_menu*)> action;
     bool is_submenu_opener;
   };
   
@@ -29,39 +31,22 @@ struct popup_menu : widget_base {
   public : 
   
   template <class Str, class Fn>
-  void add_element(Str&& str, Fn fn, graphics_context& gctx) {
-    constexpr bool is_submenu_opener = std::is_same_v<popup_menu, 
-      decltype(std::invoke(fn, std::declval<event_context&>()))
-    >;
-    auto action = [fn] (event_context& ec) -> optional<popup_menu> {
-      if constexpr (is_submenu_opener)
-        return std::invoke(fn, ec);
-      else
-      {
-        // We pop the whole popup menu stack on a leaf action
-        std::invoke(fn, ec);
-        ec.pop_overlay();
-        return {};
-      }
-    };
-    std::string elem_str = str;
-    elements.push_back({elem_str, action, is_submenu_opener});
-    text_width = std::max( gctx.text_bounds(elem_str, font_size).x, text_width );
-    set_size(point{text_width + margin.x * 2, elements.size() * row_size + margin.y * 2});
-  }
+  void add_element(Str&& str, Fn fn, graphics_context& gctx);
   
   widget_size_info size_info() const {
     widget_size_info res;
     res.min.y = elements.size() * row_size + margin.y * 2;
     res.min.x = text_width + margin.x * 2;
     res.max = res.min;
-    res.nominal_size = res.min;
+    res.nominal = res.min;
     res.flex_factor = point{0, 0};
     return res;
   }
   
   void close_children(event_context& ec);
   void open_child(event_context& ec, int idx);
+  
+  void close(event_context& ec);
   
   bool can_open_submenu() const {
     return std::ranges::any_of(elements, [] (auto& e) { return e.is_submenu_opener;});
@@ -72,10 +57,10 @@ struct popup_menu : widget_base {
     if (e.is_down())
     {
       if (!rectangle(size()).contains(e.position)) {
-        ec.pop_overlay();
+        ec.pop_overlay(this);
       }
       else if (hovered != -1 && !elements[hovered].is_submenu_opener)
-        elements[hovered].action(ec);
+        elements[hovered].action(ec, this);
     }
     else if (e.is_move()) 
     {
@@ -127,7 +112,7 @@ struct popup_menu_stack : widget_base {
     widget_size_info res;
     res.min = size();
     res.max = size();
-    res.nominal_size = size();
+    res.nominal = size();
     return res;
   }
   
@@ -141,13 +126,41 @@ struct popup_menu_stack : widget_base {
   
   void on(mouse_event e, event_context& ec) {
     if (e.is_down())
-      ec.pop_overlay();
+      ec.pop_overlay(this);
   }
   
   void paint(painter& p) {}
   
   std::vector<popup_menu> menus;
 };
+
+void popup_menu::close(event_context& ec) {
+  auto overlay_ptr = ec.has_parent() && ec.parent().is<popup_menu_stack>() 
+                      ? ec.parent() : widget_ref(this);
+  ec.pop_overlay(overlay_ptr);
+}
+
+template <class Str, class Fn>
+void popup_menu::add_element(Str&& str, Fn fn, graphics_context& gctx) {
+  constexpr bool is_submenu_opener = std::is_same_v<popup_menu, 
+    decltype(std::invoke(fn, std::declval<event_context&>()))
+  >;
+  auto action = [fn] (event_context& ec, popup_menu* this_) -> optional<popup_menu> {
+    if constexpr (is_submenu_opener)
+      return std::invoke(fn, ec);
+    else
+    {
+      // We pop the whole popup menu stack on a leaf action
+      std::invoke(fn, ec);
+      this_->close(ec);
+      return {};
+    }
+  };
+  std::string elem_str = str;
+  elements.push_back(element{elem_str, action, is_submenu_opener});
+  text_width = std::max( gctx.text_bounds(elem_str, font_size).x, text_width );
+  set_size(point{text_width + margin.x * 2, elements.size() * row_size + margin.y * 2});
+}
 
 void popup_menu::close_children(event_context& ec) {
   auto& p = ec.parent().as<popup_menu_stack>();
@@ -162,7 +175,7 @@ void popup_menu::close_children(event_context& ec) {
 void popup_menu::open_child(event_context& ec, int idx) {
   assert( elements[idx].is_submenu_opener );
   auto& p = ec.parent().as<popup_menu_stack>();
-  auto w = *elements[idx].action(ec);
+  auto w = *elements[idx].action(ec, this);
   w.set_position({position().x + size().x, position().y + idx * row_size});
   ec.grab_mouse_focus(this);
   ec.request_repaint();

@@ -35,7 +35,7 @@ struct with_fixed_size : W {
     widget_size_info res;
     res.min = W::size();
     res.max = W::size();
-    res.nominal_size = W::size();
+    res.nominal = W::size();
     res.flex_factor = point{0, 0};
     return res;
   }

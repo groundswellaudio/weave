@@ -36,10 +36,10 @@ template <class State, class Fn, class... Args>
 decltype(auto) context_invoke(Fn fn, event_context& ec, Args&&... args) {
   ec.request_rebuild();
   ec.request_repaint();
-  if constexpr ( requires { std::invoke(fn, ec, (Args&&)args...); } )
-    return (std::invoke(fn, ec, (Args&&)args...)); 
-  else if constexpr ( requires { std::invoke(fn, ec.template state<State>(), (Args&&)args...); } )
+  if constexpr ( requires { std::invoke(fn, ec.template state<State>(), (Args&&)args...); } )
     return (std::invoke(fn, ec.template state<State>(), (Args&&)args...));
+  else if constexpr ( requires { std::invoke(fn, ec, (Args&&)args...); } )
+    return (std::invoke(fn, ec, (Args&&)args...)); 
   else
     return (std::invoke(fn, (Args&&)args...));
 }

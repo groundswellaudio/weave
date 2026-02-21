@@ -32,7 +32,7 @@ struct input_event : variant<mouse_event, keyboard_event> {
 };
 
 struct widget_size_info {
-  point nominal_size {0, 0};
+  point nominal {0, 0};
   point min {0, 0};
   point max {infinity<float>(), infinity<float>()};
   point flex_factor{1, 1};
@@ -54,11 +54,11 @@ concept widget_has_children = requires (W& obj) { obj.traverse_children(any_invo
 
 struct widget_base {
   
-  vec2f size() const { return sz; }
-  vec2f position() const { return pos; }
+  point size() const { return sz; }
+  point position() const { return pos; }
   rectangle area() const { return {pos, sz}; }
   
-  void set_size(vec2f v) {
+  void set_size(point v) {
     assert( std::abs(v.x) < 1e10 && std::abs(v.y) < 1e10 && "aberrant size value" );
     assert( v.x >= 0 && v.y >= 0 && "negative size value" );
     assert( !std::isnan(v.x) && !std::isnan(v.y) && "NaN in widget size?" );
@@ -75,7 +75,7 @@ struct widget_base {
     std::cerr << type_str << " " << self.position() << " " << self.size();
     auto info = self.size_info();
     std::cerr << "min " << info.min << " max " << info.max << " flex " << info.flex_factor
-    << " nominal_size " << info.nominal_size;
+    << " nominal_size " << info.nominal;
     if constexpr ( widget_has_children<T> ) {
       self.traverse_children( [indent] (auto& elem) {
         std::cerr << '\n';
@@ -89,38 +89,28 @@ struct widget_base {
     set_position({x, y});
   }
   
-  void set_position(vec2f p) {
+  void set_position(point p) {
     assert( std::abs(p.x) < 1e10 && std::abs(p.y) < 1e10 && "aberrant position value" );
     assert( !std::isnan(p.x) && !std::isnan(p.y) && "NaN in widget position?" );
     pos = p;
   }
   
-  bool contains(vec2f pos) const {
+  bool contains(point pos) const {
     auto p = position();
     auto sz = size();
     return p.x <= pos.x && p.y <= pos.y && p.x + sz.x >= pos.x && p.y + sz.y >= pos.y;
   }
-  
-  /* 
-  widget_size_info size_info(this auto& self) {
-    return {self.min_size(), self.max_size()};
-  } */ 
    
-  vec2f do_layout(this auto& self, vec2f sz) {
+  void do_layout(this auto& self, point sz) {
     if constexpr (requires {self.layout(sz);}) {
-      auto res = self.layout(sz);
-      self.set_size(res);
-      return res;
+      self.layout(sz);
     }
-    else {  
-      self.set_size(sz);
-      return sz;
-    }
+    self.set_size(sz);
   }
   
-  std::optional<widget_ref> find_child_at(this auto& self, vec2f pos);
+  std::optional<widget_ref> find_child_at(this auto& self, point pos);
   
-  vec2f sz = {0, 0}, pos = {0, 0};
+  point sz = {0, 0}, pos = {0, 0};
 };
 
 template <class T>
@@ -144,11 +134,11 @@ namespace impl
     using ptr = T*;
     
     ptr<void(widget_base*, painter&)> paint;
-    ptr<vec2f(widget_base*, vec2f sz)> layout;
+    ptr<void(widget_base*, point sz)> layout;
     ptr<widget_size_info(const widget_base*)> size_info;
     ptr<void(widget_base*, input_event, event_context&)> on;
     ptr<void(widget_base*, input_event, event_context&, widget_ref)> on_child_event;
-    ptr<optional<widget_ref>(widget_base*, vec2f)> find_child_at;
+    ptr<optional<widget_ref>(widget_base*, point)> find_child_at;
     ptr<void(widget_base*, widget_children_vec&)> children;
     ptr<void(widget_base*, int indent)> debug_dump;
     ptr<void(widget_base*)> destroy;
@@ -235,18 +225,18 @@ class widget_ref {
   
   widget_size_info size_info() const { return vptr->size_info(data); }
   
-  vec2f size() const { return data->size(); }
+  point size() const { return data->size(); }
   rectangle area() const { return data->area(); }
   
   void set_size(vec2f sz) { data->set_size(sz); }
   
-  vec2f position() const { return data->position(); }
+  point position() const { return data->position(); }
   
-  void set_position(vec2f p) { data->set_position(p.x, p.y); }
+  void set_position(point p) { data->set_position(p.x, p.y); }
   
-  bool contains(vec2f pos) const { return data->contains(pos); }
+  bool contains(point pos) const { return data->contains(pos); }
   
-  auto find_child_at(vec2f pos) const {
+  auto find_child_at(point pos) const {
     return vptr->find_child_at(data, pos);
   }
   
@@ -291,9 +281,11 @@ struct widget_box : widget_ref {
     return data;
   }
   
-  widget_ref borrow() {
-    return widget_ref{data, vptr};
-  }
+  widget_ref borrow() { return widget_ref{data, vptr}; }
+  
+  // FIXME: would be good to have a const_widget_ref?
+  widget_ref borrow() const { return widget_ref{data, vptr}; }
+  
   
   void reset() {
     if (data) {
@@ -319,7 +311,7 @@ namespace impl {
   
 } // impl
 
-optional<widget_ref> widget_base::find_child_at(this auto& self, vec2f pos) {
+optional<widget_ref> widget_base::find_child_at(this auto& self, point pos) {
   if constexpr ( widget_has_children<decltype(self)> ) {
     optional<widget_ref> res;
     self.traverse_children( [&res, pos] (auto& elem) {
@@ -351,19 +343,27 @@ struct event_context {
   void request_rebuild() { frame_result.rebuild_requested = true; }
   void request_repaint() { frame_result.repaint_requested = true; }
   
-  widget_ref parent() const { return parents.back(); }
+  widget_ref parent() const { 
+    assert(has_parent() && "event context has no parent");
+    return parents.back(); 
+  }
+  
+  bool has_parent() const { return parents.size(); }
   
   void push_overlay(widget_box widget);
   
   void push_overlay_relative(widget_box widget);
   
-  void pop_overlay();
+  void pop_overlay(widget_ref r);
+  
+  // Pop the first child of the root zstack 
+  void pop_this_overlay();
   
   /// Register an animation fn to be executed every period_in_ms
   template <class W, class Fn>
   void animate(W& widget, Fn fn, int period_in_ms);
   
-  /// Remove all animations
+  /// Remove all animations for a widget
   void deanimate(widget_ref w);
   
   vec2f absolute_position() const {
@@ -433,9 +433,9 @@ namespace impl {
         auto& obj = *static_cast<W*>(self);
         obj.paint(p);
       },
-      +[] (widget_base* self, vec2f sz) -> vec2f {
+      +[] (widget_base* self, point sz) {
         auto& obj = *static_cast<W*>(self);
-        return obj.do_layout(sz);
+        obj.do_layout(sz);
       },
       +[] (const widget_base* self) -> widget_size_info {
         return static_cast<const W*>(self)->size_info();

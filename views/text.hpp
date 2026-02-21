@@ -1,6 +1,7 @@
 #pragma once
 
 #include "views_core.hpp"
+#include "modifiers.hpp"
 #include <string_view>
 #include <format>
 
@@ -52,7 +53,7 @@ struct text : widget_base
   auto size_info() const {
     widget_size_info res;
     res.min = point{30, prop.font_size + 2 * 5};
-    res.nominal_size = point{text_width + 2 * x_margin, prop.font_size + 2 * 5};
+    res.nominal = point{text_width + 2 * x_margin, prop.font_size + 2 * 5};
     res.flex_factor = point{0.1, 0};
     return res;
   }
@@ -73,29 +74,57 @@ struct text : widget_base
 };
 
 template <class W>
-struct with_label : W {
+struct with_label : widget_base {
   
-  vec2f size() {
-    return W::size() + vec2f{text_size, 0};
+  static constexpr float margin = 3; 
+  
+  template <class... Args>
+  with_label(Args&&... args) : child{WEAVE_FWD(args)...} {}
+  
+  auto size_info() const {
+    auto base = child.size_info();
+    widget_size_info res = child.size_info();
+    res.min.x += text_size + margin * 2;
+    res.max.x += text_size + margin * 2;
+    res.nominal.x += text_size + margin * 2;
+    // res.aspect_ratio FIXME : compute the proper aspect ratio if the base has one
+    return res;
   }
   
-  auto position() const {
-    return W::position() - vec2f{text_size, 0};
-  }
-  
-  void set_position(vec2f pos) {
-    W::set_position( pos + vec2f{text_size, 0} );
+  void layout(point size) {
+    child.set_position(point{text_size + margin * 2, 0});
+    auto sz = size - point{text_size + margin * 2, 0};
+    child.set_size(sz);
   }
   
   void paint(painter& p) {
     p.font_size(11);
     p.fill_style(colors::white);
     p.text_align(text_align::x::left, text_align::y::center);
-    p.text({0, W::size().y / 2}, text);
+    p.text({margin, child.size().y / 2}, text);
   }
+  
+  auto traverse_children(auto fn) {
+    return fn(child);
+  }
+  
+  void set_label(std::string str, graphics_context& ctx) {
+    text = WEAVE_MOVE(str);
+    text_size = ctx.text_bounds(str, 11).x;
+  }
+  
+  void set_label(std::string_view str, graphics_context& ctx) {
+    text = std::string{str};
+    text_size = ctx.text_bounds(str, 11).x;
+  }
+  
+  void on(mouse_event e, event_context& ec) {}
+  
+  private : 
   
   std::string text;
   float text_size;
+  W child;
 };
 
 } // widgets
@@ -132,7 +161,7 @@ struct text : view<text<Args...>> {
     return res;
   }
   
-  rebuild_result rebuild(text Old, widget_ref w, const build_context& up, ignore) {
+  rebuild_result rebuild(const text& Old, widget_ref w, const build_context& up, ignore) {
     auto& wb = w.as<widget_t>();
     rebuild_result res {};
     if (str != Old.str || fmt_args != Old.fmt_args) {
@@ -163,14 +192,29 @@ template <class T, class... Ts>
 text(T&& str, Ts&&... ts) -> text<Ts...>;
 
 template <class V>
-struct with_label {
+struct with_label : view<with_label<V>>, view_modifiers {
   
-  auto build(auto&& b, auto& state) {
-    return widgets::with_label{view.build(b, state), str};
+  with_label(std::string_view str, V view) : str{str}, view{WEAVE_MOVE(view)} {}
+  
+  auto build(const build_context& ctx, auto& state) {
+    using underlying = decltype(view.build(ctx, state));
+    auto res = widgets::with_label<underlying>{view.build(ctx, state)};
+    res.set_label(str, ctx.graphics_context());
+    return res;
   }
   
-  V view;
+  rebuild_result rebuild(const with_label<V>& old, widget_ref w, const build_context& ctx, auto& state) {
+    using underlying = decltype(view.build(ctx, state));
+    auto& wl = w.as<widgets::with_label<underlying>>();
+    if (str != old.str) {
+      wl.set_label(std::string(str), ctx.graphics_context());
+      return rebuild_result::size_change;
+    }
+    return {};
+  }
+  
   std::string_view str;
+  V view;
 };
 
 } // views

@@ -16,6 +16,7 @@
 #include "../events/mouse_events.hpp"
 #include "../util/vec.hpp"
 #include "../util/util.hpp"
+#include "../views/zstack.hpp"
 
 #include "nfd.h"
 
@@ -168,6 +169,10 @@ namespace impl {
       focused_absolute_pos += focused.position();
     }
     
+    auto get_focused() const { return focused; }
+    
+    const auto& parents_stack() const { return parents; }
+    
     private : 
     
     widget_ref focused;
@@ -313,16 +318,16 @@ struct application_context {
   template <class RootCtor>
   application_context(window_properties win_prop, RootCtor Ctor)
   : backend{this},
-    win{win_prop}, 
-    root{Ctor()}, 
-    overlay{nullptr},
+    win{win_prop},
+    root{Ctor()},
     mouse{root.borrow()}
   {
     backend.start_text_input(win);
     layout_root();
-    auto size_info = root.size_info();
-    win.set_min_size(size_info.min);
-    win.set_max_size(size_info.max);
+  }
+  
+  widget_ref root_widget() const {
+    return root.borrow();
   }
   
   template <class W, class Fn>
@@ -340,15 +345,20 @@ struct application_context {
   
   widget_ref push_overlay(widget_box w) 
   {
-    overlay = std::move(w);
-    mouse.set_focused(overlay.borrow(), {});
-    return overlay.borrow();
+    overlays.push_back(std::move(w));
+    mouse.set_focused(overlays.back().borrow(), {});
+    return overlays.back().borrow();
   }
   
-  void pop_overlay()
+  void pop_overlay(widget_ref r)
   {
-    mouse.set_focused(root.borrow(), {});
-    overlay.reset();
+    auto it = std::find(overlays.begin(), overlays.end(), r);
+    if (it == overlays.end())
+      return;
+    overlays.erase(it);
+    if (mouse.get_focused() == r 
+        || mouse.parents_stack().size() && mouse.parents_stack()[0] == r)
+      mouse.set_focused(root.borrow(), {});
   }
   
   void grab_keyboard_focus(widget_ref r, const event_context_parent_stack& stack) {
@@ -418,11 +428,10 @@ struct application_context {
         self(w, new_scissor_pos - pos, new_scissor_sz);
     };
     
-    fn(root.borrow(), {0, 0}, win.size());
+    fn(root_widget(), {0, 0}, win.size());
     
-    if (overlay) {
-      fn(overlay.borrow(), {0, 0}, overlay.size());
-    }
+    for (auto& o : overlays)
+      fn(o.borrow(), {0, 0}, win.size());
     
     p.end_frame();
     win.swap_buffer();
@@ -440,7 +449,7 @@ struct application_context {
   
   void layout_root() {
     root.layout(win.size());
-    auto size_info = root.size_info();
+    auto size_info = root_widget().size_info();
     win.set_min_size(size_info.min);
     win.set_max_size(size_info.max);
   }
@@ -448,7 +457,9 @@ struct application_context {
   impl::sdl_backend backend;
   struct window win;
   struct graphics_context gctx;
-  widget_box root, overlay;
+  
+  widget_box root;
+  std::vector<widget_box> overlays;
   impl::mouse_event_dispatcher mouse;
   impl::keyboard_event_dispatcher keyboard;
   impl::widget_animations animations;
@@ -465,8 +476,14 @@ void event_context::push_overlay(widget_box widget) {
   request_repaint();
 }
 
-void event_context::pop_overlay() {
-  ctx.pop_overlay();
+void event_context::pop_overlay(widget_ref r) {
+  ctx.pop_overlay(r);
+  request_repaint();
+}
+
+void event_context::pop_this_overlay() {
+  assert( parents.size() >= 1 && "pop_this_overlay called without at least 1 parent?" );
+  ctx.pop_overlay( parents[0] );
   request_repaint();
 }
 
@@ -543,11 +560,11 @@ struct application
     auto old_view = std::move(*app_view);
     app_view.emplace( view_ctor(state) );
     auto bctx = build_context{app_ctx};
-    app_view->rebuild(old_view, app_ctx.root.borrow(), bctx, state);
+    app_view->rebuild(old_view, app_ctx.root_widget(), bctx, state);
     app_ctx.mouse.update_absolute_position();
     app_ctx.rebuild_requested = false;
     // Note : it would be nice to not have to do this on every rebuild ? 
-    auto size_info = app_ctx.root.size_info();
+    auto size_info = app_ctx.root_widget().size_info();
     app_ctx.win.set_min_size(size_info.min);
     app_ctx.win.set_max_size(size_info.max);
   }

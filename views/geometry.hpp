@@ -16,7 +16,7 @@ struct shape<rectangle> : widget_base {
   auto size_info() const {
     widget_size_info res;
     res.flex_factor = point{0, 0};
-    res.nominal_size = nominal_size;
+    res.nominal = nominal_size;
     return res;
   }
   

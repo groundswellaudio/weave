@@ -16,12 +16,12 @@ struct image : widget_base {
     if (!texture) {
       res.min = point{0, 0};
       res.max = point{0, 0};
-      res.nominal_size = point{0, 0};
+      res.nominal = point{0, 0};
     }
     else {
       res.min = point{100, 100 * aspect_ratio()};
       res.max = max_size;
-      res.nominal_size = point{150, 150};
+      res.nominal = point{150, 150};
       res.aspect_ratio = 1;
     }
     res.flex_factor = point{1, 1};

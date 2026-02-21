@@ -27,7 +27,7 @@ struct transport_bar_widget : widget_base {
     widget_size_info res;
     res.min = point{100, 30};
     res.max = point{infinity<float>(), 30};
-    res.nominal_size = point{120, 30};
+    res.nominal = point{120, 30};
     res.flex_factor = point{1, 0};
     return res;
   }
@@ -127,7 +127,10 @@ void on_file_drop(event_context& ec, const std::string& path_str) {
     return;
   }
   
-  auto yes = [path] (event_context& ec) { ec.state<State>().load_directory(path); ec.pop_overlay(); };
+  auto yes = [path] (event_context& ec) { 
+    ec.state<State>().load_directory(path); 
+    ec.pop_this_overlay(); 
+  };
   
   using namespace views;
   
@@ -135,7 +138,7 @@ void on_file_drop(event_context& ec, const std::string& path_str) {
     text{"Import all audio files from directory?"},
     hstack{
       button{"Yes", yes},
-      button{"Cancel", &event_context::pop_overlay}    
+      button{"Cancel", &event_context::pop_this_overlay}    
     }
   }
   .background(rgb_f(colors::gray) * 0.3)
@@ -189,13 +192,55 @@ auto top_panel(State& state)
 using track_selection = widgets::table::selection_t;
 
 auto track_info_menu(State& state, track_selection selected) {
-  return views::text{"todo"};
-  /* 
-  return vstack {
-    with_label{"Title", text_field{}},
-    with_label{"Artist", text_field{}}
-  }; */ 
   
+  using namespace weave::views;
+  
+  auto MakeField = [&] (auto setter, auto property) {
+  
+    auto Field = text_field{setter};
+    
+    auto HasMultipleValues = [&] () {
+      auto i = selected.front();
+      for (auto t : selected) {
+        if (property(state.track(t)) != property(state.track(i)))
+          return true;
+      }
+      return false;
+    };
+    
+    if (selected.size() > 1 && HasMultipleValues())
+      Field.set_background_text("Multiple values");
+    else
+      Field.set_value(property(state.track(selected.front()))); 
+  
+    return Field;
+  };
+  
+  
+  auto TitleField = MakeField( 
+    [selected] (auto& state, std::string_view str) { state.set_tracks_title(selected, str); }, 
+    [] (auto& t) -> auto&& { return t.title(); } 
+  );
+  
+  auto ArtistField = MakeField( 
+    [selected] (auto& state, std::string_view str) {state.set_artist_name(selected, str);},
+    [] (auto& t) -> auto&& { return t.artist(); } 
+  );
+  
+  auto AlbumField = MakeField(
+    [selected] (auto& state, std::string_view str) {state.set_album_name(selected, str);},
+    [] (auto& t) -> auto&& { return t.album(); } 
+  );
+  
+  return vstack {
+    with_label{"Title", TitleField},
+    with_label{"Artist", ArtistField},
+    with_label{"Album", AlbumField}, 
+    button{"Close", &event_context::pop_this_overlay}
+  }.background(rgb_f(colors::gray) * 0.3)
+  .align_center()
+  .margin({40, 40})
+  .interspace(10);
   /* 
   return vstack {
     for_each( Database::track_properties(), [id, k = 0, selected] (auto key) mutable {
@@ -214,16 +259,17 @@ auto song_table_popup_menu(event_context& ec, track_selection selected) {
   auto info = [selected] (event_context& ec) {
     auto& s = ec.state<State>();
     auto w = track_info_menu(s, selected).build(build_context{ec.context()}, s);
-    ec.push_overlay(w);
+    w.do_layout(w.size_info().nominal);
+    w.set_position(ec.context().window().size() / 2 - w.size() / 2);
+    ec.push_overlay(std::move(w));
   };
   auto add_to_playlist = [selected] (event_context& ec) {
     widgets::popup_menu m;
     int k = 0;
     for (auto& p : ec.state<State>().playlists()) {
       m.add_element(p.name, [pid = k++, selected] (event_context& ec) {
-        selected.traverse([&] (auto id) {
+        for (auto id : selected)
           ec.state<State>().add_to_playlist(pid, id);
-        });
       }, ec.graphics_context());
     }
     return m;

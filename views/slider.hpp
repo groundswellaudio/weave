@@ -80,7 +80,7 @@ struct slider : widget_base
   auto size_info() const {
     widget_size_info res;
     res.min = point{30, 15};
-    res.nominal_size = point{50, 15};
+    res.nominal = point{50, 15};
     res.flex_factor = point{0.5, 0};
     return res;
   }
@@ -182,7 +182,7 @@ struct slider : view<slider<Lens>> {
   template <class S>
   auto build(const build_context& b, S& state) {
     auto val = lens.read(state);
-    auto res = widget_t{{size}, properties};
+    auto res = widget_t{{}, properties};
     res.write = [l = lens] (event_context& c, float val) { l.write(c.state<S>(), val); };
     set_widget_value(res, val);
     res.write_scaled = write_scaled_v;
@@ -201,10 +201,6 @@ struct slider : view<slider<Lens>> {
     w.space = space_v;
     if (val != write_scaled_v ? w.scaled_value() : w.ratio_value()) {
       set_widget_value(w, val);
-    }
-    if (size != Old.size) {
-      w.set_size(size);
-      return rebuild_result::size_change;
     }
     return {};
   }
@@ -245,7 +241,6 @@ struct slider : view<slider<Lens>> {
   
   slider_properties properties;
   Lens lens;
-  vec2f size = {80, 15};
   scalar_space space_v;
   bool write_scaled_v = true;
 };

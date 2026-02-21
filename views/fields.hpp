@@ -20,6 +20,7 @@ struct text_field : widget_base {
   private : 
   
   std::string value_str;
+  std::string background_text_str;
   glyph_positions glyph_pos;
   unsigned cursor_index[2] = {unsigned(-1), 0}; // left-right, cursor_index[1] is the caret
   bool show_caret : 1 = false;
@@ -79,9 +80,17 @@ struct text_field : widget_base {
   bool is_being_edited() const { return editing; }
   
   void set_value(std::string new_value, graphics_context& gc) {
-    value_str = new_value; 
+    value_str = WEAVE_MOVE(new_value); 
     cursor_index[1] = value_str.size();
     update_glyph_pos(gc);
+  }
+  
+  void set_background_text(std::string_view str) {
+    background_text_str = str;
+  }
+  
+  const std::string& background_text() const {
+    return background_text_str;
   }
   
   const std::string& value() const { return value_str; }
@@ -105,7 +114,7 @@ struct text_field : widget_base {
   widget_size_info size_info() const {
     widget_size_info res;
     res.min = min_size_field;
-    res.nominal_size = point{100, 15};
+    res.nominal = point{100, 15};
     res.max.y = 15;
     res.flex_factor = point{1, 0};
     return res;
@@ -189,8 +198,15 @@ struct text_field : widget_base {
     p.fill_style(colors::white);
     p.stroke_style(colors::white);
     p.stroke(rounded_rectangle(size(), 3));
+    
     p.text_align(text_align::x::left, text_align::y::center);
-    p.text({5, size().y / 2}, value_str);
+    
+    if (value().size() == 0) {
+      p.text({5, size().y / 2}, background_text());
+    }
+    else {
+      p.text({5, size().y / 2}, value());
+    }
     
     if (has_selection()) {
       auto cursor_pos_l = glyph_pos.pos_from_index(cursor_index[0]);
@@ -211,26 +227,34 @@ struct text_field : widget_base {
 
 namespace weave::views {
 
-template <class Lens>
-struct text_field : view<text_field<Lens>> {
+template <class Setter>
+struct text_field : view<text_field<Setter>>, view_modifiers {
   
-  text_field(auto lens) : lens{make_lens(lens)} {}
+  text_field(Setter fn) : setter{WEAVE_MOVE(fn)} {}
+  
+  text_field(std::string_view value, Setter fn) : value{value}, setter{WEAVE_MOVE(fn)} {}
   
   using widget_t = widgets::text_field;
   
   template <class S>
-  auto build(const build_context&, S& state) {
-    auto init_val = lens.read(state);
-    auto res = widget_t{{50, 15}, init_val};
-    res.write = to_widget_write(lens); 
+  auto build(const build_context& ctx, S& state) {
+    auto res = widget_t{};
+    res.set_background_text(background_text);
+    if (value)
+      res.set_value(std::string{*value}, ctx.graphics_context());
+    res.write = [fn = setter] (event_context& ec, std::string_view str) {
+      context_invoke<S>(fn, ec, str);
+    }; 
     return res;
   }
   
-  rebuild_result rebuild(text_field<Lens>& old, widget_ref elem, const build_context& up, auto& state) {
+  rebuild_result rebuild(text_field<Setter>& old, widget_ref elem, const build_context& up, auto& state) {
     auto& w = elem.as<widget_t>();
-    auto val = lens.read(state);
-    if (!up.application_context().has_keyboard_focus(elem))
-      w.set_value(val);
+    if (!up.application_context().has_keyboard_focus(elem) && value && w.value() != *value) {
+      w.set_value(std::string{*value}, up.graphics_context());
+    }
+    if (w.background_text() != background_text)
+      w.set_background_text(background_text);
     return {};
   }
   
@@ -239,12 +263,21 @@ struct text_field : view<text_field<Lens>> {
     if (w.is_being_edited())
       ctx.deanimate(wr);
   }
-
-  Lens lens;
+  
+  auto&& set_value(this auto&& self, std::string_view str) {
+    self.value = str;
+    return WEAVE_FWD(self);
+  }
+  
+  auto&& set_background_text(this auto&& self, std::string_view str) {
+    self.background_text = str;
+    return WEAVE_FWD(self);
+  }
+  
+  optional<std::string_view> value;
+  std::string_view background_text;
+  Setter setter;
 };
-
-template <class Lens>
-text_field(Lens) -> text_field<make_lens_result<Lens>>;
 
 } // views
 
@@ -273,7 +306,7 @@ struct numeric_field : widget_base {
   widget_size_info size_info() const {
     widget_size_info res;
     res.min = min_size_field;
-    res.nominal_size = point{100, 15};
+    res.nominal = point{100, 15};
     res.max.y = 15;
     res.flex_factor = point{1, 0};
     return res;
@@ -402,7 +435,7 @@ struct numeric_dial : widget_base
   widget_size_info size_info() const {
     widget_size_info res;
     res.min = min_size_field;
-    res.nominal_size = point{75, 15};
+    res.nominal = point{75, 15};
     res.max.y = 15;
     res.flex_factor = point{1, 0};
     return res;
