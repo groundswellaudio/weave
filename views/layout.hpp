@@ -118,7 +118,8 @@ namespace impl {
   
   void resolve_max_constraints(std::span<widget_box> children, 
                               const std::vector<widget_size_info> sz_infos, int axis, 
-                              point this_size)
+                              point this_size,
+                              stack_data data)
   {
     while (true)
     {
@@ -136,13 +137,29 @@ namespace impl {
           sz[axis] = sz_max_axis; 
           children[i].set_size(sz);
         }
-        // If we arrive at a conflict with the aspect ratio, modify the axis size to fit the cross axis one
+        // If we arrive at a conflict with the aspect ratio, modify first the cross axis size to fit, then the axis size if needed
         else if (sz_infos[i].aspect_ratio && *sz_infos[i].aspect_ratio * sz.x != sz.y) {
           auto old_sz_axis = sz_axis;
           if (axis == 0)
-            sz.x = sz.y / *sz_infos[i].aspect_ratio;
-          else
             sz.y = sz.x * *sz_infos[i].aspect_ratio;
+          else
+            sz.x = sz.y / *sz_infos[i].aspect_ratio;
+          if (sz[1 - axis] > sz_infos[i].max[1 - axis]
+              || sz[1 - axis] > this_size[1 - axis] - 2 * data.margin[1 - axis])
+          {
+            sz[1 - axis] = std::min(sz_infos[i].max[1 - axis], this_size[1 - axis] - 2 * data.margin[1 - axis]);
+            if (axis == 0)
+              sz.x = sz.y / *sz_infos[i].aspect_ratio;
+            else
+              sz.y = sz.x * *sz_infos[i].aspect_ratio;
+          }
+          else if (sz[1 - axis] < sz_infos[i].min[1 - axis]) {
+            sz[1 - axis] = sz_infos[i].min[1 - axis];
+            if (axis == 0)
+              sz.x = sz.y / *sz_infos[i].aspect_ratio;
+            else
+              sz.y = sz.x * *sz_infos[i].aspect_ratio;
+          }
           children[i].set_size(sz);
           remaining_space += old_sz_axis - sz[axis]; 
         }
@@ -225,14 +242,29 @@ namespace impl {
     sum_nominal += data.interspace * (children.size() - 1);
     sum_nominal += data.margin[axis] * 2;
     
-    auto cross_axis_size = [&] (int i, float sz_axis) {
+    auto size_from_axis = [&] (int i, float sz_axis) -> point {
       auto szi = sz_infos[i];
-      return szi.aspect_ratio ? (axis == 0 ? sz_axis / *szi.aspect_ratio 
-                                         : sz_axis * *szi.aspect_ratio)
-                            :
+      auto cross_axis_size =  
+        szi.aspect_ratio ? (axis == 0 ? sz_axis / *szi.aspect_ratio 
+                                      : sz_axis * *szi.aspect_ratio)
+                         :
              szi.flex_factor[1 - axis] != 0 
                ? (this_size[1 - axis] - 2 * data.margin[1 - axis])
                : szi.nominal[1 - axis];
+      
+      // If we arrive at a conflict with the maximum and aspect ratio, adjust axis size 
+      if (szi.aspect_ratio 
+          && (cross_axis_size > this_size[1 - axis] - data.margin[1 - axis] * 2
+          || cross_axis_size > szi.max[1 - axis]))
+      {
+        cross_axis_size = std::min(this_size[1 - axis] - data.margin[1 - axis] * 2, szi.max[1 - axis]);
+        sz_axis = axis ? cross_axis_size * *szi.aspect_ratio : cross_axis_size / *szi.aspect_ratio;
+      }
+      
+      point res;
+      res[axis] = sz_axis;
+      res[1 - axis] = cross_axis_size;
+      return res;
     };
     
     if (sum_nominal < this_size[axis]) 
@@ -248,9 +280,7 @@ namespace impl {
         {
           auto axis_sz = sz_infos[i].nominal[axis] 
                             + remaining_space * sz_infos[i].flex_factor[axis] / sum_flex;
-          vec2f sz; 
-          sz[axis] = axis_sz;
-          sz[1 - axis] = cross_axis_size(i, sz[axis]);
+          point sz = size_from_axis(i, axis_sz);
           children[i].set_size(sz);
         }
       }
@@ -258,14 +288,12 @@ namespace impl {
       {
         // None of the children are extensible, just set them to nominal size
         for (auto i : iota(children.size())) {
-          point sz;
-          sz[axis] = sz_infos[i].nominal[axis];
-          sz[1 - axis] = cross_axis_size(i, sz[axis]);
+          point sz = size_from_axis(i, sz_infos[i].nominal[axis]);
           children[i].set_size(sz);
         }
       }
       
-      resolve_max_constraints(children, sz_infos, axis, this_size);
+      resolve_max_constraints(children, sz_infos, axis, this_size, data);
     }
     else 
     {
@@ -284,9 +312,7 @@ namespace impl {
           sz_infos[i].nominal[axis] 
             - space_to_remove * 1.f / (sz_infos[i].flex_factor[axis] * sum_inv_flex);
         axis_sz = std::max(sz_infos[i].min[axis], axis_sz);
-        vec2f sz; 
-        sz[axis] = axis_sz;
-        sz[1 - axis] = cross_axis_size(i, sz[axis]);
+        point sz = size_from_axis(i, axis_sz);
         children[i].set_size(sz);
       }
       
