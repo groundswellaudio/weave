@@ -121,15 +121,15 @@ namespace impl {
                               point this_size,
                               stack_data data)
   {
+    float occupied_axis = 2 * data.margin[axis];
+    for (auto& c : children)
+      occupied_axis += c.size()[axis];
+    occupied_axis += data.interspace * children.size() - 1;
+    
+    float remaining_space = this_size[axis] - occupied_axis;
+    
     while (true)
     {
-      float occupied_axis = 2 * data.margin[axis];
-      for (auto& c : children)
-        occupied_axis += c.size()[axis];
-      occupied_axis += data.interspace * children.size() - 1;
-      
-      float remaining_space = this_size[axis] - occupied_axis;
-      
       std::vector<widget_ref> unconstrained;
       
       for (auto i : iota(children.size())) 
@@ -181,6 +181,10 @@ namespace impl {
       for (auto u : unconstrained)
         sum_unconstrained_flex += u.size_info().flex_factor[axis];
         
+      // None of the remaining widget are flexible, mothing to do
+      if (sum_unconstrained_flex == 0)
+        return;
+      
       for (auto u : unconstrained) {
         auto sz = u.size();
         auto szi = u.size_info();
@@ -188,6 +192,8 @@ namespace impl {
         sz[axis] = std::min(szi.max[axis], sz[axis]);
         u.set_size(sz);
       }
+      
+      remaining_space = 0;
     }
   }
   
