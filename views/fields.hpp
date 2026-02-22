@@ -65,16 +65,17 @@ struct text_field : widget_base {
       s.show_caret = !s.show_caret;
       return s.editing; 
     }, 800);
-    cursor_index[1] = value_str.size();
+    cursor_index[1] = value().size();
     cursor_index[0] = -1;
   }
   
   void exit_editing(event_context& ec) {
-    ec.release_keyboard_focus();
-    ec.deanimate(this);
     editing = false;
     show_caret = false;
     ec.request_repaint();
+    cursor_index[0] = -1;
+    ec.release_keyboard_focus();
+    ec.deanimate(this);
   }
   
   bool is_being_edited() const { return editing; }
@@ -96,8 +97,10 @@ struct text_field : widget_base {
   const std::string& value() const { return value_str; }
   
   void on(mouse_event e, event_context& Ec) { 
-    if (e.is_double_click()) 
+    if (e.is_double_click()) { 
       enter_editing(Ec);
+      set_caret_position_from(e.position);
+    }
     else if (e.is_down()) {
       cursor_index[0] = -1;
       set_caret_position_from(e.position);
@@ -208,7 +211,7 @@ struct text_field : widget_base {
       p.text({5, size().y / 2}, value());
     }
     
-    if (has_selection()) {
+    if (editing && has_selection()) {
       auto cursor_pos_l = glyph_pos.pos_from_index(cursor_index[0]);
       auto cursor_pos_r = glyph_pos.pos_from_index(cursor_index[1]);
       rectangle r { {cursor_pos_l, 0}, {cursor_pos_r - cursor_pos_l, size().y} };

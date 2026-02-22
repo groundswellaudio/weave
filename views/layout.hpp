@@ -93,8 +93,8 @@ struct stack_updater : view_sequence_updater<stack_updater> {
 namespace impl {
   
   // Called after the sizing has been done
-  void place_stack_layout_elements(std::vector<widget_box>& children, stack_data data, int axis, 
-                                  vec2f this_size)
+  void place_stack_layout_elements(std::span<widget_box> children, stack_data data, int axis, 
+                                   point this_size)
   {
     float axis_pos = data.margin[axis];
     
@@ -116,9 +116,9 @@ namespace impl {
     //assert( axis_pos == this_size[axis] && "incoherent final size in stack layout" );
   }
   
-  void resolve_max_constraints(std::vector<widget_box>& children, 
+  void resolve_max_constraints(std::span<widget_box> children, 
                               const std::vector<widget_size_info> sz_infos, int axis, 
-                              vec2f this_size)
+                              point this_size)
   {
     while (true)
     {
@@ -168,9 +168,9 @@ namespace impl {
     }
   }
   
-  void resolve_min_constraints(std::vector<widget_box>& children, 
-                              const std::vector<widget_size_info> sz_infos, int axis, 
-                              vec2f this_size)
+  void resolve_min_constraints(std::span<widget_box> children, 
+                              const std::vector<widget_size_info>& sz_infos, int axis, 
+                              point this_size)
   {
     while (true)
     {
@@ -208,8 +208,8 @@ namespace impl {
     }
   }
   
-  void stack_layout(std::vector<widget_box>& children, stack_data data, int axis, 
-                        vec2f this_size)
+  void stack_layout(std::span<widget_box> children, stack_data data, int axis, 
+                    point this_size)
   {
     std::vector<widget_size_info> sz_infos;
     for (auto& c : children)
@@ -225,10 +225,14 @@ namespace impl {
     sum_nominal += data.interspace * (children.size() - 1);
     sum_nominal += data.margin[axis] * 2;
     
-    auto cross_axis_size = [&] (int i) {
-      return sz_infos[i].flex_factor[1 - axis] != 0 
+    auto cross_axis_size = [&] (int i, float sz_axis) {
+      auto szi = sz_infos[i];
+      return szi.aspect_ratio ? (axis == 0 ? sz_axis / *szi.aspect_ratio 
+                                         : sz_axis * *szi.aspect_ratio)
+                            :
+             szi.flex_factor[1 - axis] != 0 
                ? (this_size[1 - axis] - 2 * data.margin[1 - axis])
-               : sz_infos[i].nominal[1 - axis];
+               : szi.nominal[1 - axis];
     };
     
     if (sum_nominal < this_size[axis]) 
@@ -246,7 +250,7 @@ namespace impl {
                             + remaining_space * sz_infos[i].flex_factor[axis] / sum_flex;
           vec2f sz; 
           sz[axis] = axis_sz;
-          sz[1 - axis] = cross_axis_size(i);
+          sz[1 - axis] = cross_axis_size(i, sz[axis]);
           children[i].set_size(sz);
         }
       }
@@ -256,7 +260,7 @@ namespace impl {
         for (auto i : iota(children.size())) {
           point sz;
           sz[axis] = sz_infos[i].nominal[axis];
-          sz[1 - axis] = cross_axis_size(i);
+          sz[1 - axis] = cross_axis_size(i, sz[axis]);
           children[i].set_size(sz);
         }
       }
@@ -282,7 +286,7 @@ namespace impl {
         axis_sz = std::max(sz_infos[i].min[axis], axis_sz);
         vec2f sz; 
         sz[axis] = axis_sz;
-        sz[1 - axis] = cross_axis_size(i);
+        sz[1 - axis] = cross_axis_size(i, sz[axis]);
         children[i].set_size(sz);
       }
       
@@ -413,43 +417,56 @@ struct flow : widget_base {
   
   auto size_info() const {
     widget_size_info res;
-    res.min = point{50, 50};
-    res.nominal = {150, 150};
-    res.flex_factor = point{1, 1};
+    res.min = nominal_size / 2; 
+    res.nominal = nominal_size;
+    res.flex_factor = flex_factor;
     return res;
   }
   
-  point layout(point sz) {
-    point pos = {0, 0};
-    float row_h = 0;
+  void layout(point sz) 
+  {
+    auto row_begin = children_vec.begin();
+    auto row_end = children_vec.begin();
+    float p = margin.x;
+    float y = 0;
     
-    /* 
-    widget_size_info row_sz_info;
+    float row_height = 0;
     
-    for (auto& c : children_vec) {
-      auto i = c.size_info();
-      row_sz_info.min[0] += i.min[0];
-      row_sz_info.min[1] = std::max(row_sz_info.min[1], i.min[1]);
-    } */ 
-    
-    /* 
-    for (auto& c : children_vec) {
-      auto sz = c.layout(lc);
-      if (pos.x + sz.x > size().x) {
-        pos.x = 0;
-        pos.y += row_h;
-        row_h = sz.y;
-        c.set_position(pos);
+    while (true) {
+      auto i = row_end->size_info();
+      auto next = p;
+      next += interspace.x;
+      next += i.nominal.x;
+      row_height = std::max(i.nominal.y, row_height);
+      
+      auto do_row_layout = [&] () {
+        stack_data stack_prop;
+        stack_prop.interspace = interspace.x;
+        stack_prop.margin = margin;
+        impl::stack_layout(std::span{row_begin, row_end}, stack_prop, 0, point{sz.x, row_height});
+        for (auto ic = row_begin; ic != row_end; ++ic) 
+          ic->set_position(ic->position() + point{0, y});
+      };
+      
+      if (i.aspect_ratio) 
+        row_height = std::max(i.nominal.x / *i.aspect_ratio, row_height);
+      
+      if (next + margin.x > sz.x) {
+        do_row_layout();
+        p = margin.x;
+        row_begin = row_end;
+        y += row_height + interspace.y;
+        row_height = 0;
       }
       else {
-        c.set_position(pos);
-        row_h = std::max(row_h, sz.y);
-        pos.x += sz.x;
+        p = next;
+        ++row_end;
+        if (row_end == children_vec.end()) {
+          do_row_layout();
+          return;
+        }
       }
     }
-    
-    return {size().x, pos.y + row_h}; */ 
-    return sz;
   }
   
   auto traverse_children(auto&& fn) {
@@ -460,6 +477,10 @@ struct flow : widget_base {
   void paint(painter&) {}
   
   std::vector<widget_box> children_vec;
+  point nominal_size = {300, 300};
+  point interspace = {5, 5};
+  point margin = {5, 5};
+  point flex_factor = {1, 1};
 };
 
 } // widgets

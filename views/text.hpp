@@ -207,7 +207,7 @@ struct with_label : view<with_label<V>>, view_modifiers {
     using underlying = decltype(view.build(ctx, state));
     auto& wl = w.as<widgets::with_label<underlying>>();
     if (str != old.str) {
-      wl.set_label(std::string(str), ctx.graphics_context());
+      wl.set_label(str, ctx.graphics_context());
       return rebuild_result::size_change;
     }
     return {};

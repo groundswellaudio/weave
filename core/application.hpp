@@ -16,7 +16,6 @@
 #include "../events/mouse_events.hpp"
 #include "../util/vec.hpp"
 #include "../util/util.hpp"
-#include "../views/zstack.hpp"
 
 #include "nfd.h"
 
