@@ -123,7 +123,13 @@ namespace impl {
   {
     while (true)
     {
-      float remaining_space = 0;
+      float occupied_axis = 2 * data.margin[axis];
+      for (auto& c : children)
+        occupied_axis += c.size()[axis];
+      occupied_axis += data.interspace * children.size() - 1;
+      
+      float remaining_space = this_size[axis] - occupied_axis;
+      
       std::vector<widget_ref> unconstrained;
       
       for (auto i : iota(children.size())) 
@@ -163,11 +169,11 @@ namespace impl {
           children[i].set_size(sz);
           remaining_space += old_sz_axis - sz[axis]; 
         }
-        else
+        else if (!sz_infos[i].aspect_ratio)
           unconstrained.push_back(children[i].borrow());
       }
       
-      if (remaining_space == 0)
+      if (std::abs(remaining_space) < 1e-3 || !unconstrained.size())
         return;
       
       float sum_unconstrained_flex = 0;
