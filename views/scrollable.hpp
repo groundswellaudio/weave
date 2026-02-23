@@ -10,6 +10,11 @@ struct scrollable_base {
   
   static constexpr float bar_width = 8.f;
   
+  // requires three member functions : 
+  // scroll_zone, which is the rectangle of the scrollable area, 
+  // scroll_size, the total size of the scroll
+  // and displace_scroll(delta)
+  
   rectangle scrollbar_rect(this auto& self) {
     auto scrollzone = self.scroll_zone().size.y;
     auto ratio = std::min( scrollzone / self.scroll_size(), 1.f );

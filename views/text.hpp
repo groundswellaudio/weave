@@ -132,7 +132,7 @@ struct with_label : widget_base {
 namespace weave::views {
 
 template <class... Args>
-struct text : view<text<Args...>> {
+struct text : view<text<Args...>>, view_modifiers {
   
   text(std::string_view str, Args... args) : str{str}, fmt_args{args...} {}
   

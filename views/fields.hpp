@@ -22,9 +22,10 @@ struct text_field : widget_base {
   std::string value_str;
   std::string background_text_str;
   glyph_positions glyph_pos;
-  unsigned cursor_index[2] = {unsigned(-1), 0}; // left-right, cursor_index[1] is the caret
+  int cursor_index[2] = {-1, 0}; // left-right, cursor_index[1] is the caret
   bool show_caret : 1 = false;
   bool editing : 1 = false;
+  float edit_x_offset = 0;
   
   void update_glyph_pos(graphics_context& gc) {
     gc.get_glyph_positions(glyph_pos, value_str, {5, size().y / 2});
@@ -45,16 +46,16 @@ struct text_field : widget_base {
     
     auto idx = glyph_pos.index_from_pos(pos.x);
     
-    if (idx > cursor_index[1])
+    if (idx > cursor_index[0])
       cursor_index[1] = idx;
-    else if (idx < cursor_index[0])
+    else
       cursor_index[0] = idx;
   }
   
   auto& caret()             { return cursor_index[1]; }
 	const auto& caret() const { return cursor_index[1]; }
 	
-	bool has_selection() const { return cursor_index[0] != unsigned(-1); }
+	bool has_selection() const { return cursor_index[0] != -1; }
 	
   public : 
   
@@ -108,8 +109,23 @@ struct text_field : widget_base {
     }
     else if (e.is_exit()) 
       exit_editing(Ec);
-    else if (e.is_drag()) {
+    else if (e.is_drag() && editing) {
       set_selection_from(e.position);
+      // dragging to the left/right : offset the text
+      if (e.position.x > size().x) {
+        unsigned old_offset = edit_x_offset;
+        edit_x_offset += 0.2;
+        edit_x_offset = std::min(edit_x_offset, (float)value().size());
+        auto l = glyph_pos.pos_from_index(edit_x_offset);
+        auto r = glyph_pos.max();
+        if (r - l < size().x)
+          edit_x_offset = old_offset;
+      }
+      else if (e.position.x < 0) {
+        unsigned old_offset = edit_x_offset;
+        edit_x_offset -= 0.2;
+        edit_x_offset = std::max(edit_x_offset, 0.f);
+      }
       Ec.request_repaint();
     }
   }
@@ -133,7 +149,7 @@ struct text_field : widget_base {
         value_str.replace( value_str.begin() + cursor_index[0], value_str.begin() + cursor_index[1],
                 e.text_input().begin(), e.text_input().end() );
         cursor_index[1] = cursor_index[0] + 1;
-        cursor_index[0] = (unsigned)(-1);
+        cursor_index[0] = -1;
       }
       else // insert after caret
       {
@@ -154,7 +170,7 @@ struct text_field : widget_base {
         {
           value_str.erase(value_str.begin() + cursor_index[0], value_str.begin() + cursor_index[1]);
           cursor_index[1] = cursor_index[0];
-          cursor_index[0] = unsigned(-1);
+          cursor_index[0] = -1;
         }
         else
         {
@@ -171,7 +187,7 @@ struct text_field : widget_base {
       case keycode::arrow_left:
         if (has_selection()) {
           cursor_index[1] = cursor_index[0];
-          cursor_index[0] = unsigned(-1);
+          cursor_index[0] = -1;
         }
         else {
           if (caret() == 0)
@@ -182,7 +198,7 @@ struct text_field : widget_base {
         break;
       case keycode::arrow_right:
         if (has_selection())
-          cursor_index[0] = unsigned(-1);
+          cursor_index[0] = -1;
         else {
           if (caret() == value_str.size())
             return;
@@ -208,7 +224,13 @@ struct text_field : widget_base {
       p.text({5, size().y / 2}, background_text());
     }
     else {
-      p.text({5, size().y / 2}, value());
+      if (!editing)
+        p.text({5, size().y / 2}, value());
+      else
+      {
+        auto str = std::string_view{value().begin() + edit_x_offset, value().end()};
+        p.text({5, size().y / 2}, str);
+      }
     }
     
     if (editing && has_selection()) {

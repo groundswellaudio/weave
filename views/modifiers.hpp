@@ -42,6 +42,18 @@ struct with_fixed_size : W {
   
 };
 
+template <class W>
+struct with_nominal_size : W {
+  
+  widget_size_info size_info() const {
+    widget_size_info res = W::size_info();
+    res.nominal = nominal_size;
+    return res;
+  }
+  
+  point nominal_size;
+};
+
 } // widgets
 
 namespace weave::views {
@@ -101,6 +113,28 @@ struct with_fixed_size : V {
   }
    
   point fixed_size;
+};
+
+template <class V>
+struct with_nominal_size : V {
+  
+  using widget_t = widgets::with_nominal_size<typename V::widget_t>; 
+  
+  auto build(const build_context& ctx, auto& state) {
+    return widget_t{ V::build(ctx, state), nominal_size };
+  }
+  
+  rebuild_result rebuild(const with_nominal_size<V>& Old, widget_ref r, const build_context& ctx, auto& state) {
+    auto& wb = r.as<widget_t>();
+    V::rebuild(Old, widget_ref{&static_cast<typename V::widget_t&>(wb)}, ctx, state);
+    if (nominal_size != Old.nominal_size) { 
+      wb.nominal_size = nominal_size;
+      return rebuild_result::size_change;
+    }
+    return {};
+  }
+   
+  point nominal_size;
 };
 
 template <class V, class Fn>
@@ -165,27 +199,31 @@ struct view_modifiers {
   public : 
   
   auto on_click(this auto&& self, auto action) {
-    return event_listener{self, &click_filter, action};
+    return event_listener{WEAVE_FWD(self), &click_filter, std::move(action)};
   }
   
   auto on_key_down(this auto&& self, auto action) {
-    return event_listener{self, &keydown_filter, action};
+    return event_listener{WEAVE_FWD(self), &keydown_filter, std::move(action)};
   }
   
   auto on_key_down(this auto&& self, keycode k, auto action) {
-    return event_listener{self, one_keydown_filter{k}, action};
+    return event_listener{WEAVE_FWD(self), one_keydown_filter{k}, std::move(action)};
   }
   
   auto on_file_drop(this auto&& self, auto action) {
-    return event_listener{self, &file_drop_filter, action};
+    return event_listener{WEAVE_FWD(self), &file_drop_filter, std::move(action)};
   }
   
   auto with_fixed_size(this auto&& self, point size) {
-    return views::with_fixed_size{self, size};
+    return views::with_fixed_size{WEAVE_FWD(self), size};
+  }
+  
+  auto with_nominal_size(this auto&& self, point size) {
+    return views::with_nominal_size{WEAVE_FWD(self), size};
   }
   
   auto animate_when(this auto&& self, bool flag, int period_ms, auto fn) {
-    return animated{self, flag, fn, period_ms};
+    return animated{WEAVE_FWD(self), flag, fn, period_ms};
   }
 };
 

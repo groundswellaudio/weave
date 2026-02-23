@@ -354,11 +354,12 @@ struct LibraryView {
           for_each(state.database.albums, [&self, k = 0] (auto& a) mutable {
             auto setter = self.selection.setter(album_id{k++});
             return vstack {
-              views::image{a.cover, false}.fit({100, 100}).on_click([setter] (ignore, ignore) {setter();}),
-              text{a.name}
-            };
+              views::image{a.cover, false}.fit({150, 150}).on_click([setter] (ignore, ignore) {setter();}),
+              text{a.name}.with_nominal_size({150, 20}),
+              text{a.artist_name}.with_nominal_size({150, 20})
+            }.interspace(2);
           })
-        };
+        }.rounded(6);
       },
       [&] (playlist_id id) {
         return text{"todo"};

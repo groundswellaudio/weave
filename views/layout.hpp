@@ -1,6 +1,7 @@
 #pragma once
 
 #include "views_core.hpp"
+#include "scrollable.hpp"
 #include "../util/tuple.hpp"
 #include "../util/util.hpp"
 #include <span>
@@ -154,17 +155,11 @@ namespace impl {
               || sz[1 - axis] > this_size[1 - axis] - 2 * data.margin[1 - axis])
           {
             sz[1 - axis] = std::min(sz_infos[i].max[1 - axis], this_size[1 - axis] - 2 * data.margin[1 - axis]);
-            if (axis == 0)
-              sz.x = sz.y / *sz_infos[i].aspect_ratio;
-            else
-              sz.y = sz.x * *sz_infos[i].aspect_ratio;
+            sz[axis] = axis ? sz.x * *sz_infos[i].aspect_ratio : sz.y / *sz_infos[i].aspect_ratio;
           }
           else if (sz[1 - axis] < sz_infos[i].min[1 - axis]) {
             sz[1 - axis] = sz_infos[i].min[1 - axis];
-            if (axis == 0)
-              sz.x = sz.y / *sz_infos[i].aspect_ratio;
-            else
-              sz.y = sz.x * *sz_infos[i].aspect_ratio;
+            sz[axis] = axis ? sz.x * *sz_infos[i].aspect_ratio : sz.y / *sz_infos[i].aspect_ratio;
           }
           children[i].set_size(sz);
           remaining_space += old_sz_axis - sz[axis]; 
@@ -451,7 +446,21 @@ struct stack : widget_base
 using hstack = stack<0>;
 using vstack = stack<1>;
 
-struct flow : widget_base {
+struct flow : widget_base, scrollable_base {
+  
+  rectangle scroll_zone() const {
+    return {{0, 0}, size()};
+  }
+  
+  float scroll_size() const {
+    return total_height; 
+  }
+  
+  void displace_scroll(float delta) {
+    for (auto& c : children_vec)
+      c.set_position(c.position() - point{0, delta});
+    scroll_offset += delta;
+  }
   
   auto size_info() const {
     widget_size_info res;
@@ -466,7 +475,7 @@ struct flow : widget_base {
     auto row_begin = children_vec.begin();
     auto row_end = children_vec.begin();
     float p = margin.x;
-    float y = 0;
+    float y = margin.y;
     
     float row_height = 0;
     
@@ -481,9 +490,10 @@ struct flow : widget_base {
         stack_data stack_prop;
         stack_prop.interspace = interspace.x;
         stack_prop.margin = margin;
+        stack_prop.margin.y = 0;
         impl::stack_layout(std::span{row_begin, row_end}, stack_prop, 0, point{sz.x, row_height});
         for (auto ic = row_begin; ic != row_end; ++ic) 
-          ic->set_position(ic->position() + point{0, y});
+          ic->set_position(ic->position() + point{0, y - scroll_offset});
       };
       
       if (i.aspect_ratio) 
@@ -501,6 +511,7 @@ struct flow : widget_base {
         ++row_end;
         if (row_end == children_vec.end()) {
           do_row_layout();
+          total_height = y + row_height + margin.y;
           return;
         }
       }
@@ -511,14 +522,25 @@ struct flow : widget_base {
     return std::all_of(children_vec.begin(), children_vec.end(), fn);
   }
   
-  void on(ignore, ignore) {}
-  void paint(painter&) {}
+  void paint(painter& p) {
+    p.fill_style(background_color);
+    p.fill(rounded_rectangle(size(), rounded_radius));
+    scrollable_base::paint(p);
+  }
+  
+  void on(mouse_event e, event_context& ec) {
+    scrollable_base::on(e, ec);
+  }
   
   std::vector<widget_box> children_vec;
   point nominal_size = {300, 300};
   point interspace = {5, 5};
   point margin = {5, 5};
   point flex_factor = {1, 1};
+  rgba_u8 background_color = colors::black;
+  float rounded_radius = 0;
+  float scroll_offset = 0;
+  float total_height = 0;
 };
 
 } // widgets
@@ -590,15 +612,24 @@ struct flow : view<flow<Ts...>> {
   
   auto build(auto&& ctx, auto& state) {
     auto res = impl::build_stack<widgets::flow>(*this, ctx, state, vec2f{width, 0});
+    res.rounded_radius = rounded_radius;
     return res;
   }
   
   auto rebuild(flow<Ts...>& Old, widget_ref w, auto&& ctx, auto& state) {
+    auto& f = w.as<widgets::flow>();
+    f.rounded_radius = rounded_radius;
     return impl::rebuild_stack<widgets::flow>(*this, Old, w, ctx, state);
+  }
+  
+  auto& rounded(float val) {
+    rounded_radius = val;
+    return *this;
   }
   
   float width;
   tuple<Ts...> children;
+  float rounded_radius = 0;
 };
 
 template <class... Ts>

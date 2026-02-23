@@ -417,11 +417,9 @@ struct application_context {
       
       // p.stroke_style(colors::red);
       // p.stroke_rect(new_scissor_pos, new_scissor_sz);
-      //auto s = p.scissor(new_scissor_pos, new_scissor_sz);
+      auto scissor_raii = p.scissor(new_scissor_pos, new_scissor_sz);
       auto traii = p.translate(pos);
-      auto _ = p.scissor(point{0, 0}, w.size());
-      //p.stroke_style(colors::red);
-      //p.stroke(rectangle{point{0, 0}, w.size()});
+     // auto _ = p.scissor(point{0, 0}, w.size());
       w.paint(p);
       for (auto& w : w.children())
         self(w, new_scissor_pos - pos, new_scissor_sz);
@@ -448,6 +446,7 @@ struct application_context {
   
   void layout_root() {
     root.layout(win.size());
+    root.debug_dump();
     auto size_info = root_widget().size_info();
     win.set_min_size(size_info.min);
     win.set_max_size(size_info.max);
