@@ -118,42 +118,7 @@ namespace impl {
       set_focused(root, {});
     }
     
-    event_frame_result on(mouse_event e, void* state, application_context& ctx)
-    {
-      event_frame_result res;
-      
-      if (e.is_move() && !e.is_drag())
-      {
-        auto old_focus = focused;
-        auto old_pos = focused_absolute_pos;
-        auto old_ctx = event_context{ctx, res, parents, state};
-        find_new_focused{*this, e, parents}.find_from(focused, focused_absolute_pos);
-        if (old_focus != focused) 
-        {
-          old_focus.on(mouse_event{e.position - old_pos, mouse_exit{}}, old_ctx);
-          auto ec = event_context{ctx, res, parents, state};
-          focused.on(mouse_event{e.position - focused_absolute_pos, mouse_enter{}}, ec);
-        }
-      }
-      
-      // FIXME : avoid the copy of the parents vector here
-      auto ec = event_context{ctx, res, parents, state};
-      e.position -= focused_absolute_pos;
-      focused.on(e, ec);
-      
-      if (top_parent_listener) {
-        e.position += focused.position();
-        for (auto p : std::ranges::views::reverse(parents)) 
-        {
-          p.on_child_event(e, ec, focused);
-          e.position += p.position();
-          if (top_parent_listener == p)
-            break;
-        }
-      }
-      
-      return res;
-    }
+    event_result on(mouse_event e, void* state, application_context& ctx);
     
     point focused_absolute_position() const {
       return focused_absolute_pos;
@@ -189,17 +154,24 @@ namespace impl {
       parents = stack;
     }
     
-    void reset_focus() {
-      focused.reset();
-      parents.clear();
+    event_result reset_focus(application_context& ctx, void* state) {
+      if (focused) {
+        event_result res;
+        auto ec = event_context{ctx, res, parents, state};
+        focused->on(input_event{keyboard_focus_release{}}, ec);
+        focused.reset();
+        parents.clear();
+        return res;
+      }
+      return {};
     }
     
-    event_frame_result on(keyboard_event e, void* state, application_context& ctx) {
-      event_frame_result res;
-      if (focused) {
-        auto ec = event_context{ctx, res, parents, state};
+    event_result on(keyboard_event e, void* state, application_context& ctx) {
+      event_result res;
+      // FIXME : avoid the copy of the parents stack here?
+      auto ec = event_context{ctx, res, parents, state};
+      if (focused) 
         focused->on(e, ec);
-      }
       return res;
     }
     
@@ -364,12 +336,16 @@ struct application_context {
     keyboard.set_focused(r, stack);
   }
   
-  void release_keyboard_focus() {
-    keyboard.reset_focus();
+  event_result reset_keyboard_focus(void* state) {
+    return keyboard.reset_focus(*this, state);
   }
   
-  widget_ref current_mouse_focus() {
+  widget_ref current_mouse_focus() const {
     return mouse.current_focus();
+  }
+  
+  optional<widget_ref> current_keyboard_focus() const {
+    return keyboard.focused;
   }
   
   bool has_keyboard_focus(widget_ref r) const {
@@ -402,7 +378,7 @@ struct application_context {
     p.set_font("default");
     p.begin_frame(win.size(), 1);
     
-    auto fn = [this, &p] (this auto&& self, widget_ref w, vec2f scissor_pos, vec2f scissor_sz) -> void
+    auto fn = [this, &p] (this auto&& self, widget_ref w, point scissor_pos, point scissor_sz) -> void
     {
       auto pos = w.position();
       auto sz = w.size();
@@ -419,7 +395,6 @@ struct application_context {
       // p.stroke_rect(new_scissor_pos, new_scissor_sz);
       auto scissor_raii = p.scissor(new_scissor_pos, new_scissor_sz);
       auto traii = p.translate(pos);
-     // auto _ = p.scissor(point{0, 0}, w.size());
       w.paint(p);
       for (auto& w : w.children())
         self(w, new_scissor_pos - pos, new_scissor_sz);
@@ -463,6 +438,51 @@ struct application_context {
   impl::widget_animations animations;
 };
 
+namespace impl {
+
+event_result mouse_event_dispatcher::on(mouse_event e, void* state, application_context& ctx)
+{
+  event_result res;
+  
+  if (e.is_move() && !e.is_drag())
+  {
+    auto old_focus = focused;
+    auto old_pos = focused_absolute_pos;
+    auto old_ctx = event_context{ctx, res, parents, state};
+    find_new_focused{*this, e, parents}.find_from(focused, focused_absolute_pos);
+    if (old_focus != focused) 
+    {
+      old_focus.on(mouse_event{e.position - old_pos, mouse_exit{}}, old_ctx);
+      auto ec = event_context{ctx, res, parents, state};
+      focused.on(mouse_event{e.position - focused_absolute_pos, mouse_enter{}}, ec);
+    }
+  }
+  
+  // Release the keyboard focus on a click 
+  if (e.is_down() && focused != ctx.current_keyboard_focus())
+    res = res || ctx.reset_keyboard_focus(state);
+  
+  // FIXME : avoid the copy of the parents stack here?
+  auto ec = event_context{ctx, res, parents, state};
+  e.position -= focused_absolute_pos;
+  focused.on(e, ec);
+  
+  if (top_parent_listener) {
+    e.position += focused.position();
+    for (auto p : std::ranges::views::reverse(parents)) 
+    {
+      p.on_child_event(e, ec, focused);
+      e.position += p.position();
+      if (top_parent_listener == p)
+        break;
+    }
+  }
+  
+  return res;
+}
+    
+}
+
 auto event_context::lift_rebuild_request() {
   return [p = &context()] {
     p->rebuild_requested = true;
@@ -499,7 +519,7 @@ void event_context::grab_keyboard_focus(widget_ref focused) {
 }
 
 void event_context::release_keyboard_focus() {
-  ctx.release_keyboard_focus();
+  ctx.reset_keyboard_focus(state_ptr);
 }
 
 widget_ref event_context::current_mouse_focus() {
@@ -561,7 +581,7 @@ struct application
     app_view->rebuild(old_view, app_ctx.root_widget(), bctx, state);
     app_ctx.mouse.update_absolute_position();
     app_ctx.rebuild_requested = false;
-    // Note : it would be nice to not have to do this on every rebuild ? 
+    // FIXME : it would be nice to not have to do this on every rebuild ? 
     auto size_info = app_ctx.root_widget().size_info();
     app_ctx.win.set_min_size(size_info.min);
     app_ctx.win.set_max_size(size_info.max);
@@ -571,7 +591,7 @@ struct application
   {
     while(!app_ctx.backend.want_quit)
     {
-      event_frame_result frame;
+      event_result frame;
       app_ctx.backend.visit_event( [&, this] (auto&& e) {
         if constexpr ( std::is_same_v<std::remove_reference_t<decltype(e)>, keyboard_event> )
           frame = app_ctx.keyboard.on(e, &state, app_ctx);

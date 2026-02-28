@@ -77,9 +77,8 @@ struct text_field : widget_base {
     editing = false;
     show_caret = false;
     edit_x_offset = 0;
-    ec.request_repaint();
     cursor_index[0] = -1;
-    ec.release_keyboard_focus();
+    ec.request_repaint();
     ec.deanimate(this);
   }
   
@@ -101,6 +100,10 @@ struct text_field : widget_base {
   
   const std::string& value() const { return value_str; }
   
+  void on_keyboard_focus_release(event_context& ec) {
+    exit_editing(ec);
+  }
+  
   void on(mouse_event e, event_context& Ec) { 
     if (e.is_down()) {
       if (!editing) {
@@ -113,8 +116,6 @@ struct text_field : widget_base {
         Ec.request_repaint();
       }
     }
-    else if (e.is_exit())
-      exit_editing(Ec);
     else if (e.is_drag() && editing) {
       set_selection_from(e.position);
       // dragging to the left/right : offset the text
@@ -223,7 +224,7 @@ struct text_field : widget_base {
   }
   
   void paint(painter& p) {
-    p.fill_style(editing ? rgb_u8{40, 40, 40} : colors::black);
+    p.fill_style(editing ? rgba_f{colors::cyan}.with_alpha(0.3) : rgba_f{colors::black});
     p.fill(rectangle(size()));
     p.fill_style(colors::white);
     p.stroke_style(colors::white);

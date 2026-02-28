@@ -21,10 +21,12 @@ namespace weave {
 
 struct painter;
 struct event_context;
-struct application_context; 
+struct application_context;
 
-struct input_event : variant<mouse_event, keyboard_event> {
-  using variant<mouse_event, keyboard_event>::variant;
+struct keyboard_focus_release {};
+
+struct input_event : variant<mouse_event, keyboard_event, keyboard_focus_release> {
+  using variant<mouse_event, keyboard_event, keyboard_focus_release>::variant;
   bool is_mouse() const { return index() == 0; }
   auto& mouse() { return get<0>(*this); }
   bool is_keyboard() const { return index() == 1; }
@@ -108,6 +110,8 @@ struct widget_base {
     self.set_size(sz);
   }
   
+  void on_keyboard_focus_release(event_context& ec) {}
+  
   std::optional<widget_ref> find_child_at(this auto& self, point pos);
   
   point sz = {0, 0}, pos = {0, 0};
@@ -186,7 +190,7 @@ class widget_ref {
     return data == o.data;
   }
   
-  auto layout(vec2f sz) {
+  auto layout(point sz) {
     return vptr->layout(data, sz);
   }
 
@@ -228,7 +232,7 @@ class widget_ref {
   point size() const { return data->size(); }
   rectangle area() const { return data->area(); }
   
-  void set_size(vec2f sz) { data->set_size(sz); }
+  void set_size(point sz) { data->set_size(sz); }
   
   point position() const { return data->position(); }
   
@@ -328,7 +332,13 @@ optional<widget_ref> widget_base::find_child_at(this auto& self, point pos) {
 /// and provided by event_context
 using event_context_parent_stack = std::vector<widget_ref>;
 
-struct event_frame_result {
+struct event_result {
+  
+  event_result operator || (event_result er) const {
+    return {rebuild_requested || er.rebuild_requested, 
+            repaint_requested || er.repaint_requested};
+  }
+  
   bool rebuild_requested = false;
   bool repaint_requested = false;
 };
@@ -404,7 +414,7 @@ struct event_context {
   } */ 
   
   application_context& ctx;
-  event_frame_result& frame_result;
+  event_result& frame_result;
   event_context_parent_stack parents;
   void* state_ptr;
 };
@@ -418,8 +428,10 @@ namespace impl {
         auto& Obj = *static_cast<W*>(self);
         if (e.index() == 0)
           Obj.on_child_event(get<0>(e), ec, child);
-        else if constexpr ( requires { Obj.on_child_event(get<1>(e), ec, child); } )
-          Obj.on_child_event(get<1>(e), ec, child);
+        else if constexpr ( requires { Obj.on_child_event(get<1>(e), ec, child); } ) {
+          if (e.index() == 1)
+            Obj.on_child_event(get<1>(e), ec, child);
+        }
       };
     else
       return nullptr;
@@ -445,11 +457,13 @@ namespace impl {
         if (e.index() == 0) {
           return Obj.on(get<0>(e), ctx);
         }
-        else {
+        else if (e.index() == 1) {
           // reacting to keyboard event is optional
           if constexpr ( requires { Obj.on(get<1>(e), ctx); } )
             return Obj.on(get<1>(e), ctx);
         }
+        else
+          return Obj.on_keyboard_focus_release(ctx);
       },
       child_event_fn_ptr<W>(),
       +[] (widget_base* self, vec2f pos) -> optional<widget_ref> {
