@@ -382,25 +382,28 @@ template <class T>
   requires complete_type<table_model<T>>
 struct table : view<table<T>>, view_modifiers {
   
-  table(T data, bool RebuildWhen) : data{data}, rebuild_when{RebuildWhen} {}
+  table(const observed_value<T>& data) : data{data} {}
   
   using widget_t = widgets::table;
   using model_t = table_model<std::decay_t<T>>;
   
   auto build(auto&& builder, auto& state) {
     widget_t res {{400, 400}};
-    res.set_properties(model_t{}.properties(data));
-    res.set_cells(data);
+    res.set_properties(model_t{}.properties(data.get()));
+    res.set_cells(data.get());
     res.cell_double_click = cell_double_click;
     res.popup = popup_opener;
+    version = data.version();
     return res;
   }
   
   rebuild_result rebuild(auto& old, widget_ref w, ignore, auto& state) {
-    if (rebuild_when) {
+    version = old.version;
+    if (version != data.version()) {
+      version = data.version();
       auto& wb = w.as<widget_t>();
-      wb.set_properties(model_t{}.properties(data));
-      wb.set_cells(data);
+      wb.set_properties(model_t{}.properties(data.get()));
+      wb.set_cells(data.get());
     }
     return {};
   }
@@ -426,10 +429,10 @@ struct table : view<table<T>>, view_modifiers {
     return *this;
   }
   
-  T data;
+  const observed_value<T>& data;
   widget_action<int> cell_double_click;
   widget_action<widgets::popup_menu(widgets::table::selection_t)> popup_opener;
-  bool rebuild_when = false;
+  unsigned version; 
 };
 
 template <class T>

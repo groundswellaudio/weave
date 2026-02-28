@@ -44,4 +44,31 @@ decltype(auto) context_invoke(Fn fn, event_context& ec, Args&&... args) {
     return (std::invoke(fn, (Args&&)args...));
 }
 
+/// A simple helper for the observation of mutations of large data structure (images/array/ect)
+template <class T>
+struct observed_value {
+  
+  auto&& get(this auto&& self) { return self.value; }
+  
+  template <class V>
+  auto& operator=(V&& v) {
+    value = WEAVE_FWD(v);
+    mut();
+    return *this;
+  }
+  
+  T* operator->() { return &value; }
+  const T* operator->() const { return &value; }
+  
+  auto& mut() { ++version_count; return value; }
+  
+  unsigned version() const { return version_count; }
+  void note_mutation() { ++version_count; }
+  
+  
+  T value;
+  private : 
+  unsigned version_count = 0;
+};
+
 } // weave

@@ -335,12 +335,10 @@ struct LibraryView {
   auto body(State& state, view_state& self) {
     using namespace views;
     
-    bool update_table = std::exchange(state.table_mutated, false);
-    
     auto center_view = either {
       self.selection.value, 
       [&] (songs_t) {
-        return table{state.database.tracks, update_table}
+        return table{state.database.tracks}
                     .on_cell_double_click(&State::play_track)
                     .popup_menu(&song_table_popup_menu)
                     .on_file_drop(&on_file_drop);
@@ -354,7 +352,7 @@ struct LibraryView {
           for_each(state.database.albums, [&self, k = 0] (auto& a) mutable {
             auto setter = self.selection.setter(album_id{k++});
             return vstack {
-              views::image{a.cover, false}.fit({150, 150}).on_click([setter] (ignore, ignore) {setter();}),
+              views::image{a.cover}.fit({150, 150}).on_click([setter] (ignore, ignore) {setter();}),
               text{a.name}.with_nominal_size({150, 20}),
               text{a.artist_name}.with_nominal_size({150, 20})
             }.interspace(2);
@@ -369,9 +367,9 @@ struct LibraryView {
       },
       [&] (album_id id) {
         return vstack {
-          views::image{state.database.album(id.value).cover, false}.fit({600, 600}),
-          text{state.database.album(id.value).name},
-          table{state.database.album_tracks(id.value), false}.on_cell_double_click(&State::play_track)
+          views::image{state.database.album(id.value).cover}.fit({600, 600}),
+          text{state.database.album(id.value).name}//,
+          //table{state.database.album_tracks(id.value)}.on_cell_double_click(&State::play_track)
         };
       }
     };
@@ -388,12 +386,10 @@ auto make_view(State& state)
   
   state.check_done_reading();
   
-  bool update_cover = std::exchange(state.current_cover_updated, false);
-  
   return vstack{ top_panel(state),
                   hstack{ 
                         library_view{}, 
-                        views::image(state.current_cover, update_cover)
+                        views::image(state.current_cover)
                         .fit({600, 600})
                         }.align(1).fill() 
                }.align_center()

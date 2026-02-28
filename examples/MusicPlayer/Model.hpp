@@ -118,7 +118,7 @@ struct Database {
     
     std::string name;
     std::string artist_name;
-    weave::image<weave::rgb_u8> cover;
+    observed_value<weave::image<weave::rgb_u8>> cover;
     std::vector<int> tracks;
   };
   
@@ -126,7 +126,7 @@ struct Database {
     "Title", "Artist", "Album", "Date added"
   };
   
-  std::vector<Track> tracks;
+  observed_value<std::vector<Track>> tracks;
   std::set<std::string> artists; // We want artists ordered by default
   std::vector<Playlist> playlists_v;
   std::deque<Album> albums;
@@ -145,14 +145,15 @@ struct Database {
     auto DateAdded = std::format("{} {:%R}", 
       std::chrono::year_month_day(std::chrono::floor<std::chrono::days>(Now)), 
       Now);
-    tracks.push_back( {path, {Title, Artist, Album, DateAdded}} );
+    tracks->push_back( {path, {Title, Artist, Album, DateAdded}} );
     try_add_artist(Artist);
-    try_add_album(tracks.back(), tracks.size() - 1);
+    try_add_album(tracks->back(), tracks->size() - 1);
+    tracks.mut();
     return true;
   }
   
   void set_artist_name(int track_id, std::string_view str) {
-    auto& t = tracks[track_id];
+    auto& t = tracks.mut()[track_id];
     t.artist() = str;
     TagLib::FileRef file{t.file_path.c_str()};
     file.tag()->setArtist(std::string{str});
@@ -160,7 +161,7 @@ struct Database {
   }
   
   void set_track_title(int track_id, std::string_view str) {
-    auto& t = tracks[track_id];
+    auto& t = tracks.mut()[track_id];
     t.title() = str;
     TagLib::FileRef file{t.file_path.c_str()};
     file.tag()->setTitle(std::string{str});
@@ -168,17 +169,17 @@ struct Database {
   }
   
   void set_album_name(int track_id, std::string_view str) {
-    auto& t = tracks[track_id];
+    auto& t = tracks.mut()[track_id];
     t.album() = str;
     TagLib::FileRef file{t.file_path.c_str()};
     file.tag()->setAlbum(std::string{str});
     file.save();
   }
   
-  bool empty() const { return tracks.empty(); }
-  auto num_tracks() const { return tracks.size(); }
+  bool empty() const { return tracks->empty(); }
+  auto num_tracks() const { return tracks->size(); }
   
-  auto& track(this auto& self, int index) { return self.tracks[index]; }
+  auto& track(this auto& self, int index) { return self.tracks.get()[index]; }
   
   auto& playlists() const { 
     return playlists_v; 
@@ -228,7 +229,7 @@ struct Database {
     if (it == albums.end() || *it != key) {
       it = albums.insert(it, Album{std::string(get<0>(key)), std::string(get<1>(key))});
     }
-    if (it->cover.empty()) {
+    if (it->cover->empty()) {
       auto c = read_file_cover(track.file_path);
       if (c)
         it->cover = c->to<weave::rgb_u8>();
@@ -319,8 +320,7 @@ struct State : weave::app_state {
       buffer_track_id = *current_track_id;
       auto cover = read_file_cover(path);
       if (cover) {
-        current_cover = std::move(*cover);
-        current_cover_updated = true;
+        current_cover.mut() = std::move(*cover);
       }
       player.done_reading = false;
     }
@@ -353,8 +353,7 @@ struct State : weave::app_state {
   }
   
   void load_track(const std::string& path) {  
-    if (database.add_track_from_file(path))    
-      table_mutated = true;
+    database.add_track_from_file(path);
   }
   
   auto& track(this auto& self, int id) {
@@ -406,8 +405,5 @@ struct State : weave::app_state {
   bool is_playing_v = false;
   
   Database database;
-  bool table_mutated = false;
-  
-  weave::image<rgba<unsigned char>> current_cover;
-  bool current_cover_updated = false;
+  observed_value<weave::image<rgba<unsigned char>>> current_cover;
 };

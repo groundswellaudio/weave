@@ -67,8 +67,8 @@ struct image : view<image<ImgT, Proj>>, view_modifiers {
   
   using widget_t = widgets::image;
   
-  image(const ImgT& data, bool RefreshWhen, Proj proj = {}) 
-  : img{data}, refresh{RefreshWhen}, image_proj{proj} 
+  image(const observed_value<ImgT>& data, Proj proj = {}) 
+  : img{data}, image_proj{proj} 
   {
   }
   
@@ -78,10 +78,10 @@ struct image : view<image<ImgT, Proj>>, view_modifiers {
   }
   
   vec2f get_display_size() const {
-    if (img.empty())
+    if (img->empty())
       return {0, 0};
     // CAREFUL here : by convention the dimensions of images are stored as (y, x), but the size of widget is (x, y)!
-    auto img_size = vec2f{(float)img.shape()[1], (float)img.shape()[0]};
+    auto img_size = vec2f{(float)img->shape()[1], (float)img->shape()[0]};
     if (max_bounds) {
       if (img_size[0] == 0.f || img_size[1] == 0.f)
         return *max_bounds;
@@ -101,24 +101,26 @@ struct image : view<image<ImgT, Proj>>, view_modifiers {
   
   auto build(const build_context& ctx, ignore) {
     optional<texture_handle> texture;
-    if (!img.empty())
+    if (!img->empty())
       texture = make_texture(ctx.graphics_context());
     auto wsize = get_display_size();
+    version = img.version();
     return widget_t{{wsize}, texture, wsize, corner_offset};
   }
   
   rebuild_result rebuild(const image& old, widget_ref elem, const build_context& up, ignore) {
     auto& w = elem.as<widget_t>();
+    version = old.version;
     if (!w.texture) {
-      if (!img.empty())
+      if (!img->empty())
         w.texture = make_texture(up.graphics_context());
     }
-    else if (refresh) {
+    else if (version != img.version()) {
       debug_log("refreshing image");
       auto& gctx = up.graphics_context();
       gctx.delete_texture(*w.texture);
       
-      if (img.empty()) {
+      if (img->empty()) {
         w.texture = std::nullopt;
         w.set_size({0, 0});
         return rebuild_result::size_change;
@@ -138,22 +140,22 @@ struct image : view<image<ImgT, Proj>>, view_modifiers {
   
   texture_handle make_texture(graphics_context& ctx) {
     if constexpr (std::is_same_v<ImgT, weave::image<rgba<unsigned char>>>) 
-      return ctx.create_texture(img, img.shape());
+      return ctx.create_texture(img.get(), img->shape());
     else {
       weave::image<rgba<unsigned char>> tex;
-      tex.reshape(img.shape());
+      tex.reshape(img->shape());
       for (int y : iota(tex.shape()[0]))
         for (int x : iota(tex.shape()[1]))
-          tex(y, x) = static_cast<rgba<unsigned char>>(image_proj(img(y, x)));
+          tex(y, x) = static_cast<rgba<unsigned char>>(image_proj(img.get()(y, x)));
       return ctx.create_texture(tex, tex.shape());
     }
   }
   
-  const ImgT& img;
+  const observed_value<ImgT>& img;
+  unsigned version;
   Proj image_proj;
   optional<vec2f> max_bounds;
   point corner_offset = {0, 0};
-  bool refresh; 
 };
 
 } // views
