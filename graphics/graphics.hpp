@@ -312,6 +312,10 @@ struct glyph_positions {
   auto min() const { return !size() ? 0 : positions.front().minx; }
   auto max() const { return !size() ? 0 : positions.back().maxx;  }
   
+  auto& operator[] (int idx) const {
+    return positions[idx];
+  }
+   
   float pos_from_index(unsigned idx) const {
     if (idx >= size())
       return max();
