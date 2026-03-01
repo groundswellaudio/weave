@@ -141,8 +141,8 @@ struct text : view<text<Args...>>, view_modifiers {
   text(text&&) = default;
   text(const text&) = default;
   
-  vec2f bounds(graphics_context& gctx) {
-    return str.size() == 0 ? vec2f{0, prop.font_size} : gctx.text_bounds(str, prop.font_size);
+  point bounds(graphics_context& gctx) {
+    return str.size() == 0 ? point{0, prop.font_size} : gctx.text_bounds(str, prop.font_size);
   }
   
   using widget_t = widgets::text;
@@ -158,6 +158,7 @@ struct text : view<text<Args...>>, view_modifiers {
     auto res = widget_t{};
     res.set_string(make_string(), gctx);
     res.set_alignment(align_x);
+    res.set_font_size(prop.font_size, b.graphics_context());
     return res;
   }
   
@@ -166,6 +167,10 @@ struct text : view<text<Args...>>, view_modifiers {
     rebuild_result res {};
     if (str != Old.str || fmt_args != Old.fmt_args) {
       wb.set_string(make_string(), up.graphics_context());
+      res |= rebuild_result::size_change;
+    }
+    if (Old.prop.font_size != prop.font_size) {
+      wb.set_font_size(prop.font_size, up.graphics_context());
       res |= rebuild_result::size_change;
     }
     wb.set_alignment(align_x);
@@ -177,9 +182,14 @@ struct text : view<text<Args...>>, view_modifiers {
     return WEAVE_FWD(self);
   }
   
-  auto&& align_right(this auto&& self) {
+  auto align_right(this auto self) {
     self.align_x = text_align::x::right;
     return WEAVE_FWD(self);
+  }
+  
+  auto&& font_size(this auto&& self, float sz) {
+    self.prop.font_size = sz;
+    return self;
   }
   
   widget_t::properties prop;

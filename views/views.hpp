@@ -18,3 +18,4 @@
 #include "selectable.hpp"
 #include "composite.hpp"
 #include "zstack.hpp"
+#include "geometry.hpp"

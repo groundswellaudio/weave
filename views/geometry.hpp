@@ -10,12 +10,11 @@ struct shape {
   Shape shape;
 };
 
-template <>
-struct shape<rectangle> : widget_base {
+struct rectangle : widget_base {
   
   auto size_info() const {
     widget_size_info res;
-    res.flex_factor = point{0, 0};
+    res.flex_factor = point{1, 1};
     res.nominal = nominal_size;
     return res;
   }
@@ -31,6 +30,8 @@ struct shape<rectangle> : widget_base {
     }
   }
   
+  void on(mouse_event e, event_context& ec) {}
+  
   point nominal_size;
   rgba_u8 color;
   short stroke_width;
@@ -41,40 +42,33 @@ struct shape<rectangle> : widget_base {
 
 namespace weave::views {
   
-  struct rectangle : view<rectangle> {
-    
-    rectangle(vec2f sz, rgba_u8 col) : sz{sz}, color{col} {}
-    rectangle(geo::rectangle_f r, rgba_u8 col) {
-      sz = r.size;
-      origin = r.origin;
-      color = col;
-    }
+  struct rectangle : view<rectangle>, view_modifiers {
     
     auto build(ignore, ignore) {
-      auto res = widget_t{sz, color, stroke_w, do_stroke};
-      if (origin)
-        res.set_position(*origin);
+      auto res = widgets::rectangle{};
+      res.nominal_size = point{100, 30};
+      res.color = color;
+      res.stroke_width = stroke_w;
+      res.stroke = do_stroke;
       return res;
     }
     
-    auto rebuild(ignore, widget_ref wr, ignore, ignore) {
+    rebuild_result rebuild(rectangle rect, widget_ref wr, ignore, ignore) {
       auto res = rebuild_result{};
-      auto& w = wr.as<widget_t>();
-      if (w.size() != rect.size) {
-        w.set_size(rect.size);
-        res |= rebuild_result::size_changed;
-      }
-      if (origin)
-        w.set_position(origin);
+      auto& w = wr.as<widgets::rectangle>();
       w.color = color;
       w.stroke_width = stroke_w;
       w.stroke = do_stroke;
-      return w;
+      return {};
+    }
+    
+    auto stroke(float w) {
+      stroke_w = w;
+      do_stroke = true;
+      return *this;
     }
     
     rgba_u8 color;
-    std::optional<vec2f> origin; 
-    vec2f sz;
     short stroke_w = 1;
     bool do_stroke = false;
   };

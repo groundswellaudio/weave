@@ -344,7 +344,11 @@ struct LibraryView {
                     .on_file_drop(&on_file_drop);
       },
       [&] (artists_t) {
-        return list{state.artists(), false};
+        return vstack {
+          for_each{ state.artists(), [] (auto& a) {
+            return text{a}.font_size(20).background(views::rectangle{}.stroke(2));
+          }}
+        };
       },
       [&] (albums_t) {
         return flow{ 
@@ -402,7 +406,7 @@ inline void run_app() {
   State state;
   window_properties prop;
   prop.name = "spinner";
-  prop.size = vec2f{600, 400};
+  prop.size = point{600, 400};
   auto app = make_app(state, &make_view, prop);
   app.run(state);
 }

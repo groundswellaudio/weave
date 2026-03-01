@@ -54,6 +54,22 @@ struct with_nominal_size : W {
   point nominal_size;
 };
 
+template <class T, class B>
+struct with_background : T {
+  
+  void do_layout(point sz) {
+    background.do_layout(sz);
+    T::do_layout(sz);
+  }
+  
+  void paint(painter& p) {
+    background.paint(p);
+    T::paint(p);
+  }
+  
+  B background;
+};
+
 } // widgets
 
 namespace weave::views {
@@ -164,6 +180,9 @@ struct animated : V {
   int period_ms;
 };
 
+template <class V, class B>
+struct with_background;
+
 /// Common extensions for views.
 struct view_modifiers {
 
@@ -225,6 +244,31 @@ struct view_modifiers {
   auto animate_when(this auto&& self, bool flag, int period_ms, auto fn) {
     return animated{WEAVE_FWD(self), flag, fn, period_ms};
   }
+  
+  auto background(this auto&& self, auto&& background) {
+    return with_background{WEAVE_FWD(self), WEAVE_FWD(background)};
+  }
+};
+
+template <class V, class B>
+struct with_background : V {
+  
+  auto build(const build_context& ctx, auto& state) {
+    return widgets::with_background{V::build(ctx, state), background.build(ctx, state)};
+  }
+  
+  rebuild_result rebuild (const with_background<V, B>& Old, widget_ref w, 
+                          const build_context& ctx, auto& state) {
+    
+    using widget_t = decltype(widgets::with_background{V::build(ctx, state),
+                                                        background.build(ctx, state)});
+    using foreground = decltype(V::build(ctx, state));
+    auto res = V::rebuild((V&)Old, widget_ref(&(foreground&)w.as<widget_t>()), ctx, state);
+    res |=  background.rebuild(Old.background, widget_ref{&w.as<widget_t>().background}, ctx, state);
+    return res;
+  }
+  
+  B background;
 };
 
 } // views

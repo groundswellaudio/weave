@@ -9,7 +9,7 @@ struct for_each : view_sequence_base {
   
   for_each(auto&& range, ViewCtor ctor) : range{range}, view_ctor{ctor} {}
   
-  using element = decltype( std::declval<ViewCtor>()(std::declval<Range>().front()) );
+  using element = decltype( std::declval<ViewCtor>()(*std::declval<Range>().begin()) );
   
   void seq_build(auto Consumer, const build_context& b,  auto& state) {
     for (auto&& elem : range) {
