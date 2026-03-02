@@ -6,6 +6,8 @@
 #include <taglib/fileref.h>
 #include <taglib/tpropertymap.h>
 
+#include <unordered_set>
+
 #include <ghc/filesystem.hpp>
 #include <atomic>
 #include <set>
@@ -60,11 +62,89 @@ static optional<weave::image<weave::rgba<unsigned char>>> read_file_cover(const 
   return weave::decode_image({(unsigned char*)data_vec.data(), data_vec.size()});
 }
 
+struct Album { 
+    
+  // Name and artist
+  using Key = weave::tuple<std::string_view, std::string_view>;
+  
+  bool less(Key o) const {
+    auto [artist_name2, name2] = o;
+    if (artist < artist_name2)
+      return true;
+    if (artist_name2 < artist)
+      return false;
+    return name < name2;
+  }
+  
+  bool operator<(const Album& o) const {  
+    return less({o.artist, o.name});
+  }
+  
+  bool operator<(const tuple<std::string_view, std::string_view>& o) const {
+    return less(o);
+  }
+  
+  bool operator>(const tuple<std::string_view, std::string_view>& o) const {
+    return !less(o) && !(*this == o);
+  }
+  
+  bool operator==(const Album& o) const {
+    return name == o.name && artist == o.artist;
+  }
+  
+  bool operator==(Key k) const {
+    return artist == get<0>(k) && name == get<1>(k);
+  }
+  
+  bool operator!=(auto& o) const { return not ((*this) == o); }
+  
+  std::string_view title() const { return name; }
+  
+  std::string artist;
+  std::string name;
+  mutable observed_value<weave::image<weave::rgb_u8>> cover;
+  mutable std::vector<int> tracks;
+};
+  
+inline bool operator<(const tuple<std::string_view, std::string_view> s, const Album& a) {
+  auto [artist, title] = s;
+  if (artist < a.artist)
+    return true;
+  if (artist > a.artist)
+    return false;
+  return title < a.name;
+}
+
+struct Artist {
+    
+  bool operator<(std::string_view str) const { 
+    return name < str;
+  }
+  
+  bool operator==(std::string_view str) const {
+    return name == str;
+  }
+  
+  auto operator<=>(const Artist& artist) const {
+    return name <=> artist.name;
+  }
+  
+  std::string name;
+  mutable std::unordered_set<std::string> albums; 
+};
+
+bool operator<(std::string_view str, const Artist& a) {
+  return str < a.name;
+}
+  
 struct Database {
   
   using Self = Database;
   Database() = default;
   Database(const Database&) = delete;
+  
+  using Album = Album; 
+  using Artist = Artist; 
   
   struct Track {
     
@@ -82,54 +162,14 @@ struct Database {
     std::vector<int> tracks;
   };
   
-  struct Album { 
-    
-    // Name and artist
-    using Key = weave::tuple<std::string_view, std::string_view>;
-    
-    bool less(Key o) const {
-      auto [name2, artist_name2] = o;
-      if (name < name2)
-        return true;
-      if (name2 > name)
-        return false;
-      if (artist_name < artist_name2)  
-        return true;
-      return false;
-    }
-    
-    bool operator<(const Album& o) const {  
-      return less({o.name, o.artist_name});
-    }
-    
-    bool operator<(tuple<std::string_view, std::string_view> o) const {
-      return less(o);
-    }
-    
-    bool operator==(const Album& o) const {
-      return name == o.name && artist_name == o.artist_name;
-    }
-    
-    bool operator==(Key k) const {
-      return name == get<0>(k) && artist_name == get<1>(k);
-    }
-    
-    bool operator!=(auto& o) const { return not ((*this) == o); }
-    
-    std::string name;
-    std::string artist_name;
-    observed_value<weave::image<weave::rgb_u8>> cover;
-    std::vector<int> tracks;
-  };
-  
   static constexpr const char* properties_v[] = {
     "Title", "Artist", "Album", "Date added"
   };
   
   observed_value<std::vector<Track>> tracks;
-  std::set<std::string> artists; // We want artists ordered by default
+  std::set<Artist, std::less<>> artists; // We want artists ordered by default
   std::vector<Playlist> playlists_v;
-  std::deque<Album> albums;
+  std::set<Album, std::less<>> albums;
   
   bool add_track_from_file(const std::string& path) {
     TagLib::FileRef f{path.c_str()};
@@ -193,22 +233,29 @@ struct Database {
     return playlists()[id];
   }
   
-  struct AlbumTracks {
-    
-    auto tracks() const {
-      return std::views::transform(self.album(album_id).tracks, [s = &self] (auto id) -> auto& { return s->track(id); });
-    }
-    
-    Self& self;
-    int album_id;
-  };
-  
-  AlbumTracks album_tracks(int id) {
-    return {*this, id};
+  auto& album(std::string_view artist, std::string_view title) {
+    auto it = albums.find(tuple{artist, title});
+    assert( it != albums.end() );
+    return *it;
   }
   
-  Album& album(int id) {
-    return albums[id];
+  auto artist_albums(std::string_view artist) {
+    return std::views::transform(artists.find(artist)->albums, 
+                                [artist, this] (auto& album) -> auto& {
+                                  auto it = albums.find(tuple{artist, std::string_view{album}});
+                                  assert( it != albums.end() && "album not found?" );
+                                  return *it;
+                                });
+  }
+  
+  auto album_tracks(std::string_view artist, std::string_view title) {
+    return std::views::transform( album(artist, title).tracks, 
+                                 [this] (auto id) -> auto& { return this->track(id); });
+  }
+  
+  auto album_tracks(const Album& a) const {
+    return std::views::transform(a.tracks, 
+                                [this] (auto id) -> auto& { return this->track(id); });
   }
   
   void add_to_playlist(int playlist_id, int track_id) {
@@ -220,14 +267,17 @@ struct Database {
   void try_add_artist(const std::string& str) {
     if (str == "")
       return;
-    artists.insert(str);
+    auto it = artists.find(std::string_view{str});
+    if (it == artists.end())
+      artists.insert(it, Artist{str});
   }
   
   void try_add_album(Track& track, int track_id) {
-    auto key = weave::tuple{std::string_view{track.album()}, std::string_view{track.artist()}};
-    auto it = std::lower_bound(albums.begin(), albums.end(), key);
+    auto key = weave::tuple{std::string_view{track.artist()}, std::string_view{track.album()}};
+    auto it = albums.find(key);
     if (it == albums.end() || *it != key) {
-      it = albums.insert(it, Album{std::string(get<0>(key)), std::string(get<1>(key))});
+      bool whatever;
+      std::tie(it, whatever) = albums.insert(Album{std::string(get<0>(key)), std::string(get<1>(key))});
     }
     if (it->cover->empty()) {
       auto c = read_file_cover(track.file_path);
@@ -235,6 +285,15 @@ struct Database {
         it->cover = c->to<weave::rgb_u8>();
     }
     it->tracks.push_back(track_id);
+    
+    auto artist_key = std::string_view{track.artist()};
+    auto ait = artists.find(artist_key);
+    if (ait == artists.end()) {
+      auto [it2, inserted] = artists.insert(Artist{track.artist()});
+      it2->albums.insert(track.album());
+    }
+    else
+      ait->albums.insert(track.album());
   }
 };
 
@@ -242,13 +301,6 @@ template <>
 struct weave::table_model<std::vector<Database::Track>> {
   auto&& properties(ignore) { return Database::properties_v; }
   auto& cells(auto& self) { return self; }
-  auto& cell_properties(const Database::Track& t) { return t.properties; }
-};
-
-template <>
-struct weave::table_model<Database::AlbumTracks> {
-  auto&& properties(ignore) { return Database::properties_v; }
-  auto cells(auto& obj) { return obj.tracks(); }
   auto& cell_properties(const Database::Track& t) { return t.properties; }
 };
 

@@ -2,6 +2,7 @@
 
 #include "views_core.hpp"
 #include <functional>
+#include <concepts>
 
 namespace weave::widgets {
 
@@ -43,6 +44,7 @@ template <class V, class S, class Id>
 struct selectable : view<selectable<V, S, Id>> {
   
   selectable(V v, S* selection, Id id) 
+    requires (std::assignable_from<S&, Id>)
   : view{WEAVE_MOVE(v)}, selection{selection}, id{id} {}
   
   auto build(const build_context& b, auto& state) {

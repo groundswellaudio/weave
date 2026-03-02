@@ -280,6 +280,22 @@ auto song_table_popup_menu(event_context& ec, track_selection selected) {
   return menu;
 }
 
+struct make_album_view {
+  State& state; 
+  auto operator()(const Database::Album& a) {
+    using namespace weave::views;
+    
+    auto track_view = [this, p = 0] (const Database::Track& t) mutable {
+      return hstack{ text{"{} - ", p++}, 
+                     text{"{}", t.title()}.align_right() };
+    };
+    return vstack {
+      text{a.title()}.font_size(20),
+      for_each(state.database.album_tracks(a), track_view)
+    };
+  }
+};
+
 struct LibraryView {
   
   struct songs_t { bool operator==(const songs_t&) const = default;};
@@ -287,11 +303,17 @@ struct LibraryView {
   struct albums_t { bool operator==(const albums_t&) const = default;};
   struct artist_id { int value; bool operator==(const artist_id&) const = default; };
   struct playlist_id { int value; bool operator==(const playlist_id& p) const = default;};
-  struct album_id {int value; bool operator==(const album_id&) const = default; };
+  struct album_id { std::string_view artist, title; bool operator==(const album_id&) const = default; };
+  
+  // The artist name strings are uniqued
+  struct artist_key {
+    bool operator==(const artist_key& o) const { return value.data() == o.value.data(); }
+    std::string_view value;
+  };
   
   struct ViewState {
     variant<songs_t, artists_t, albums_t, playlist_id, album_id> selection;
-    int artist = -1;
+    optional<artist_key> artist;
   };
   
   using view_state = ViewState;
@@ -342,23 +364,35 @@ struct LibraryView {
                     .on_file_drop(&on_file_drop);
       },
       [&] (artists_t) {
-        return vstack {
+        auto left = vstack {
           for_each{ state.artists(), [&self, aid = 0] (auto& a) mutable {
-            auto t = text{a}.font_size(20)
+            auto t = text{a.name}.font_size(20)
                       .background(views::rectangle{}.stroke(1).color(colors::white));
-            return selectable{t, &self.artist, aid++};
+            return selectable{t, &self.artist, artist_key{std::string_view{a.name}}};
           }}
         }.interspace(0);
+        auto artist_view = [&state] (artist_key current) {
+          return vstack{
+            text{current.value}.font_size(30),
+            for_each( state.database.artist_albums(current.value),
+                      make_album_view{state} )
+          };
+        };
+        
+        auto right = either{self.artist, artist_view, [] () { return vstack{}; }};
+        return hstack{left, right};
       },
       [&] (albums_t) {
         return flow{ 
           400,
           for_each(state.database.albums, [&self, k = 0] (auto& a) mutable {
-            auto setter = [&self, p = k++] (ignore, ignore) { self.selection = album_id{p}; };
+            auto setter = [&self, artist_name = std::string_view{a.artist}, name = a.name] (ignore, ignore) { 
+              self.selection = album_id{artist_name, name}; 
+            };
             return vstack {
               views::image{a.cover}.fit({150, 150}).on_click(setter),
               text{a.name}.with_nominal_size({150, 20}),
-              text{a.artist_name}.with_nominal_size({150, 20})
+              text{a.artist}.with_nominal_size({150, 20})
             }.interspace(2);
           })
         }.rounded(6);
@@ -371,8 +405,8 @@ struct LibraryView {
       },
       [&] (album_id id) {
         return vstack {
-          views::image{state.database.album(id.value).cover}.fit({600, 600}),
-          text{state.database.album(id.value).name}//,
+          views::image{state.database.album(id.artist, id.title).cover}.fit({600, 600}),
+          text{id.title}//,
           //table{state.database.album_tracks(id.value)}.on_cell_double_click(&State::play_track)
         };
       }

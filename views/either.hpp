@@ -94,9 +94,9 @@ namespace impl {
   }
   
   template <class... Ts, class T, class F, class G>
-  variant<Ts...> map_ptr(T* ptr, F f, G g) {
-    if (ptr)
-      return variant<Ts...>{in_place_index<0>, f(*ptr)};
+  variant<Ts...> map_nullable(T nullable, F f, G g) {
+    if (nullable)
+      return variant<Ts...>{in_place_index<0>, f(*nullable)};
     else
       return variant<Ts...>{in_place_index<1>, g()};
   }
@@ -116,7 +116,11 @@ struct either : view_sequence_base {
   }
   
   template <class T, class A, class B>
-  either(T* ptr, A fna, B fnb) : body{impl::map_ptr<Ts...>(ptr, fna, fnb)} {}
+  either(T* ptr, A fna, B fnb) : body{impl::map_nullable<Ts...>(ptr, fna, fnb)} {}
+  
+  template <class T, class A, class B>
+  either(const optional<T>& opt, A fna, B fnb) : body{impl::map_nullable<Ts...>(opt, fna, fnb)}
+  {}
   
   void seq_build(auto consumer, auto&& ctx, auto& state) {
     visit( [&] (auto& elem) {
@@ -158,5 +162,8 @@ either(variant<Vs...>, Fn... fns) -> either<std::invoke_result_t<Fn, Vs>...>;
 
 template <class T, class A, class B>
 either(T* ptr, A a, B b) -> either<std::invoke_result_t<A, T&>, std::invoke_result_t<B>>;
+
+template <class T, class A, class B>
+either(const optional<T>& ptr, A a, B b) -> either<std::invoke_result_t<A, const T&>, std::invoke_result_t<B>>;
 
 } // views
