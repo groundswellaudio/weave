@@ -235,12 +235,14 @@ struct Database {
   
   auto& album(std::string_view artist, std::string_view title) {
     auto it = albums.find(tuple{artist, title});
-    assert( it != albums.end() );
+    assert( it != albums.end() && "album not found?" );
     return *it;
   }
   
   auto artist_albums(std::string_view artist) {
-    return std::views::transform(artists.find(artist)->albums, 
+    auto it = artists.find(artist);
+    assert( it != artists.end() && "artist not found?" );
+    return std::views::transform(it->albums, 
                                 [artist, this] (auto& album) -> auto& {
                                   auto it = albums.find(tuple{artist, std::string_view{album}});
                                   assert( it != albums.end() && "album not found?" );
@@ -435,8 +437,8 @@ struct State : weave::app_state {
     }
   }
   
-  auto&& artists() { return database.artists; }
-  auto&& songs() { return database.tracks; }
+  auto& artists() { return database.artists; }
+  auto& songs() { return database.tracks; }
   auto& playlists() const { return database.playlists(); }
   
   void load_directory(ghc::filesystem::path p) {

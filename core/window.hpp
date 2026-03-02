@@ -2,6 +2,7 @@
 
 #include <SDL3/SDL.h>
 #include "../util/vec.hpp"
+#include "../util/util.hpp"
 
 namespace weave {
 
@@ -53,7 +54,8 @@ struct window {
   }
   
   void set_max_size(vec2f sz) {
-    SDL_SetWindowMaximumSize(win, sz.x, sz.y);
+    SDL_SetWindowMaximumSize(win, sz.x == infinity<float>() ? infinity<int>() : sz.x, 
+                                  sz.x == infinity<float>() ? infinity<int>() : sz.y);
   }
   
   void swap_buffer() {

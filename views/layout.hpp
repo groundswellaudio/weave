@@ -62,35 +62,6 @@ struct stack
   stack_data info;
 };
 
-struct stack_updater : view_sequence_updater<stack_updater> {
-  build_context b;
-  std::vector<widget_box>& vec;
-  std::vector<int> to_erase;
-  int& index;
-  bool mutated = false;
-  
-  [[no_unique_address]] non_copyable _;
-  
-  void consume(auto&& W) { 
-    vec.insert( 
-      vec.begin() + index++, 
-      widget_box{(decltype(W)&&)(W)}
-    );
-    mutated = true;
-  }
-  
-  widget_ref next() {
-    return vec[index++].borrow();
-  }
-  
-  widget_ref destroy() {
-    widget_ref res = vec[index].borrow();
-    to_erase.push_back(index++);
-    mutated = true;
-    return res;
-  }
-};
-
 namespace impl {
   
   // Called after the sizing has been done
@@ -329,6 +300,35 @@ namespace impl {
       c.layout(c.size());
   }
   
+  struct stack_updater : view_sequence_updater<stack_updater> {
+    build_context b;
+    std::vector<widget_box>& vec;
+    std::vector<int> to_erase;
+    int& index;
+    bool mutated = false;
+    
+    [[no_unique_address]] non_copyable _;
+    
+    void consume(auto&& W) { 
+      vec.insert( 
+        vec.begin() + index++, 
+        widget_box{(decltype(W)&&)(W)}
+      );
+      mutated = true;
+    }
+    
+    widget_ref next() {
+      return vec[index++].borrow();
+    }
+    
+    widget_ref destroy() {
+      widget_ref res = vec[index].borrow();
+      to_erase.push_back(index++);
+      mutated = true;
+      return res;
+    }
+  };
+
   template <class T, class V, class S>
   auto build_stack(V& view, const build_context& ctx, S& state, auto&&... ctor_args) {
     T Res { ctor_args... };
@@ -362,9 +362,20 @@ namespace impl {
       res |= elem.seq_rebuild(get<elem_index.value>(Old.children), seq_updater, ctx, state);
     }, New.children);
     
-    // FIXME : this could be rewritten more efficiently with erase(remove(...))
-    for (auto i : seq_updater.to_erase)
-      w.children_vec.erase(w.children_vec.begin() + i);
+    if (seq_updater.to_erase.size())
+    {
+      auto it = std::remove_if( w.children_vec.begin(), w.children_vec.end(), 
+                                [ida = 0, idb = 0, &seq_updater] (ignore) mutable {
+                                  if (idb == seq_updater.to_erase.size())
+                                    return false;
+                                  if (ida++ == seq_updater.to_erase[idb]) {
+                                    idb++;
+                                    return true;
+                                  }
+                                  return false;
+                                } );
+      w.children_vec.erase(it, w.children_vec.end());
+    }
     
     if (seq_updater.mutated || (res & rebuild_result::size_change)) {
       w.do_layout(w.size());

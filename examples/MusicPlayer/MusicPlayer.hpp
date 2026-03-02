@@ -365,7 +365,7 @@ struct LibraryView {
       },
       [&] (artists_t) {
         auto left = vstack {
-          for_each{ state.artists(), [&self, aid = 0] (auto& a) mutable {
+          for_each{ state.artists(), [&self] (auto& a) mutable {
             auto t = text{a.name}.font_size(20)
                       .background(views::rectangle{}.stroke(1).color(colors::white));
             return selectable{t, &self.artist, artist_key{std::string_view{a.name}}};
@@ -386,7 +386,7 @@ struct LibraryView {
         return flow{ 
           400,
           for_each(state.database.albums, [&self, k = 0] (auto& a) mutable {
-            auto setter = [&self, artist_name = std::string_view{a.artist}, name = a.name] (ignore, ignore) { 
+            auto setter = [&self, artist_name = std::string_view{a.artist}, name = std::string_view{a.name}] (ignore, ignore) { 
               self.selection = album_id{artist_name, name}; 
             };
             return vstack {

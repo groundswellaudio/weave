@@ -21,5 +21,7 @@ include_directories(${filesystem_SOURCE_DIR}/include)
 add_executable(MusicPlayer main.cpp)
 
 target_include_directories(MusicPlayer PUBLIC ${TagLib_SOURCE_DIR})
+target_compile_options(MusicPlayer PRIVATE -fsanitize=address,undefined)
+target_link_options(MusicPlayer PRIVATE -fsanitize=address,undefined)
 
 target_link_libraries(MusicPlayer Weave TagLib::tag)
