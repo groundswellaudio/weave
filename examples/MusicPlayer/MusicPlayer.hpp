@@ -282,15 +282,15 @@ auto song_table_popup_menu(event_context& ec, track_selection selected) {
 
 struct LibraryView {
   
-  struct songs_t {};
-  struct artists_t {};
-  struct albums_t {};
-  struct artist_id { int value; };
-  struct playlist_id { int value; };
-  struct album_id {int value;};
+  struct songs_t { bool operator==(const songs_t&) const = default;};
+  struct artists_t { bool operator==(const artists_t&) const = default; };
+  struct albums_t { bool operator==(const albums_t&) const = default;};
+  struct artist_id { int value; bool operator==(const artist_id&) const = default; };
+  struct playlist_id { int value; bool operator==(const playlist_id& p) const = default;};
+  struct album_id {int value; bool operator==(const album_id&) const = default; };
   
   struct ViewState {
-    selection_value<variant<songs_t, artists_t, albums_t, playlist_id, album_id>> selection;
+    variant<songs_t, artists_t, albums_t, playlist_id, album_id> selection;
     int artist = -1;
   };
   
@@ -303,10 +303,8 @@ struct LibraryView {
   auto left_panel(State& state, view_state& self) {
     using namespace views;
     
-    auto setter = [&self] (auto v) { return self.selection.setter(v); };
-    
-    auto panel_item = [setter] (auto&& str, auto id) {
-      return selectable{text{str}, setter(id)};
+    auto panel_item = [&self] (auto&& str, auto id) {
+      return selectable{text{str}, &self.selection, id};
     };
     
     return vstack {
@@ -324,7 +322,7 @@ struct LibraryView {
       for_each(state.tags(), [] (auto& p) {
         return selectable{ text{p.name()}, group };
       }); */ 
-    }.fill();
+    }.fill_cross_axis();
   }
   
   /* 
@@ -336,7 +334,7 @@ struct LibraryView {
     using namespace views;
     
     auto center_view = either {
-      self.selection.value, 
+      self.selection, 
       [&] (songs_t) {
         return table{state.database.tracks}
                     .on_cell_double_click(&State::play_track)
@@ -345,18 +343,20 @@ struct LibraryView {
       },
       [&] (artists_t) {
         return vstack {
-          for_each{ state.artists(), [] (auto& a) {
-            return text{a}.font_size(20).background(views::rectangle{}.stroke(2));
+          for_each{ state.artists(), [&self, aid = 0] (auto& a) mutable {
+            auto t = text{a}.font_size(20)
+                      .background(views::rectangle{}.stroke(1).color(colors::white));
+            return selectable{t, &self.artist, aid++};
           }}
-        };
+        }.interspace(0);
       },
       [&] (albums_t) {
         return flow{ 
           400,
           for_each(state.database.albums, [&self, k = 0] (auto& a) mutable {
-            auto setter = self.selection.setter(album_id{k++});
+            auto setter = [&self, p = k++] (ignore, ignore) { self.selection = album_id{p}; };
             return vstack {
-              views::image{a.cover}.fit({150, 150}).on_click([setter] (ignore, ignore) {setter();}),
+              views::image{a.cover}.fit({150, 150}).on_click(setter),
               text{a.name}.with_nominal_size({150, 20}),
               text{a.artist_name}.with_nominal_size({150, 20})
             }.interspace(2);
@@ -378,7 +378,10 @@ struct LibraryView {
       }
     };
     
-    return hstack{left_panel(state, self), center_view};
+    return hstack{left_panel(state, self), 
+                  center_view, 
+                  views::image(state.current_cover).fit({600, 600})
+                  }.fill_cross_axis();;
   }
 };
 
@@ -391,15 +394,11 @@ auto make_view(State& state)
   state.check_done_reading();
   
   return vstack{ top_panel(state),
-                  hstack{ 
-                        library_view{}, 
-                        views::image(state.current_cover)
-                        .fit({600, 600})
-                        }.align(1).fill() 
+                  library_view{}, 
                }.align_center()
                 .margin({10, 10})
                 .background( rgb_f(colors::gray) * 0.4 )
-                .fill(); 
+                .fill_cross_axis(); 
 }
 
 inline void run_app() {

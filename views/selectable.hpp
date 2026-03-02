@@ -3,36 +3,6 @@
 #include "views_core.hpp"
 #include <functional>
 
-inline void do_nothing() {}
-
-template <class T>
-struct selection_value;
-
-template <class T>
-struct observed_value_setter {
-  
-  void operator() (std::function<void()> next_observer = &do_nothing) const {
-    self->value = new_value; 
-    if (self->on_change)
-      self->on_change();
-    self->on_change = next_observer; 
-  }
-  
-  selection_value<T>* self;
-  T new_value; 
-};
-
-template <class T>
-struct selection_value {
-  
-  auto setter(T next_value) { 
-    return observed_value_setter{this, next_value};
-  }
-  
-  T value;
-  std::function<void()> on_change;
-};
-
 namespace weave::widgets {
 
 template <class W>
@@ -46,15 +16,11 @@ struct selectable : W {
     if (e.is_down() && !is_selected)
     {
       is_selected = true;
+      on_select();
       ec.request_repaint();
-      on_select(ec, [this] () { this->unselect(); });
-      //group_ptr->on_select(key, [this] () {unselect();});
+      ec.request_rebuild();
     }
     W::on(e, ec);
-  }
-  
-  void unselect() {
-    is_selected = false;
   }
   
   void paint(painter& p) {
@@ -65,38 +31,38 @@ struct selectable : W {
     }
   }
   
-  widget_action<std::function<void()>> on_select;
   bool is_selected = false;
+  std::function<void()> on_select; 
 };
 
 } // widgets
 
 namespace weave::views {
 
-template <class V, class OnSelect>
-struct selectable : view<selectable<V, OnSelect>> {
-  using widget_t = widgets::selectable<typename V::widget_t>;
+template <class V, class S, class Id>
+struct selectable : view<selectable<V, S, Id>> {
   
-  selectable(auto&& v, auto&& selection) : view{v}, on_select{selection} {}
+  selectable(V v, S* selection, Id id) 
+  : view{WEAVE_MOVE(v)}, selection{selection}, id{id} {}
   
   auto build(const build_context& b, auto& state) {
+    using widget_t = widgets::selectable<decltype(view.build(b, state))>;
     auto res = widget_t{ view.build(b, state) };
-    res.on_select = [f = on_select] (event_context& ec, auto next_on_change) {
-      ec.request_rebuild();
-      f(next_on_change);
-    };
+    res.is_selected = *selection == id;
+    res.on_select = [ptr = selection, id = id] () { *ptr = id; };
     return res;
   }
   
   auto rebuild(auto& old, widget_ref r, auto&& ctx, auto& state) {
-    return view.rebuild(old.view, widget_ref{&r.as<widget_t>().base()}, ctx, state);
+    using widget_t = widgets::selectable<decltype(view.build(ctx, state))>;
+    auto& ws = r.as<widget_t>();
+    ws.is_selected = *selection == id;
+    return view.rebuild(old.view, widget_ref{&ws.base()}, ctx, state);
   }
   
   V view;
-  OnSelect on_select;
+  S* selection;
+  Id id;
 };
-
-template <class V, class Fn>
-selectable(V, Fn fn) -> selectable<V, Fn>;
 
 } // views

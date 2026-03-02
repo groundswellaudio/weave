@@ -47,7 +47,7 @@ namespace weave::views {
     auto build(ignore, ignore) {
       auto res = widgets::rectangle{};
       res.nominal_size = point{100, 30};
-      res.color = color;
+      res.color = col;
       res.stroke_width = stroke_w;
       res.stroke = do_stroke;
       return res;
@@ -56,10 +56,15 @@ namespace weave::views {
     rebuild_result rebuild(rectangle rect, widget_ref wr, ignore, ignore) {
       auto res = rebuild_result{};
       auto& w = wr.as<widgets::rectangle>();
-      w.color = color;
+      w.color = col;
       w.stroke_width = stroke_w;
       w.stroke = do_stroke;
       return {};
+    }
+    
+    auto& color(rgba_u8 c) {
+      col = c;
+      return *this;
     }
     
     auto stroke(float w) {
@@ -68,7 +73,7 @@ namespace weave::views {
       return *this;
     }
     
-    rgba_u8 color;
+    rgba_u8 col = colors::white;
     short stroke_w = 1;
     bool do_stroke = false;
   };

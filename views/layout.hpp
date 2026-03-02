@@ -53,7 +53,7 @@ struct stack
     return self;
   }
   
-  auto&& fill(this auto&& self) {
+  auto&& fill_cross_axis(this auto&& self) {
     self.info.fill_cross_axis = true;
     return self;
   }
@@ -103,8 +103,8 @@ namespace impl {
     {
       point pos;
       pos[axis] = axis_pos;
-      pos[1 - axis] = data.margin[1 - axis] + data.align_ratio * 
-                                (this_size[1-axis] - c.size()[1-axis] - 2 * data.margin[1 - axis]);
+      pos[!axis] = data.margin[!axis] + data.align_ratio * 
+                                (this_size[!axis] - c.size()[!axis] - 2 * data.margin[!axis]);
       c.set_position(pos);
       
       axis_pos += c.size()[axis];
@@ -125,11 +125,11 @@ namespace impl {
     float occupied_axis = 2 * data.margin[axis];
     for (auto& c : children)
       occupied_axis += c.size()[axis];
-    occupied_axis += data.interspace * children.size() - 1;
+    occupied_axis += data.interspace * (children.size() - 1);
     
     float remaining_space = this_size[axis] - occupied_axis;
     
-    while (true)
+    for (int k = 0; k < 3; ++k)
     {
       std::vector<widget_ref> unconstrained;
       
@@ -146,11 +146,8 @@ namespace impl {
         }
         // If we arrive at a conflict with the aspect ratio, modify first the cross axis size to fit, then the axis size if needed
         else if (sz_infos[i].aspect_ratio && *sz_infos[i].aspect_ratio * sz.x != sz.y) {
-          auto old_sz_axis = sz_axis;
-          if (axis == 0)
-            sz.y = sz.x * *sz_infos[i].aspect_ratio;
-          else
-            sz.x = sz.y / *sz_infos[i].aspect_ratio;
+          auto old_sz_axis = sz_axis; 
+            sz[1 - axis] = axis ? sz[axis] / *sz_infos[i].aspect_ratio : sz[axis] * *sz_infos[i].aspect_ratio;
           if (sz[1 - axis] > sz_infos[i].max[1 - axis]
               || sz[1 - axis] > this_size[1 - axis] - 2 * data.margin[1 - axis])
           {
@@ -176,7 +173,7 @@ namespace impl {
       for (auto u : unconstrained)
         sum_unconstrained_flex += u.size_info().flex_factor[axis];
         
-      // None of the remaining widget are flexible, mothing to do
+      // None of the remaining widget are flexible, nothing to do
       if (sum_unconstrained_flex == 0)
         return;
       
@@ -472,6 +469,9 @@ struct flow : widget_base, scrollable_base {
   
   void layout(point sz) 
   {
+    if (!children_vec.size())
+      return;
+    
     auto row_begin = children_vec.begin();
     auto row_end = children_vec.begin();
     float p = margin.x;
