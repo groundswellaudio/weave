@@ -363,6 +363,7 @@ namespace impl {
       res |= elem.seq_rebuild(get<elem_index.value>(Old.children), seq_updater, ctx, state);
     }, New.children);
     
+    // Remove every elements at the (sorted) indexes in to_erase
     if (seq_updater.to_erase.size())
     {
       auto it = std::remove_if( w.children_vec.begin(), w.children_vec.end(), 

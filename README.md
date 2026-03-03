@@ -119,3 +119,13 @@ auto make_app(State& s) {
   auto s3 = views::slider{ read_write{&State::get_x, &State::set_x} };
 }
 ```
+
+## Roadmap 
+
+[ ] Code a fully fledged music player and library manager (30% there)
+
+[ ] Audio plugins support 
+
+[ ] Accessibility support
+
+[ ] Richer rendering API (maybe transitioning from nanovg towards some Rust library)

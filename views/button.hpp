@@ -327,6 +327,9 @@ namespace weave::views
     graphic_toggle_button (PaintFn P, bool val, WriteFn W) 
     : val{val}, paint_fn{P}, write_fn{W} {}
     
+    graphic_toggle_button(graphic_toggle_button&&) = default;
+    graphic_toggle_button(const graphic_toggle_button&) = default;
+    
     template <class S>
     auto build(const build_context& b, S& state) {
       widget_t res {{size_v}, paint_fn, {}, val};

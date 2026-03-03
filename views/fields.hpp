@@ -17,20 +17,22 @@ struct text_field : widget_base {
   
   widget_action<std::string_view> write;
   
-  static constexpr float margin = 5; 
+  static constexpr float margin = 5;  
   
   private : 
   
   std::string value_str;
   std::string background_text_str;
   glyph_positions glyph_pos;
+  float font_size = 11;
+  float height = 11; 
   float edit_x_offset = 0;
   int cursor_index[2] = {-1, 0}; // left-right, cursor_index[1] is the caret
   bool show_caret : 1 = false;
   bool editing : 1 = false;
   
   void update_glyph_pos(graphics_context& gc) {
-    gc.get_glyph_positions(glyph_pos, value_str, {5, size().y / 2});
+    gc.get_glyph_positions(glyph_pos, value_str, {5, size().y / 2}, font_size);
   }
   
   void set_caret_position_from(point pos)
@@ -80,6 +82,11 @@ struct text_field : widget_base {
     cursor_index[0] = -1;
     ec.request_repaint();
     ec.deanimate(this);
+  }
+  
+  void set_font_size(float new_size, const graphics_context& ctx) {
+    font_size = new_size;
+    height = ctx.text_height(font_size);
   }
   
   bool is_being_edited() const { return editing; }
@@ -139,9 +146,9 @@ struct text_field : widget_base {
   
   widget_size_info size_info() const {
     widget_size_info res;
-    res.min = min_size_field;
-    res.nominal = point{100, 15};
-    res.max.y = 15;
+    res.min = point{50, height + 4};
+    res.nominal = point{100, height + 4};
+    res.max.y = height + 4;
     res.flex_factor = point{1, 0};
     return res;
   }
@@ -230,6 +237,7 @@ struct text_field : widget_base {
     p.stroke_style(colors::white);
     p.stroke(rounded_rectangle(size(), 3));
     
+    p.font_size(font_size);
     p.text_align(text_align::x::left, text_align::y::center);
     
     if (value().size() == 0) {
@@ -303,7 +311,8 @@ struct text_field : view<text_field<Setter>>, view_modifiers {
       res.set_value(std::string{*value}, ctx.graphics_context());
     res.write = [fn = setter] (event_context& ec, std::string_view str) {
       context_invoke<S>(fn, ec, str);
-    }; 
+    };
+    res.set_font_size(font_size_v, ctx.graphics_context());
     return res;
   }
   
@@ -314,6 +323,10 @@ struct text_field : view<text_field<Setter>>, view_modifiers {
     }
     if (w.background_text() != background_text)
       w.set_background_text(background_text);
+    if (old.font_size_v != font_size_v) {
+      w.set_font_size(font_size_v, up.graphics_context());
+      return rebuild_result::size_change;
+    }
     return {};
   }
   
@@ -325,17 +338,23 @@ struct text_field : view<text_field<Setter>>, view_modifiers {
   
   auto&& set_value(this auto&& self, std::string_view str) {
     self.value = str;
-    return WEAVE_FWD(self);
+    return self;
   }
   
   auto&& set_background_text(this auto&& self, std::string_view str) {
     self.background_text = str;
-    return WEAVE_FWD(self);
+    return self;
+  }
+  
+  auto&& font_size(this auto&& self, float new_size) {
+    self.font_size_v = new_size;
+    return self;
   }
   
   optional<std::string_view> value;
   std::string_view background_text;
   Setter setter;
+  float font_size_v = 11;
 };
 
 } // views

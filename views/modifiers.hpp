@@ -70,6 +70,18 @@ struct with_background : T {
   B background;
 };
 
+template <class T>
+struct with_flex_factor : T {
+  
+  widget_size_info size_info() const {
+    auto res = T::size_info();
+    res.flex_factor = flex_factor;
+    return res;
+  }
+  
+  point flex_factor;
+};
+
 } // widgets
 
 namespace weave::views {
@@ -184,6 +196,28 @@ template <class V, class B>
   requires (is_view<V> && is_view<B>)
 struct with_background;
 
+template <class V>
+struct with_flex_factor : V {
+  
+  using widget_t = widgets::with_flex_factor<typename V::widget_t>;
+  
+  auto build(const build_context& ctx, auto& state) {
+    return widget_t{ V::build(ctx, state), flex_factor };
+  }
+  
+  rebuild_result rebuild(const with_flex_factor<V>& Old, widget_ref r, const build_context& ctx, auto& state) {
+    auto& wb = r.as<widget_t>();
+    V::rebuild((V&)Old, widget_ref{&static_cast<typename V::widget_t&>(wb)}, ctx, state);
+    if (flex_factor != Old.flex_factor) { 
+      wb.flex_factor = flex_factor;
+      return rebuild_result::size_change;
+    }
+    return {};
+  }
+  
+  point flex_factor;
+};
+
 /// Common extensions for views.
 struct view_modifiers {
 
@@ -248,6 +282,10 @@ struct view_modifiers {
   
   auto background(this auto&& self, auto&& background) {
     return with_background{WEAVE_FWD(self), WEAVE_FWD(background)};
+  }
+  
+  auto with_flex_factor(this auto&& self, point flex_factor) {
+    return views::with_flex_factor{WEAVE_FWD(self), flex_factor};
   }
 };
 

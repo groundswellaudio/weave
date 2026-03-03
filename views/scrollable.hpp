@@ -105,7 +105,7 @@ struct scrollable : view<scrollable<View>> {
   
   using widget_t = widgets::scrollable<typename View::widget_t>;
   
-  scrollable(vec2f sz, View child) : size{sz}, child{child} {}
+  scrollable(point sz, View child) : size{sz}, child{child} {}
   
   template <class State>
   auto build(build_context b, State& state) {

@@ -340,16 +340,25 @@ struct graphics_context
 {
   graphics_context();
   
-  void get_glyph_positions(glyph_positions& p, std::string_view text, point pos) const {
+  void get_glyph_positions(glyph_positions& p, std::string_view text, point pos, float font_size) const {
+    nvgFontSize(ctx, font_size);
+    update_font_offset();
     p.positions.resize(text.size());
     nvgTextGlyphPositions(ctx, pos.x, pos.y, text.begin(), text.end(), p.positions.data(), (int)(p.positions.size()) );
   }
 
-  vec2f text_bounds(std::string_view str, int font_size) const {
+  point text_bounds(std::string_view str, int font_size) const {
     nvgFontSize(ctx, font_size);
     float bounds[4];
     nvgTextBounds(ctx, 0, 0, str.data(), str.end(), bounds);
     return vec2f{ bounds[2] - bounds[0], bounds[3] - bounds[1] };
+  }
+  
+  float text_height(int font_size) const {
+    nvgFontSize(ctx, font_size);
+    float a, d, h;
+    nvgTextMetrics(ctx, &a, &d, &h);
+    return h;
   }
   
   texture_handle create_texture(const image<rgba<unsigned char>>& data, vec2<int> size) {
@@ -379,7 +388,7 @@ struct graphics_context
   
   private : 
   
-  void update_font_offset()
+  void update_font_offset() const 
   {
     // due to font format unconsistency,
     // sometimes the ascender actually means "height max"
@@ -391,7 +400,7 @@ struct graphics_context
   }
   
   NVGcontext* ctx = nullptr;
-  float text_vert_offset;
+  mutable float text_vert_offset;
 };
 
 } // weave

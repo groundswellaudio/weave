@@ -250,14 +250,18 @@ struct Database {
                                 });
   }
   
-  auto album_tracks(std::string_view artist, std::string_view title) {
-    return std::views::transform( album(artist, title).tracks, 
-                                 [this] (auto id) -> auto& { return this->track(id); });
+  auto album_tracks(const Album& a) const {
+    return std::views::transform( a.tracks, 
+                                 [this] (int id) -> auto { return tuple<const Database::Track&, int>{track(id), id}; });
   }
   
-  auto album_tracks(const Album& a) const {
-    return std::views::transform(a.tracks, 
-                                [this] (auto id) -> auto& { return this->track(id); });
+  auto album_tracks(std::string_view artist, std::string_view title) {
+    return album_tracks(album(artist, title));
+  }
+  
+  auto playlist_tracks(int playlist_id) const {
+    return std::views::transform( playlists_v[playlist_id].tracks, 
+                                  [this] (int id) -> auto { return tuple<const Database::Track&, int>{track(id), id}; } );
   }
   
   void add_to_playlist(int playlist_id, int track_id) {
@@ -315,6 +319,10 @@ inline bool is_audio_file(fs::path path) {
 }
 
 struct State : weave::app_state {
+  
+  void set_playlist_name(int id, std::string_view str) {
+    database.playlists_v[id].name = str;
+  }
   
   template <class IdRange>
   void set_artist_name(IdRange ids, std::string_view str) {

@@ -176,7 +176,7 @@ auto top_panel(State& state)
     combo_box(device_val, audio_output_devices()), 
     transport_buttons,
     vstack{ either{ state.current_track(), 
-              [] (auto& t) { return text{"{} - {}", t.artist(), t.title()}.align_center(); }, 
+              [] (auto& t) { return text{"{} - {}", std::string(t.artist()), std::string(t.title())}.align_center(); }, 
               [] () { return text{"Not playing."}.align_center(); }
             },
             transport_bar 
@@ -280,18 +280,36 @@ auto song_table_popup_menu(event_context& ec, track_selection selected) {
   return menu;
 }
 
+struct make_track_view {
+  State& state;
+  int p = 0;
+  
+  auto operator()(tuple<const Database::Track&, int> TrackAndId) {
+    using namespace weave::views;
+    auto [t, tid] = TrackAndId;
+    return hstack{ text{"{} - ", p++}.with_flex_factor({0,0}), 
+                     graphic_toggle_button{&paint_play_button, 
+                                           state.is_playing() && state.current_track_id == tid, 
+                                           [id = tid] (State& state, bool Val) { 
+                                            if (Val)
+                                              state.play_track(id);
+                                            else
+                                              state.set_play(false); 
+                                            return Val;
+                                          }}
+                                          .with_fixed_size({11, 11}),
+                     text{t.title()}.align_right() }.align_center();
+  }
+  
+ };
+
 struct make_album_view {
   State& state; 
   auto operator()(const Database::Album& a) {
     using namespace weave::views;
-    
-    auto track_view = [this, p = 0] (const Database::Track& t) mutable {
-      return hstack{ text{"{} - ", p++}, 
-                     text{"{}", t.title()}.align_right() };
-    };
     return vstack {
       hstack{ views::image{a.cover}.fit({150, 150}), text{a.title()}.font_size(20) }.align_center(),
-      for_each(state.database.album_tracks(a), track_view)
+      for_each(state.database.album_tracks(a), make_track_view{state})
     };
   }
 };
@@ -398,10 +416,11 @@ struct LibraryView {
         }.rounded(6);
       },
       [&] (playlist_id id) {
-        return text{"todo"};
-        /* 
-        return table{ state.database.playlist(id.value), false }
-               .on_cell_double_click( &State::play_track ); */ 
+        return vstack {
+          text_field{ [id] (State& s, std::string_view str) { s.set_playlist_name(id.value, str); } }
+          .set_value(state.database.playlist(id.value).name).font_size(30),
+          for_each( state.database.playlist_tracks(id.value), make_track_view{state} )
+        }.scrollable();
       },
       [&] (album_id id) {
         return vstack {

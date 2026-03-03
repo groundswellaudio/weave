@@ -376,8 +376,8 @@ struct event_context {
   /// Remove all animations for a widget
   void deanimate(widget_ref w);
   
-  vec2f absolute_position() const {
-    vec2f res {0, 0};
+  point absolute_position() const {
+    point res {0, 0};
     for (auto p : parents)
       res += p.position();
     return res;

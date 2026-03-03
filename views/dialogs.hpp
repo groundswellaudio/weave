@@ -177,11 +177,12 @@ void popup_menu::open_child(event_context& ec, int idx) {
   auto& p = ec.parent().as<popup_menu_stack>();
   auto w = *elements[idx].action(ec, this);
   w.set_position({position().x + size().x, position().y + idx * row_size});
-  ec.grab_mouse_focus(this);
   ec.request_repaint();
   has_child = true;
   // careful here : we change the address of this 
   p.push( std::move(w) );
+  // We most likely have the mouse focus, reset it to not cause a memory referencing error
+  ec.grab_mouse_focus(&p);
 }
 
 inline void enter_popup_menu(event_context& ec, popup_menu m) {
