@@ -142,7 +142,7 @@ struct with_nominal_size : V {
   
   rebuild_result rebuild(const with_nominal_size<V>& Old, widget_ref r, const build_context& ctx, auto& state) {
     auto& wb = r.as<widget_t>();
-    V::rebuild(Old, widget_ref{&static_cast<typename V::widget_t&>(wb)}, ctx, state);
+    V::rebuild((V&)Old, widget_ref{&static_cast<typename V::widget_t&>(wb)}, ctx, state);
     if (nominal_size != Old.nominal_size) { 
       wb.nominal_size = nominal_size;
       return rebuild_result::size_change;
@@ -181,6 +181,7 @@ struct animated : V {
 };
 
 template <class V, class B>
+  requires (is_view<V> && is_view<B>)
 struct with_background;
 
 /// Common extensions for views.
@@ -251,6 +252,7 @@ struct view_modifiers {
 };
 
 template <class V, class B>
+  requires (is_view<V> && is_view<B>)
 struct with_background : V {
   
   auto build(const build_context& ctx, auto& state) {

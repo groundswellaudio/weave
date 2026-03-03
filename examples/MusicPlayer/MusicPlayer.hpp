@@ -141,7 +141,7 @@ void on_file_drop(event_context& ec, const std::string& path_str) {
       button{"Cancel", &event_context::pop_this_overlay}    
     }
   }
-  .background(rgb_f(colors::gray) * 0.3)
+  .background_color(rgb_f(colors::gray) * 0.3)
   .align_center()
   .margin({30, 30});
   
@@ -237,7 +237,7 @@ auto track_info_menu(State& state, track_selection selected) {
     with_label{"Artist", ArtistField},
     with_label{"Album", AlbumField}, 
     button{"Close", &event_context::pop_this_overlay}
-  }.background(rgb_f(colors::gray) * 0.3)
+  }.background_color(rgb_f(colors::gray) * 0.3)
   .align_center()
   .margin({40, 40})
   .interspace(10);
@@ -370,13 +370,13 @@ struct LibraryView {
                       .background(views::rectangle{}.stroke(1).color(colors::white));
             return selectable{t, &self.artist, artist_key{std::string_view{a.name}}};
           }}
-        }.interspace(0);
+        }.interspace(0).scrollable();
         auto artist_view = [&state] (artist_key current) {
           return vstack{
             text{current.value}.font_size(30),
             for_each( state.database.artist_albums(current.value),
                       make_album_view{state} )
-          };
+          }.with_nominal_size({300, 300});
         };
         
         auto right = either{self.artist, artist_view, [] () { return vstack{}; }};
@@ -431,7 +431,7 @@ auto make_view(State& state)
                   library_view{}, 
                }.align_center()
                 .margin({10, 10})
-                .background( rgb_f(colors::gray) * 0.4 )
+                .background_color( rgb_f(colors::gray) * 0.4 )
                 .fill_cross_axis(); 
 }
 

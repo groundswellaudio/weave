@@ -121,7 +121,7 @@ template <class T>
 concept is_child_event_listener = requires (T obj, mouse_event e, widget_ref r, 
                                             event_context& ec)
 {
-  obj.on_child_event(e, ec, r);
+  obj.on_child_event(e, r, ec);
 };
 
 template <class T>
@@ -427,10 +427,10 @@ namespace impl {
       return + [] (widget_base* self, input_event e, event_context& ec, widget_ref child) {
         auto& Obj = *static_cast<W*>(self);
         if (e.index() == 0)
-          Obj.on_child_event(get<0>(e), ec, child);
-        else if constexpr ( requires { Obj.on_child_event(get<1>(e), ec, child); } ) {
+          Obj.on_child_event(get<0>(e), child, ec);
+        else if constexpr ( requires { Obj.on_child_event(get<1>(e), child, ec); } ) {
           if (e.index() == 1)
-            Obj.on_child_event(get<1>(e), ec, child);
+            Obj.on_child_event(get<1>(e), child, ec);
         }
       };
     else

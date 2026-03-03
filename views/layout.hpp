@@ -2,6 +2,7 @@
 
 #include "views_core.hpp"
 #include "scrollable.hpp"
+#include "modifiers.hpp"
 #include "../util/tuple.hpp"
 #include "../util/util.hpp"
 #include <span>
@@ -35,27 +36,27 @@ struct stack
   
   auto&& margin(this auto&& self, vec2f margin) {
     self.info.margin = margin;
-    return self;
+    return WEAVE_FWD(self);
   }
   
   auto&& align(this auto&& self, float ratio) {
     self.info.align_ratio = ratio;
-    return self;
+    return WEAVE_FWD(self);
   }
   
   auto&& align_center(this auto&& self) {
     self.info.align_ratio = 0.5;
-    return self;
+    return WEAVE_FWD(self);
   }
   
-  auto&& background(this auto&& self, rgba_u8 col) {
+  auto&& background_color(this auto&& self, rgba_u8 col) {
     self.info.background_col = col;
-    return self;
+    return WEAVE_FWD(self);
   }
   
   auto&& fill_cross_axis(this auto&& self) {
     self.info.fill_cross_axis = true;
-    return self;
+    return WEAVE_FWD(self);
   }
   
   tuple<Ts...> children;
@@ -390,28 +391,60 @@ namespace impl {
 namespace widgets {
 
 template <int Axis>
-struct stack : widget_base
+struct stack : widget_base, scrollable_base
 {
   stack_data data;
   std::vector<widget_box> children_vec;
   
+  float scroll_offset = 0, total_height = 0;
+  // if scrollable
+  optional<float> min_scroll_axis;
+  
   stack(stack_data d) : data{d} {}
+  
+  rectangle scroll_zone() const {
+    return {{0, 0}, size()};
+  }
+  
+  float scroll_size() const {
+    return total_height; 
+  }
+  
+  void displace_scroll(float delta) {
+    for (auto& c : children_vec) {
+      auto p = c.position();
+      p[Axis] -= delta;
+      c.set_position(p);
+    }
+    scroll_offset += delta;
+  }
+  
+  void on(mouse_event e, event_context& ec) {
+    if (min_scroll_axis)
+      scrollable_base::on(e, ec);
+  }
+  
+  void on_child_event(mouse_event e, widget_ref r, event_context& ec) {
+    if (min_scroll_axis)
+      scrollable_base::on_child_event(e, r, ec);
+  }
   
   void paint(painter& p) {
     p.fill_style(data.background_col);
     p.fill(rectangle(size()));
+    if (min_scroll_axis)
+      scrollable_base::paint(p);
     // p.stroke_style(colors::green);
     //  p.stroke(rectangle(size()));
   }
   
   auto size_info() const {
     widget_size_info res;
-    point min {0, 0}, max{0, 0}, nominal_size{0, 0};
     
     res.flex_factor = point{0, 0};
     
     if (!children_vec.size()) {
-      return widget_size_info{min, max, nominal_size};
+      return res;
     }
     
     for (auto& e : children_vec) {
@@ -430,23 +463,44 @@ struct stack : widget_base
     
     res.min[Axis] += (children_vec.size() - 1) * data.interspace;
     res.max[Axis] += (children_vec.size() - 1) * data.interspace;
-    min += data.margin * 2.f;
-    max += data.margin * 2.f;
+    res.min += data.margin * 2.f;
+    res.max += data.margin * 2.f;
     res.nominal[Axis] += data.margin[Axis] * 2.f + (children_vec.size() - 1) * data.interspace;
     res.nominal[1 - Axis] += data.margin[1 - Axis] * 2.f;
     // Average the flex factor cross axis
     res.flex_factor[1 - Axis] /= children_vec.size();
+    
+    if (min_scroll_axis) {
+      res.min[Axis] = *min_scroll_axis;
+      res.flex_factor[Axis] = 1;
+      res.min[1 - Axis] += scrollable_base::bar_width;
+      res.nominal[1 - Axis] += scrollable_base::bar_width;
+      res.max[1 - Axis] += scrollable_base::bar_width;
+    }
+    
     return res;
   }
-  
-  void on(ignore, ignore) {}
   
   bool traverse_children(auto&& fn) {
     return std::all_of(children_vec.begin(), children_vec.end(), fn);
   }
   
   auto layout(point sz) {
+    if (min_scroll_axis)
+      sz[1 - Axis] -= scrollable_base::bar_width;
     impl::stack_layout(children_vec, data, Axis, sz);
+    if (children_vec.size()) {
+      auto& w = children_vec.back();
+      total_height = w.position()[Axis] + w.size()[Axis];
+    }
+    if (min_scroll_axis)
+    {
+      for (auto& c : children_vec) {
+        auto p = c.position();
+        p[Axis] -= scroll_offset;
+        c.set_position(p);
+      }
+    }
     return sz;
   }
 };
@@ -562,29 +616,40 @@ namespace views
 template <class T, class... Ts>
 struct stack_base : view<stack_base<T, Ts...>>, stack<Ts...> {
   
+  optional<float> min_scroll_sz;
+  
   template <class... Vs>
   constexpr stack_base(Vs&&... ts) : stack<Ts...>{ {(Vs&&)(ts)...} } {} 
   
-  stack_base(stack_base&& o) : stack<Ts...>{std::move(o)} {}
+  stack_base(stack_base&& o) = default;
   stack_base(const stack_base&) = default;
   
   template <class S>
   auto build(const build_context& ctx, S& state) 
   {
     auto Res = impl::build_stack<T>(*this, ctx, state, this->info);
+    Res.min_scroll_axis = min_scroll_sz;
     return Res;
   }
   
   template <class S>
   rebuild_result rebuild(stack_base<T, Ts...>& Old, widget_ref wb, const build_context& ctx, S& state) {
+    auto& wl = wb.as<T>();
+    wl.min_scroll_axis = min_scroll_sz;
     return impl::rebuild_stack<T>(*this, Old, wb, ctx, state);
+  }
+  
+  auto&& scrollable(this auto&& self, float min_scroll_size = 300) {
+      self.min_scroll_sz = min_scroll_size;
+      return self;
   }
 };
 
 template <class... Ts>
   requires (is_view_sequence<Ts> && ...)
-struct vstack : stack_base<widgets::stack<1>, Ts...>
+struct vstack : stack_base<widgets::stack<1>, Ts...>, view_modifiers
 { 
+  using widget_t = widgets::stack<1>;
   template <class... Vs>
     requires (std::constructible_from<Ts, Vs&&> && ...)
   vstack(Vs&&... ts) : stack_base<widgets::vstack, Ts...>{(Vs&&)ts...} {}
@@ -599,8 +664,9 @@ vstack(Ts...) -> vstack<Ts...>;
 
 template <class... Ts>
   requires (is_view_sequence<Ts> && ...)
-struct hstack : stack_base<widgets::stack<0>, Ts...>
+struct hstack : stack_base<widgets::stack<0>, Ts...>, view_modifiers
 { 
+  using widget_t = widgets::stack<0>;
   template <class... Vs>
     requires (std::constructible_from<Ts, Vs&&> && ...)
   hstack(Vs&&... ts) : stack_base<widgets::hstack, Ts...>{(Vs&&)ts...} {}

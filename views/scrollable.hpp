@@ -37,7 +37,7 @@ struct scrollable_base {
   
   bool on(this auto& self, mouse_event e, event_context& ec) {
     if (e.is_scroll()) 
-      return (self.scrollbar_move(e.scroll_delta().y, ec), true);
+      return (self.scrollbar_move(-e.scroll_delta().y, ec), true);
     else if (e.is_drag() && self.is_dragging) 
       return (self.scrollbar_move(e.drag_delta().y, ec), true);
     else if (self.scrollbar_rect().contains(e.position) && e.is_down())
@@ -46,9 +46,9 @@ struct scrollable_base {
     return false;
   }
   
-  void on_child_event(this auto& self, mouse_event e, event_context& ec) {
+  void on_child_event(this auto& self, mouse_event e, widget_ref, event_context& ec) {
     if (e.is_scroll())
-      self.scrollbar_move(e.scroll_delta(), ec);
+      self.scrollbar_move(-e.scroll_delta().y, ec);
   }
   
   void paint(this auto& self, painter& p) {
