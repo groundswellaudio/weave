@@ -115,7 +115,7 @@ struct image : view<image<ImgT, Proj>>, view_modifiers {
       if (!img->empty())
         w.texture = make_texture(up.graphics_context());
     }
-    else if (version != img.version()) {
+    else if (img.get().data() != old.img.get().data() || version != img.version()) {
       debug_log("refreshing image");
       auto& gctx = up.graphics_context();
       gctx.delete_texture(*w.texture);
@@ -132,7 +132,6 @@ struct image : view<image<ImgT, Proj>>, view_modifiers {
     if (w.size() == new_size)
       return {};
     w.max_size = new_size;
-    w.set_size(new_size);
     return rebuild_result::size_change;
   }
   

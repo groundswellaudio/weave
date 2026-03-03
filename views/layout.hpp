@@ -378,6 +378,10 @@ namespace impl {
       w.children_vec.erase(it, w.children_vec.end());
     }
     
+    // If some underlying items were deleted or added, reset the scrollbar position
+    if (seq_updater.mutated)
+      w.reset_scrollbar();
+      
     if (seq_updater.mutated || (res & rebuild_result::size_change)) {
       w.do_layout(w.size());
       return {};
@@ -485,7 +489,7 @@ struct stack : widget_base, scrollable_base
     return std::all_of(children_vec.begin(), children_vec.end(), fn);
   }
   
-  auto layout(point sz) {
+  void layout(point sz) {
     if (min_scroll_axis)
       sz[1 - Axis] -= scrollable_base::bar_width;
     impl::stack_layout(children_vec, data, Axis, sz);
@@ -501,7 +505,6 @@ struct stack : widget_base, scrollable_base
         c.set_position(p);
       }
     }
-    return sz;
   }
 };
 
@@ -640,8 +643,8 @@ struct stack_base : view<stack_base<T, Ts...>>, stack<Ts...> {
   }
   
   auto&& scrollable(this auto&& self, float min_scroll_size = 300) {
-      self.min_scroll_sz = min_scroll_size;
-      return self;
+    self.min_scroll_sz = min_scroll_size;
+    return self;
   }
 };
 

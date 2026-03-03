@@ -290,7 +290,7 @@ struct make_album_view {
                      text{"{}", t.title()}.align_right() };
     };
     return vstack {
-      text{a.title()}.font_size(20),
+      hstack{ views::image{a.cover}.fit({150, 150}), text{a.title()}.font_size(20) }.align_center(),
       for_each(state.database.album_tracks(a), track_view)
     };
   }
@@ -370,13 +370,13 @@ struct LibraryView {
                       .background(views::rectangle{}.stroke(1).color(colors::white));
             return selectable{t, &self.artist, artist_key{std::string_view{a.name}}};
           }}
-        }.interspace(0).scrollable();
+        }.interspace(0).scrollable().with_nominal_size({100, 300});
         auto artist_view = [&state] (artist_key current) {
           return vstack{
             text{current.value}.font_size(30),
             for_each( state.database.artist_albums(current.value),
                       make_album_view{state} )
-          }.with_nominal_size({300, 300});
+          }.with_nominal_size({300, 300}).scrollable();
         };
         
         auto right = either{self.artist, artist_view, [] () { return vstack{}; }};

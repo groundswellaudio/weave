@@ -58,6 +58,11 @@ struct scrollable_base {
       p.fill(rounded_rectangle(r));
   }
   
+  void reset_scrollbar(this auto& self) {
+    self.displace_scroll(-self.scrollbar_pos * self.scroll_size() / self.scroll_zone().size.y);
+    self.scrollbar_pos = 0;
+  }
+  
   private : 
   
   float scrollbar_pos = 0;
