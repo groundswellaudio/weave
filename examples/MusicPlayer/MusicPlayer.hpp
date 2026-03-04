@@ -388,7 +388,7 @@ struct LibraryView {
                       .background(views::rectangle{}.stroke(1).color(colors::white));
             return selectable{t, &self.artist, artist_key{std::string_view{a.name}}};
           }}
-        }.interspace(0).scrollable().with_nominal_size({100, 300});
+        }.interspace(0).scrollable().with_nominal_size({200, 300});
         auto artist_view = [&state] (artist_key current) {
           return vstack{
             text{current.value}.font_size(30),
@@ -423,11 +423,7 @@ struct LibraryView {
         }.scrollable();
       },
       [&] (album_id id) {
-        return vstack {
-          views::image{state.database.album(id.artist, id.title).cover}.fit({600, 600}),
-          text{id.title}//,
-          //table{state.database.album_tracks(id.value)}.on_cell_double_click(&State::play_track)
-        };
+        return make_album_view{state}(state.database.album(id.artist, id.title)).scrollable();
       }
     };
     

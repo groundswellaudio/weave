@@ -332,7 +332,7 @@ namespace weave::views
     
     template <class S>
     auto build(const build_context& b, S& state) {
-      widget_t res {{size_v}, paint_fn, {}, val};
+      widget_t res {{}, paint_fn, {}, val};
       res.write = [w = write_fn] (event_context& ec, bool v) -> bool {
         return context_invoke<S>(w, ec, v);
       };
@@ -340,19 +340,18 @@ namespace weave::views
       return res;
     }
     
-    rebuild_result rebuild(auto& Old, widget_ref w, ignore, ignore) {
+    template <class S>
+    rebuild_result rebuild(auto& Old, widget_ref w, ignore, S& state) {
       auto& wb = w.as<widget_t>();
+      wb.write = [w = write_fn] (event_context& ec, bool v) -> bool {
+        return context_invoke<S>(w, ec, v);
+      };
+      res.paint_fn = paint_fn;
       wb.flag = val;
       return {};
     }
     
-    auto& size(point sz) {
-      size_v = sz;
-      return *this;
-    }
-    
     bool val;
-    point size_v = {20, 20};
     PaintFn paint_fn;
     WriteFn write_fn;
   };

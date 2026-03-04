@@ -243,7 +243,7 @@ struct Database {
     auto it = artists.find(artist);
     assert( it != artists.end() && "artist not found?" );
     return std::views::transform(it->albums, 
-                                [artist, this] (auto& album) -> auto& {
+                                [artist = std::string_view{it->name}, this] (auto& album) -> auto& {
                                   auto it = albums.find(tuple{artist, std::string_view{album}});
                                   assert( it != albums.end() && "album not found?" );
                                   return *it;
