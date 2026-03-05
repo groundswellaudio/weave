@@ -241,17 +241,6 @@ auto track_info_menu(State& state, track_selection selected) {
   .align_center()
   .margin({40, 40})
   .interspace(10);
-  /* 
-  return vstack {
-    for_each( Database::track_properties(), [id, k = 0, selected] (auto key) mutable {
-      auto setter = [id, key, selected] (auto& s, auto&& str) {
-        traverse( selected, [&] (auto id) {
-          s.set_track_property(id, key, str);
-        });
-      };
-      return with_label{key.name(), text_field{p.value, setter}};
-    });
-  }; */ 
 }
 
 auto song_table_popup_menu(event_context& ec, track_selection selected) {
@@ -423,7 +412,8 @@ struct LibraryView {
         }.scrollable();
       },
       [&] (album_id id) {
-        return make_album_view{state}(state.database.album(id.artist, id.title)).scrollable();
+        return make_album_view{state}(state.database.album(id.artist, id.title))
+               .scrollable().with_nominal_size({300, 300});
       }
     };
     

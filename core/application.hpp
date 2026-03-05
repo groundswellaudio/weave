@@ -99,7 +99,7 @@ namespace impl {
       
       // Note : In a lot of cases we don't have to recompute the position entirely from the root
       // but it's good to recompute it once in a while
-      vec2f absolute_pos = {0, 0};
+      point absolute_pos = {0, 0};
       for (auto p : parents)
         absolute_pos += p.position();
       absolute_pos += w.position();
@@ -350,6 +350,10 @@ struct application_context {
   
   bool has_keyboard_focus(widget_ref r) const {
     return keyboard.focused == r; 
+  }
+  
+  bool has_mouse_focus(widget_ref r) const {
+    return mouse.current_focus() == r;
   }
   
   void reset_mouse_focus() {

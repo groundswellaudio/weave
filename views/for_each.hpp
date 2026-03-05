@@ -46,6 +46,11 @@ struct for_each : view_sequence_base {
     return res;
   }
   
+  void seq_destroy(auto&& Get, application_context& ctx) {
+    for (auto& e : elements)
+      e.seq_destroy(Get, ctx);
+  }
+  
   Range range;
   ViewCtor view_ctor;
   std::vector<element> elements;

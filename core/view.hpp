@@ -76,7 +76,7 @@ struct view : view_sequence_base, view_base {
     return self.rebuild(old, seq_updater.next(), ctx, state);
   }
   
-  void seq_destroy(this auto& self, auto GetForDestroy, application_context& ctx) {
+  void seq_destroy(this auto& self, auto&& GetForDestroy, application_context& ctx) {
     self.destroy( GetForDestroy(), ctx );
   }
   

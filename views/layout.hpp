@@ -363,6 +363,8 @@ namespace impl {
       res |= elem.seq_rebuild(get<elem_index.value>(Old.children), seq_updater, ctx, state);
     }, New.children);
     
+    // FIXME : we're not calling .destroy on the views! (implementing this is actually a bit tricky)
+    
     // Remove every elements at the (sorted) indexes in to_erase
     if (seq_updater.to_erase.size())
     {
@@ -643,6 +645,16 @@ struct stack_base : view<stack_base<T, Ts...>>, stack<Ts...> {
     return impl::rebuild_stack<T>(*this, Old, wb, ctx, state);
   }
   
+  void destroy(widget_ref w, application_context& ctx) {
+    auto& wb = w.as<T>();
+    auto lift_destroy = [it = wb.children_vec.begin()] mutable {
+      return (it++)->borrow();
+    };
+    tuple_for_each( [&] (auto& elem) {
+      elem.seq_destroy(lift_destroy, ctx);
+    }, this->children );
+  }
+  
   auto&& scrollable(this auto&& self, float min_scroll_size = 300) {
     self.min_scroll_sz = min_scroll_size;
     return self;
@@ -701,6 +713,16 @@ struct flow : view<flow<Ts...>> {
     auto& f = w.as<widgets::flow>();
     f.rounded_radius = rounded_radius;
     return impl::rebuild_stack<widgets::flow>(*this, Old, w, ctx, state);
+  }
+  
+  void destroy(widget_ref r, application_context& ctx) {
+    auto& wb = r.as<widgets::flow>();
+    auto lift_destroy = [it = wb.children_vec.begin()] mutable {
+      return (it++)->borrow();
+    };
+    tuple_for_each( [&] (auto& elem) {
+      elem.seq_destroy(lift_destroy, ctx);
+    }, children );
   }
   
   auto& rounded(float val) {

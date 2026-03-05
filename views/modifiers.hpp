@@ -108,6 +108,14 @@ struct event_listener : V {
     return V::rebuild(old, widget_ref{&r.as<widget_t>().base()}, ctx, state);
   }
   
+  // a widget with a on_click action might trigger a rebuild that delete itself, 
+  // thus we have to potentially reset the mouse focus
+  void destroy(widget_ref r, application_context& ctx) {
+    if (ctx.has_mouse_focus(r))
+      ctx.reset_mouse_focus();
+    V::destroy(widget_ref(&r.as<widget_t>().base()), ctx);
+  }
+  
   Filter filter;
   Action action;
 };
@@ -161,6 +169,10 @@ struct with_nominal_size : V {
     }
     return {};
   }
+  
+  void destroy(widget_ref w, application_context& ctx) {
+    V::destroy(widget_ref(&(typename V::widget_t&)w.as<widget_t>()), ctx);
+  }
    
   point nominal_size;
 };
@@ -185,6 +197,7 @@ struct animated : V {
   void destroy(widget_ref r, application_context& ctx) {
     if (flag)
       ctx.deanimate(r);
+    V::destroy(widget_ref((typename V::widget_t*)&r.as<widget_t>()), ctx);
   }
   
   bool flag; 
@@ -213,6 +226,10 @@ struct with_flex_factor : V {
       return rebuild_result::size_change;
     }
     return {};
+  }
+  
+  void destroy(widget_ref r, application_context& ctx) {
+    V::destroy(widget_ref((typename V::widget_t*)&r.as<widget_t>()), ctx);
   }
   
   point flex_factor;
@@ -293,19 +310,23 @@ template <class V, class B>
   requires (is_view<V> && is_view<B>)
 struct with_background : V {
   
+  using widget_t = widgets::with_background<typename V::widget_t, typename B::widget_t>;
+
   auto build(const build_context& ctx, auto& state) {
     return widgets::with_background{V::build(ctx, state), background.build(ctx, state)};
   }
   
   rebuild_result rebuild (const with_background<V, B>& Old, widget_ref w, 
                           const build_context& ctx, auto& state) {
-    
-    using widget_t = decltype(widgets::with_background{V::build(ctx, state),
-                                                        background.build(ctx, state)});
     using foreground = decltype(V::build(ctx, state));
     auto res = V::rebuild((V&)Old, widget_ref(&(foreground&)w.as<widget_t>()), ctx, state);
     res |=  background.rebuild(Old.background, widget_ref{&w.as<widget_t>().background}, ctx, state);
     return res;
+  }
+  
+  void destroy(widget_ref r, application_context& ctx) {
+    V::destroy(widget_ref((typename V::widget_t*)&r.as<widget_t>()), ctx);
+    background.destroy(widget_ref(&r.as<widget_t>().background), ctx);
   }
   
   B background;

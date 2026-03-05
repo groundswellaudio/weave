@@ -175,6 +175,11 @@ struct toggle_button : view<toggle_button<Lens>>, view_modifiers {
     return {};
   }
   
+  void destroy(widget_ref r, application_context& ctx) {
+      if (ctx.has_mouse_focus(r))
+        ctx.reset_mouse_focus();
+    }
+  
   Lens lens;
   button_properties properties;
 };
@@ -230,6 +235,11 @@ struct button : view<button<Fn>>, view_modifiers {
     disabled = flag;
     return *this;
   }
+  
+  void destroy(widget_ref r, application_context& ctx) {
+      if (ctx.has_mouse_focus(r))
+        ctx.reset_mouse_focus();
+    }
   
   private : 
   
@@ -346,9 +356,14 @@ namespace weave::views
       wb.write = [w = write_fn] (event_context& ec, bool v) -> bool {
         return context_invoke<S>(w, ec, v);
       };
-      res.paint_fn = paint_fn;
+      wb.paint_fn = paint_fn;
       wb.flag = val;
       return {};
+    }
+    
+    void destroy(widget_ref r, application_context& ctx) {
+      if (ctx.has_mouse_focus(r))
+        ctx.reset_mouse_focus();
     }
     
     bool val;
@@ -366,7 +381,7 @@ namespace weave::views
     
     template <class S>
     auto build(const build_context& b, S& state) {
-      widget_t res {{size_v}, paint_fn, {}};
+      widget_t res {{}, paint_fn, {}};
       res.on_click = action<S>();
       return res;
     }
@@ -378,9 +393,9 @@ namespace weave::views
       return {};
     }
     
-    auto& size(vec2f sz) {
-      size_v = sz;
-      return *this;
+    void destroy(widget_ref r, application_context& ctx) {
+      if (ctx.has_mouse_focus(r))
+        ctx.reset_mouse_focus();
     }
     
     private : 
@@ -391,8 +406,6 @@ namespace weave::views
         context_invoke<S>(w, ec);
       };
     }
-    
-    point size_v = {20, 20};
     PaintFn paint_fn;
     Payload payload;
   };

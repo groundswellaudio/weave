@@ -44,6 +44,8 @@ namespace weave::views {
   
   struct rectangle : view<rectangle>, view_modifiers {
     
+    using widget_t = widgets::rectangle;
+    
     auto build(ignore, ignore) {
       auto res = widgets::rectangle{};
       res.nominal_size = point{100, 30};
