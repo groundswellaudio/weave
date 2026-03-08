@@ -2,6 +2,8 @@
 
 #include "../util/vec.hpp"
 #include "../util/variant.hpp"
+#include "../geometry/geometry.hpp"
+
 #include <string>
 
 namespace weave {
@@ -29,13 +31,13 @@ struct mouse_up {
 };
 
 struct mouse_move {
-  vec2f delta;
+  point delta;
   bool is_dragging;
   mouse_button button;
 };
 
 struct mouse_scroll {
-  vec2f delta;
+  point delta;
 };
 
 struct file_drop {
@@ -43,7 +45,7 @@ struct file_drop {
 };
 
 struct mouse_event {
-  vec2f position;
+  point position;
   variant<mouse_enter, mouse_exit, mouse_down, mouse_up, mouse_move, mouse_scroll, file_drop> event; 
   
   template <class T>
@@ -53,7 +55,7 @@ struct mouse_event {
   auto& get_as(this auto&& self) { return get<T>(self.event); }
   
   bool is_double_click() const { return is_down() && get_as<mouse_down>().double_click; }
-  vec2f scroll_delta() const { return get_as<mouse_scroll>().delta; }
+  point scroll_delta() const { return get_as<mouse_scroll>().delta; }
   bool is_scroll() const { return is<mouse_scroll>(); }
   bool is_enter() const { return is<mouse_enter>(); }
   bool is_exit() const { return is<mouse_exit>(); }

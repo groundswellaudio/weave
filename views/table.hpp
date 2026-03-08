@@ -177,7 +177,7 @@ struct table : widget_base, scrollable_base {
       dragging = -1;
   }
   
-  bool traverse_children(auto fn) {
+  bool traverse_children(auto&& fn) {
     return edited_field ? fn(*edited_field) : true;
   }
   
@@ -238,7 +238,7 @@ struct table : widget_base, scrollable_base {
       cell_double_click(Ec, cells[row].index);
       return;
     }
-    bool select_range = Ec.context().is_active(key_modifier::shift);
+    bool select_range = Ec.is_held(key_modifier::shift);
     if (select_range && selection.size()) {
       auto i = selection.front();
       selection.erase(selection.begin() + 1, selection.end());

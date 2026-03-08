@@ -344,7 +344,7 @@ namespace impl {
   }
   
   template <class T, class V, class S>
-  rebuild_result rebuild_stack(V& New, V& Old, widget_ref wb, const build_context& ctx, S& state) {
+  rebuild_result rebuild_stack(V& New, auto& Old, widget_ref wb, const build_context& ctx, S& state) {
     auto& w = wb.as<T>();
     int index = 0;
     
@@ -639,7 +639,7 @@ struct stack_base : view<stack_base<T, Ts...>>, stack<Ts...> {
   }
   
   template <class S>
-  rebuild_result rebuild(stack_base<T, Ts...>& Old, widget_ref wb, const build_context& ctx, S& state) {
+  rebuild_result rebuild(auto& Old, widget_ref wb, const build_context& ctx, S& state) {
     auto& wl = wb.as<T>();
     wl.min_scroll_axis = min_scroll_sz;
     return impl::rebuild_stack<T>(*this, Old, wb, ctx, state);

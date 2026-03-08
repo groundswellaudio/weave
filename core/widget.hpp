@@ -406,6 +406,8 @@ struct event_context {
     return Res;
   }
   
+  bool is_held(key_modifier mod) const; 
+  
   /* 
   template <class S, class View>
   auto build_view(View&& v) {

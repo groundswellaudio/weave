@@ -360,7 +360,7 @@ struct application_context {
     mouse.reset_focus(root.borrow());
   }
   
-  bool is_active(key_modifier mod) const {
+  bool is_held(key_modifier mod) const {
     return backend.is_active(mod);
   }
   
@@ -554,6 +554,10 @@ void event_context::push_overlay_relative(widget_box widget) {
 
 graphics_context& event_context::graphics_context() const {
   return ctx.graphics_context();
+}
+
+bool event_context::is_held(key_modifier mod) const {
+  return ctx.is_held(mod);
 }
 
 graphics_context& build_context::graphics_context() const { 

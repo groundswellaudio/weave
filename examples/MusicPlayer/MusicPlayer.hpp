@@ -269,14 +269,34 @@ auto song_table_popup_menu(event_context& ec, track_selection selected) {
   return menu;
 }
 
+struct songs_t { bool operator==(const songs_t&) const = default;};
+struct artists_t { bool operator==(const artists_t&) const = default; };
+struct albums_t { bool operator==(const albums_t&) const = default;};
+struct artist_id { int value; bool operator==(const artist_id&) const = default; };
+struct playlist_id { int value; bool operator==(const playlist_id& p) const = default;};
+struct album_id { std::string_view artist, title; bool operator==(const album_id&) const = default; };
+
+// The artist name strings are uniqued
+struct artist_key {
+  bool operator==(const artist_key& o) const { return value.data() == o.value.data(); }
+  std::string_view value;
+};
+  
+struct CenterViewState {
+  variant<songs_t, artists_t, albums_t, playlist_id, album_id> selection;
+  optional<artist_key> artist;
+  std::set<unsigned> song_selection;
+};
+
 struct make_track_view {
   State& state;
-  int p = 0;
+  CenterViewState& view_state;
+  int p = 1;
   
   auto operator()(tuple<const Database::Track&, int> TrackAndId) {
     using namespace weave::views;
     auto [t, tid] = TrackAndId;
-    return hstack{ text{"{} - ", p++}.with_flex_factor({0,0}), 
+    auto r = hstack{ text{"{} - ", (int)p}.with_flex_factor({0,0}), 
                      graphic_toggle_button{&paint_play_button, 
                                            state.is_playing() && state.current_track_id == tid, 
                                            [id = tid] (State& state, bool Val) { 
@@ -288,45 +308,30 @@ struct make_track_view {
                                           }}
                                           .with_fixed_size({11, 11}),
                      text{t.title()}.align_right() }.align_center();
+    return multi_selectable{r, &view_state.song_selection, p++};
   }
   
  };
 
 struct make_album_view {
-  State& state; 
+  State& state;
+  CenterViewState& view_state;
+  
   auto operator()(const Database::Album& a) {
     using namespace weave::views;
     return vstack {
       hstack{ views::image{a.cover}.fit({150, 150}), text{a.title()}.font_size(20) }.align_center(),
-      for_each(state.database.album_tracks(a), make_track_view{state})
+      for_each(state.database.album_tracks(a), make_track_view{state, view_state})
     };
   }
 };
 
 struct LibraryView {
   
-  struct songs_t { bool operator==(const songs_t&) const = default;};
-  struct artists_t { bool operator==(const artists_t&) const = default; };
-  struct albums_t { bool operator==(const albums_t&) const = default;};
-  struct artist_id { int value; bool operator==(const artist_id&) const = default; };
-  struct playlist_id { int value; bool operator==(const playlist_id& p) const = default;};
-  struct album_id { std::string_view artist, title; bool operator==(const album_id&) const = default; };
-  
-  // The artist name strings are uniqued
-  struct artist_key {
-    bool operator==(const artist_key& o) const { return value.data() == o.value.data(); }
-    std::string_view value;
-  };
-  
-  struct ViewState {
-    variant<songs_t, artists_t, albums_t, playlist_id, album_id> selection;
-    optional<artist_key> artist;
-  };
-  
-  using view_state = ViewState;
+  using view_state = CenterViewState;
   
   auto init_state() {
-    return ViewState{songs_t{}};
+    return view_state{songs_t{}};
   }
   
   auto left_panel(State& state, view_state& self) {
@@ -378,11 +383,11 @@ struct LibraryView {
             return selectable{t, &self.artist, artist_key{std::string_view{a.name}}};
           }}
         }.interspace(0).scrollable().with_nominal_size({200, 300});
-        auto artist_view = [&state] (artist_key current) {
+        auto artist_view = [&] (artist_key current) {
           return vstack{
             text{current.value}.font_size(30),
             for_each( state.database.artist_albums(current.value),
-                      make_album_view{state} )
+                      make_album_view{state, self} )
           }.with_nominal_size({300, 300}).scrollable();
         };
         
@@ -408,11 +413,11 @@ struct LibraryView {
         return vstack {
           text_field{ [id] (State& s, std::string_view str) { s.set_playlist_name(id.value, str); } }
           .set_value(state.database.playlist(id.value).name).font_size(30),
-          for_each( state.database.playlist_tracks(id.value), make_track_view{state} )
+          for_each( state.database.playlist_tracks(id.value), make_track_view{state, self} )
         }.scrollable();
       },
       [&] (album_id id) {
-        return make_album_view{state}(state.database.album(id.artist, id.title))
+        return make_album_view{state, self}(state.database.album(id.artist, id.title))
                .scrollable().with_nominal_size({300, 300});
       }
     };

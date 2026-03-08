@@ -70,7 +70,7 @@ struct view : view_sequence_base, view_base {
   }
   
   template <class O>
-  rebuild_result seq_rebuild(this O& self, O& old, auto&& seq_updater, 
+  rebuild_result seq_rebuild(this O& self, auto& old, auto&& seq_updater, 
                    const build_context& ctx, auto& state) 
   {
     return self.rebuild(old, seq_updater.next(), ctx, state);
