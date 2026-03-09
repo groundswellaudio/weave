@@ -1,6 +1,7 @@
 #pragma once
 
 #include "views_core.hpp"
+#include "modifiers.hpp"
 #include <functional>
 #include <concepts>
 
@@ -143,7 +144,7 @@ struct multi_selectable : W {
 namespace weave::views {
 
 template <class V, class S, class Id>
-struct selectable : view<selectable<V, S, Id>> {
+struct selectable : view<selectable<V, S, Id>>, view_modifiers {
   
   using widget_t = widgets::selectable<typename V::widget_t>;
   
@@ -176,7 +177,7 @@ struct selectable : view<selectable<V, S, Id>> {
 };
 
 template <class V, class S, class Id>
-struct multi_selectable : view<multi_selectable<V, S, Id>> {
+struct multi_selectable : view<multi_selectable<V, S, Id>>, view_modifiers {
   
   using widget_t = widgets::multi_selectable<typename V::widget_t>;
   

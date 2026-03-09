@@ -470,14 +470,20 @@ event_result mouse_event_dispatcher::on(mouse_event e, void* state, application_
   auto ec = event_context{ctx, res, parents, state};
   e.position -= focused_absolute_pos;
   focused.on(e, ec);
-  
+
   if (top_parent_listener) {
     e.position += focused.position();
-    for (auto p : std::ranges::views::reverse(parents)) 
+    auto parents_tmp = parents; // copy the vector to avoid the potential mutation in old_child_event. this is dirty and temporary code until the ID system is implemented
+    auto focused_tmp = focused;
+    auto top_parent_listener_tmp = top_parent_listener;
+    auto it = --parents_tmp.end();
+    for (auto p : std::ranges::views::reverse(parents_tmp)) 
     {
-      p.on_child_event(e, ec, focused);
+      event_context parent_ec{ec};
+      parent_ec.parents = std::vector<widget_ref>{parents_tmp.begin(), it};
+      p.on_child_event(e, parent_ec, focused_tmp);
       e.position += p.position();
-      if (top_parent_listener == p)
+      if (top_parent_listener_tmp == p)
         break;
     }
   }

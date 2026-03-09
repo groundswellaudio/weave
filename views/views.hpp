@@ -10,7 +10,7 @@
 #include "scrollable.hpp"
 #include "fields.hpp"
 #include "combo_box.hpp"
-#include "dialogs.hpp"
+#include "popup_menu.hpp"
 #include "image.hpp"
 #include "progress.hpp"
 #include "table.hpp"

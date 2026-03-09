@@ -3,6 +3,9 @@
 #include "weave.hpp"
 #include "Model.hpp"
 
+#include <ranges>
+#include <algorithm>
+
 using namespace weave;
 
 struct transport_bar_widget : widget_base {
@@ -243,7 +246,7 @@ auto track_info_menu(State& state, track_selection selected) {
   .interspace(10);
 }
 
-auto song_table_popup_menu(event_context& ec, track_selection selected) {
+auto song_selection_popup_menu(event_context& ec, track_selection selected) {
   widgets::popup_menu menu;
   auto info = [selected] (event_context& ec) {
     auto& s = ec.state<State>();
@@ -288,27 +291,54 @@ struct CenterViewState {
   std::set<unsigned> song_selection;
 };
 
+template <class R, class A, class B>
+auto filter_from_ascending_indices(A&& range, B&& indices) -> R {
+  // A filter + to<std::vector> doesn't work for this because the mutable closure will be 
+  // evaluated several times
+  R res;
+  res.reserve(indices.size());
+  auto i = 0;
+  auto idx_it = indices.begin();
+  for (auto&& e : range) {
+    if (idx_it == indices.end())
+      return res;
+    if (i++ == *idx_it) {
+      ++idx_it;
+      res.push_back(e);
+    }
+  }
+  return res;
+}
+
+template <class TrackRange>
 struct make_track_view {
   State& state;
   CenterViewState& view_state;
+  TrackRange track_range;
   int p = 1;
   
   auto operator()(tuple<const Database::Track&, int> TrackAndId) {
     using namespace weave::views;
     auto [t, tid] = TrackAndId;
+    auto play_track = [id = tid] (State& state, bool Val) { 
+      if (Val)
+        state.play_track(id);
+      else
+        state.set_play(false); 
+      return Val;
+    };
     auto r = hstack{ text{"{} - ", (int)p}.with_flex_factor({0,0}), 
                      graphic_toggle_button{&paint_play_button, 
                                            state.is_playing() && state.current_track_id == tid, 
-                                           [id = tid] (State& state, bool Val) { 
-                                            if (Val)
-                                              state.play_track(id);
-                                            else
-                                              state.set_play(false); 
-                                            return Val;
-                                          }}
+                                           play_track}
                                           .with_fixed_size({11, 11}),
                      text{t.title()}.align_right() }.align_center();
-    return multi_selectable{r, &view_state.song_selection, p++};
+    return multi_selectable{r, &view_state.song_selection, p++}
+           .with_popup_menu([s = &view_state, track_range = track_range] (event_context& ec) {
+              auto track_id_range = std::ranges::transform_view(track_range, [] (auto&& e) { return get<1>(e); });
+              auto selected_tracks = filter_from_ascending_indices<std::vector<unsigned>>(track_id_range, s->song_selection);
+              return song_selection_popup_menu(ec, selected_tracks);
+           });
   }
   
  };
@@ -319,9 +349,10 @@ struct make_album_view {
   
   auto operator()(const Database::Album& a) {
     using namespace weave::views;
+    auto album_tracks = state.database.album_tracks(a);
     return vstack {
       hstack{ views::image{a.cover}.fit({150, 150}), text{a.title()}.font_size(20) }.align_center(),
-      for_each(state.database.album_tracks(a), make_track_view{state, view_state})
+      for_each(album_tracks, make_track_view{state, view_state, album_tracks})
     };
   }
 };
@@ -372,7 +403,7 @@ struct LibraryView {
       [&] (songs_t) {
         return table{state.database.tracks}
                     .on_cell_double_click(&State::play_track)
-                    .popup_menu(&song_table_popup_menu)
+                    .popup_menu(&song_selection_popup_menu)
                     .on_file_drop(&on_file_drop);
       },
       [&] (artists_t) {
@@ -410,10 +441,11 @@ struct LibraryView {
         }.rounded(6);
       },
       [&] (playlist_id id) {
+        auto&& tracks = state.database.playlist_tracks(id.value);
         return vstack {
           text_field{ [id] (State& s, std::string_view str) { s.set_playlist_name(id.value, str); } }
           .set_value(state.database.playlist(id.value).name).font_size(30),
-          for_each( state.database.playlist_tracks(id.value), make_track_view{state, self} )
+          for_each( tracks, make_track_view{state, self, tracks} )
         }.scrollable();
       },
       [&] (album_id id) {

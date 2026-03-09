@@ -2,9 +2,10 @@
 
 #include "views_core.hpp"
 #include "audio.hpp"
-#include "dialogs.hpp"
+#include "popup_menu.hpp"
 
-#include <ranges>
+#include <vector>
+#include <string>
 
 namespace weave {
 

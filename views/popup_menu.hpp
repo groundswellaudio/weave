@@ -3,7 +3,10 @@
 #include "views_core.hpp"
 #include "audio.hpp"
 
-#include <ranges>
+#include <algorithm>
+#include <functional>
+#include <string>
+#include <vector>
 
 namespace weave::widgets {
 

@@ -1,6 +1,8 @@
 #pragma once
 
 #include "views_core.hpp"
+#include "popup_menu.hpp"
+#include "../core/widget.hpp"
 #include <functional>
 
 namespace weave::widgets {
@@ -80,6 +82,28 @@ struct with_flex_factor : T {
   }
   
   point flex_factor;
+};
+
+template <class W>
+struct with_popup_menu : W {
+  
+  void on(mouse_event e, event_context& ec) {
+    if (e.is_right_click())
+      enter_popup_menu_relative(ec, popup_opener(ec), this);
+    else
+      W::on(e, ec);
+  }
+  
+  void on_child_event(mouse_event e, widget_ref r, event_context& ec) {
+    if (e.is_right_click())
+      enter_popup_menu_relative(ec, popup_opener(ec), this);
+    else if constexpr (is_child_event_listener<W>)
+      W::on_child_event(e, r, ec);
+  }
+    
+  using W::on;
+  
+  std::function<popup_menu(event_context&)> popup_opener;
 };
 
 } // widgets
@@ -235,6 +259,31 @@ struct with_flex_factor : V {
   point flex_factor;
 };
 
+template <class V, class Fn>
+struct with_popup_menu : V {
+  
+  using widget_t = widgets::with_popup_menu<typename V::widget_t>;
+  
+  auto build(const build_context& ctx, auto& state) {
+    auto res = widget_t{ V::build(ctx, state) };
+    res.popup_opener = opener;
+    return res;
+  }
+  
+  rebuild_result rebuild(const with_popup_menu<V, Fn>& Old, widget_ref r, const build_context& ctx, auto& state) {
+    auto& wb = r.as<widget_t>();
+    V::rebuild((V&)Old, widget_ref{&static_cast<typename V::widget_t&>(wb)}, ctx, state);
+    wb.popup_opener = opener;
+    return {};
+  }
+  
+  void destroy(widget_ref r, application_context& ctx) {
+    V::destroy(widget_ref((typename V::widget_t*)&r.as<widget_t>()), ctx);
+  }
+  
+  Fn opener;
+};
+
 /// Common extensions for views.
 struct view_modifiers {
 
@@ -303,6 +352,10 @@ struct view_modifiers {
   
   auto with_flex_factor(this auto&& self, point flex_factor) {
     return views::with_flex_factor{WEAVE_FWD(self), flex_factor};
+  }
+  
+  auto with_popup_menu(this auto&& self, auto&& opener) {
+    return views::with_popup_menu{WEAVE_FWD(self), WEAVE_FWD(opener)};
   }
 };
 

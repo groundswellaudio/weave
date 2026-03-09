@@ -2,6 +2,8 @@
 
 #include "../util/util.hpp"
 #include "../geometry/geometry.hpp"
+#include "../core/widget.hpp"
+
 #include <functional>
 
 namespace weave {

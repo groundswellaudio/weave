@@ -1,13 +1,15 @@
 #pragma once
 
 #include "views_core.hpp"
+#include <ranges>
+#include <type_traits>
 
 namespace weave::views {
 
 template <class Range, class ViewCtor>
 struct for_each : view_sequence_base {
   
-  for_each(auto&& range, ViewCtor ctor) : range{range}, view_ctor{ctor} {}
+  for_each(auto&& range, ViewCtor ctor) : range{WEAVE_FWD(range)}, view_ctor{ctor} {}
   
   using element = decltype( std::declval<ViewCtor>()(*std::declval<Range>().begin()) );
   
@@ -56,10 +58,10 @@ struct for_each : view_sequence_base {
   std::vector<element> elements;
 };
 
-template <class R, class V>
-for_each(R&, V) -> for_each<R&, V>;
+template <class R, class C>
+for_each(R&, C) -> for_each<std::conditional_t<std::ranges::view<R>, R, R&>, C>;
 
-template <class R, class V>
-for_each(R&&, V) -> for_each<R, V>;
+template <class R, class C>
+for_each(R&&, C) -> for_each<R, C>;
 
 } // views
