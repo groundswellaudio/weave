@@ -48,6 +48,8 @@ struct build_context
 {
   graphics_context& graphics_context() const;
   auto& application_context() const { return ctx; }
+  struct widget_tree& widget_tree() const;
+  widget_id new_id() const { return widget_tree().new_id(); }
   
   struct application_context& ctx;
 };

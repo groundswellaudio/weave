@@ -20,8 +20,10 @@
 namespace weave {
 
 struct painter;
+struct widget_tree;
 struct event_context;
 struct application_context;
+struct destroy_context; 
 
 struct keyboard_focus_release {};
 
@@ -41,12 +43,6 @@ struct widget_size_info {
   optional<float> aspect_ratio = {}; // the ratio of width / height 
 };
 
-template <class T>
-auto& operator<<(std::ostream& os, const vec<T, 2>& v) {
-  os << "{" << v.x << " " << v.y << "}";
-  return os;
-}
-
 struct widget_ref;
 
 struct any_invocable { bool operator()(auto&&... args) { return false; } };
@@ -54,10 +50,54 @@ struct any_invocable { bool operator()(auto&&... args) { return false; } };
 template <class W>
 concept widget_has_children = requires (W& obj) { obj.traverse_children(any_invocable{}); };
 
+struct widget_id {
+  
+  friend struct widget_tree;
+  
+  widget_id(const widget_id& o) : value{o.value} {}
+  
+  widget_id& operator=(widget_id o) {
+    value = o.value;
+    return *this;
+  }
+  
+  bool operator==(const widget_id& o) const {
+    return value == o.value;
+  }
+  
+  unsigned raw() const { return value; }
+  
+  private : 
+  
+  widget_id(unsigned x) : value{x} {}
+  
+  unsigned value; 
+};
+
+} // weave
+
+template <>
+struct std::hash<weave::widget_id> {
+  std::size_t operator()(weave::widget_id id) const {
+    return std::hash<unsigned>{}(id.raw());
+  }
+};
+
+namespace weave {
+
+struct destroy_context {
+  struct widget_tree& tree() const { return widget_tree; }
+  struct widget_tree& widget_tree;
+};
+
 struct widget_base {
   
   point size() const { return sz; }
+  
   point position() const { return pos; }
+  
+  point absolute_position(const widget_tree& tree) const;
+  
   rectangle area() const { return {pos, sz}; }
   
   void set_size(point v) {
@@ -114,6 +154,11 @@ struct widget_base {
   
   std::optional<widget_ref> find_child_at(this auto& self, point pos);
   
+  void destroy(this auto&& self, destroy_context ctx);
+  
+  widget_id id() const { return uuid; }
+  
+  widget_id uuid;
   point sz = {0, 0}, pos = {0, 0};
 };
 
@@ -145,7 +190,7 @@ namespace impl
     ptr<optional<widget_ref>(widget_base*, point)> find_child_at;
     ptr<void(widget_base*, widget_children_vec&)> children;
     ptr<void(widget_base*, int indent)> debug_dump;
-    ptr<void(widget_base*)> destroy;
+    ptr<void(widget_base*, destroy_context ctx)> destroy;
   };
   
   template <class T>
@@ -238,10 +283,18 @@ class widget_ref {
   
   void set_position(point p) { data->set_position(p.x, p.y); }
   
+  point absolute_position(const widget_tree& tree) const {
+    return data->absolute_position(tree);
+  }
+  
   bool contains(point pos) const { return data->contains(pos); }
   
   auto find_child_at(point pos) const {
     return vptr->find_child_at(data, pos);
+  }
+  
+  widget_id id() const {
+    return data->id();
   }
   
   std::vector<widget_ref> children() const {
@@ -290,16 +343,187 @@ struct widget_box : widget_ref {
   // FIXME: would be good to have a const_widget_ref?
   widget_ref borrow() const { return widget_ref{data, vptr}; }
   
-  
-  void reset() {
+  void reset(destroy_context ctx) {
     if (data) {
-      vptr->destroy(data);
+      vptr->destroy(data, ctx);
       data = nullptr;
     }
   }
   
-  ~widget_box() { if (data) vptr->destroy(data); }
+  void destroy(destroy_context ctx) {
+    reset(ctx);
+  }
 };
+
+struct widget_tree {
+  
+  widget_id new_id() {
+    while(tree.contains(widget_id{id_count}))
+      ++id_count;
+    return widget_id{id_count++};
+  }
+  
+  optional<widget_ref> get(widget_id id) const {
+    auto it = tree.find(id);
+    if (it == tree.end())
+      return {};
+    return it->second.ref;
+  }
+  
+  void insert(widget_ref ref, widget_id parent) {
+    tree.insert_or_assign(ref.id(), node{parent, ref});
+  }
+  
+  template <class W>
+  void insert(W& w, widget_id parent) {
+    insert(widget_ref(&w), parent);
+  }
+  
+  void erase(widget_ref ref) {
+    erase(ref.id());
+  }
+  
+  void erase(widget_id id) {
+    tree.erase(id);
+  }
+  
+  void erase(const widget_base& w) {
+    erase(w.id());
+  }
+  
+  template <class W>
+  void erase_children(W& w) {
+    w.traverse_children([this] (auto&& c) {
+      erase(c.id());
+      return true;
+    });
+  }
+  
+  template <class W>
+  void insert_children(W& w) {
+    w.traverse_children([this, &w] (auto&& c) {
+      if constexpr (std::is_same_v<std::decay_t<decltype(c)>, widget_box>)
+        insert(c.borrow(), w.id());
+      else
+        insert(widget_ref(&c), w.id());
+      return true;
+    });
+  }
+  
+  void relocate(widget_ref ref) {
+    auto it = tree.find(ref.id());
+    assert( it != tree.end() && "called relocate on an element not in the tree" );
+    it->second.ref = ref;
+  }
+  
+  template <class W>
+  void relocate(W& w) {
+    relocate(widget_ref(&w));
+  }
+  
+  struct parent_end_iterator {};
+    
+  struct parent_iterator {
+    
+    auto& operator++() {
+      auto next = self.parent_of(id);
+      if (next == id)
+        done = true;
+      else
+        id = next;
+      return *this;
+    }
+    
+    widget_ref operator*() { 
+      auto res = self.get(id);
+      assert( res && "parent in parent range not in widget tree?" );
+      return *res;
+    }
+    
+    bool operator==(parent_end_iterator) const {
+      return done;
+    }
+    
+    bool operator!=(parent_end_iterator o) const {
+      return !((*this) == o);
+    }
+    
+    const widget_tree& self;
+    widget_id id;
+    bool done = false;
+  };
+  
+  
+  struct parent_range {
+    
+    auto begin() const { return parent_iterator{self, id, done}; }
+    
+    auto end() const { return parent_end_iterator{}; }
+    
+    const widget_tree& self;
+    widget_id id;
+    bool done = false;
+  };
+  
+  widget_ref last_parent_of(widget_id id) const {
+    while(true) {
+      auto next = parent_ref(id);
+      if (next.id() == id)
+        return next;
+      id = next.id();
+    }
+  }
+  
+  auto parents_of(widget_id id) const {
+    auto p = parent_of(id);
+    return parent_range{*this, p, p == id};
+  }
+  
+  auto parents_of(widget_ref r) const {
+    return parents_of(r.id());
+  }
+  
+  auto parents_of(const widget_base& w) const {
+    return parents_of(w.id());
+  }
+  
+  widget_id parent_of(widget_id id) const {
+    auto it = tree.find(id);
+    assert( it != tree.end() && "widget not found in tree" );
+    return it->second.parent;
+  }
+  
+  widget_ref parent_ref(widget_id id) const {
+    return *get(parent_of(id));
+  }
+  
+  private : 
+  
+  struct node {
+    widget_id parent;
+    widget_ref ref;
+  };
+  
+  std::unordered_map<widget_id, node> tree;
+  unsigned id_count = 0;
+};
+
+void widget_base::destroy(this auto&& self, destroy_context ctx) {
+  if constexpr (widget_has_children<decltype(self)>) {
+    self.traverse_children([ctx] (auto&& c) {
+      ctx.tree().erase(c.id());
+      c.destroy(ctx);
+      return true;
+    });
+  }
+}
+
+point widget_base::absolute_position(const widget_tree& tree) const {
+  auto p = position();
+  for (auto parent : tree.parents_of(*this))
+    p += parent.position();
+  return p;
+}
 
 namespace impl {
   
@@ -328,10 +552,6 @@ optional<widget_ref> widget_base::find_child_at(this auto& self, point pos) {
   }
 }
 
-/// A stack of parents [p+n...p0] which is constructed on traversal
-/// and provided by event_context
-using event_context_parent_stack = std::vector<widget_ref>;
-
 struct event_result {
   
   event_result operator || (event_result er) const {
@@ -353,21 +573,13 @@ struct event_context {
   void request_rebuild() { frame_result.rebuild_requested = true; }
   void request_repaint() { frame_result.repaint_requested = true; }
   
-  widget_ref parent() const { 
-    assert(has_parent() && "event context has no parent");
-    return parents.back(); 
-  }
-  
-  bool has_parent() const { return parents.size(); }
+  widget_ref parent_of(widget_base& b) const;
   
   void push_overlay(widget_box widget);
   
   void push_overlay_relative(widget_box widget);
   
-  void pop_overlay(widget_ref r);
-  
-  // Pop the first child of the root zstack 
-  void pop_this_overlay();
+  void pop_overlay(widget_id id);
   
   /// Register an animation fn to be executed every period_in_ms
   template <class W, class Fn>
@@ -376,20 +588,13 @@ struct event_context {
   /// Remove all animations for a widget
   void deanimate(widget_ref w);
   
-  point absolute_position() const {
-    point res {0, 0};
-    for (auto p : parents)
-      res += p.position();
-    return res;
-  }
-  
-  void grab_keyboard_focus(widget_ref r);
+  void grab_keyboard_focus(widget_id id);
   
   void release_keyboard_focus();
   
   widget_ref current_mouse_focus();
   
-  void grab_mouse_focus(widget_ref w);
+  void grab_mouse_focus(widget_id w);
   
   void reset_mouse_focus();
   
@@ -400,24 +605,12 @@ struct event_context {
   template <class S>
   S& state() const { return *static_cast<S*>(state_ptr); }
   
-  event_context with_parent(widget_ref p) const {
-    auto Res {*this};
-    Res.parents.push_back(p);
-    return Res;
-  }
+  bool is_held(key_modifier mod) const;
   
-  bool is_held(key_modifier mod) const; 
-  
-  /* 
-  template <class S, class View>
-  auto build_view(View&& v) {
-    auto w = v.build( build_context{context()}, state<S>() );
-    return w;
-  } */ 
+  widget_tree& tree() const;
   
   application_context& ctx;
   event_result& frame_result;
-  event_context_parent_stack parents;
   void* state_ptr;
 };
 
@@ -482,7 +675,8 @@ namespace impl {
       +[] (widget_base* self, int indent) {
         static_cast<W*>(self)->debug_dump(indent + 1);
       },
-      +[] (widget_base* self) {
+      +[] (widget_base* self, destroy_context ctx) {
+        static_cast<W*>(self)->destroy(ctx);
         delete static_cast<W*>(self);
       }
     };

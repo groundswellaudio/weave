@@ -46,8 +46,8 @@ namespace weave::views {
     
     using widget_t = widgets::rectangle;
     
-    auto build(ignore, ignore) {
-      auto res = widgets::rectangle{};
+    auto build(build_context ctx, ignore) {
+      auto res = widgets::rectangle{ctx.new_id()};
       res.nominal_size = point{100, 30};
       res.color = col;
       res.stroke_width = stroke_w;

@@ -70,7 +70,7 @@ struct transport_bar_view : view<transport_bar_view<Fn>>, views::view_modifiers 
 
   template <class S>
   auto build(const build_context& ctx, S& state) {
-    auto res = widget_t{};
+    auto res = widget_t{ctx.new_id()};
     res.write = [fn = write_fn] (event_context& ec, auto val) {
       context_invoke<S>(fn, ec, val);
     };
@@ -130,9 +130,9 @@ void on_file_drop(event_context& ec, const std::string& path_str) {
     return;
   }
   
-  auto yes = [path] (event_context& ec) { 
+  auto yes = [path] (event_context& ec, widget_id id) { 
     ec.state<State>().load_directory(path); 
-    ec.pop_this_overlay(); 
+    ec.pop_overlay(id);
   };
   
   using namespace views;
@@ -141,7 +141,7 @@ void on_file_drop(event_context& ec, const std::string& path_str) {
     text{"Import all audio files from directory?"},
     hstack{
       button{"Yes", yes},
-      button{"Cancel", &event_context::pop_this_overlay}    
+      button{"Cancel", &event_context::pop_overlay}    
     }
   }
   .background_color(rgb_f(colors::gray) * 0.3)
@@ -239,7 +239,7 @@ auto track_info_menu(State& state, track_selection selected) {
     with_label{"Title", TitleField},
     with_label{"Artist", ArtistField},
     with_label{"Album", AlbumField}, 
-    button{"Close", &event_context::pop_this_overlay}
+    button{"Close", &event_context::pop_overlay}
   }.background_color(rgb_f(colors::gray) * 0.3)
   .align_center()
   .margin({40, 40})
@@ -247,7 +247,7 @@ auto track_info_menu(State& state, track_selection selected) {
 }
 
 auto song_selection_popup_menu(event_context& ec, track_selection selected) {
-  widgets::popup_menu menu;
+  widgets::popup_menu menu {ec.tree().new_id()};
   auto info = [selected] (event_context& ec) {
     auto& s = ec.state<State>();
     auto w = track_info_menu(s, selected).build(build_context{ec.context()}, s);
@@ -256,7 +256,7 @@ auto song_selection_popup_menu(event_context& ec, track_selection selected) {
     ec.push_overlay(std::move(w));
   };
   auto add_to_playlist = [selected] (event_context& ec) {
-    widgets::popup_menu m;
+    widgets::popup_menu m {ec.tree().new_id()};
     int k = 0;
     for (auto& p : ec.state<State>().playlists()) {
       m.add_element(p.name, [pid = k++, selected] (event_context& ec) {

@@ -63,10 +63,12 @@ struct text_field : widget_base {
 	
   public : 
   
+  text_field(widget_id id) : widget_base{id} {}
+  
   void enter_editing(event_context& ec) { 
     editing = true;
     show_caret = true;
-    ec.grab_keyboard_focus(this);
+    ec.grab_keyboard_focus(id());
     ec.animate(*this, [] (auto& s, ignore) { 
       s.show_caret = !s.show_caret;
       return s.editing; 
@@ -305,7 +307,7 @@ struct text_field : view<text_field<Setter>>, view_modifiers {
   
   template <class S>
   auto build(const build_context& ctx, S& state) {
-    auto res = widget_t{};
+    auto res = widget_t{ctx.new_id()};
     res.set_background_text(background_text);
     if (value)
       res.set_value(std::string{*value}, ctx.graphics_context());
@@ -376,9 +378,8 @@ struct numeric_field : widget_base {
   widget_action<double> write;
   
   void on(mouse_event e, event_context& Ec) {
-    if (e.is_double_click()) {
-      Ec.grab_keyboard_focus(this);
-    }
+    if (e.is_double_click()) 
+      Ec.grab_keyboard_focus(id());
   }
   
   widget_size_info size_info() const {
@@ -459,10 +460,11 @@ struct numeric_field : view<numeric_field<Lens>> {
   numeric_field(auto lens) : lens{make_lens(lens)} {}
   
   template <class S>
-  auto build(const build_context&, S& state) {
+  auto build(const build_context& ctx, S& state) {
     auto init_val = lens.read(state);
-    auto res = widget_t{{50, 15}, prop, (double)init_val};
+    auto res = widget_t{{ctx.new_id()}, prop, (double)init_val};
     res.update_str();
+    res.set_size({50, 15});
     res.accept_decimal = std::is_floating_point_v<decltype(init_val)>;
     res.write = [a = lens] (event_context& ec, double value) {
       ec.request_rebuild();
@@ -471,10 +473,10 @@ struct numeric_field : view<numeric_field<Lens>> {
     return res;
   }
   
-  rebuild_result rebuild(numeric_field<Lens>& old, widget_ref elem, const build_context& up, auto& state) {
+  rebuild_result rebuild(numeric_field<Lens>& old, widget_ref elem, const build_context& ctx, auto& state) {
     auto& w = elem.as<widget_t>();
     auto val = lens.read(state);
-    if (!up.application_context().has_keyboard_focus(elem))
+    if (!ctx.application_context().has_keyboard_focus(elem))
     {
       w.value = val;
       w.update_str();
@@ -503,7 +505,7 @@ struct numeric_dial : widget_base
 {
   using prop_t = numeric_field_properties;
   
-  numeric_dial(prop_t prop) : prop{prop} {}
+  numeric_dial(widget_id id, prop_t prop) : widget_base{id}, prop{prop} {}
   
   numeric_field_properties prop;
   float mult_mod;

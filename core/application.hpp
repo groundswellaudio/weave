@@ -39,20 +39,19 @@ namespace impl {
     {
       mouse_event_dispatcher& self;
       mouse_event e;
-      event_context_parent_stack& parents;
+      const widget_tree& tree;
       
-      bool find_in_children(widget_ref w, vec2f abs_pos) {
+      bool find_in_children(widget_ref w, point abs_pos) {
         auto c = w.find_child_at(e.position - abs_pos);
         if (!c)
           return false;
-        parents.push_back(w);
         if (find_in_children(*c, abs_pos + c->position())) 
           return true;
-        self.set_focused(*c);
+        self.set_focused(c->id(), tree);
         return true;
       }
       
-      bool find_from(widget_ref w, vec2f abs_pos) 
+      bool find_from(widget_ref w, point abs_pos) 
       {
         // Note : widget::contains assumes a point relative to the position 
         // of the *parent*, and abs_pos contains the position of w, so we have 
@@ -61,61 +60,40 @@ namespace impl {
           if (find_in_children(w, abs_pos)) {
             return true;
           }
-          self.set_focused(w);
+          self.set_focused(w.id(), tree);
           return true;
        }
        else {
-        if (parents.empty()) {
-          // It's important that we call set_focused here as the event may lay outside 
-          // of the root widget, but we still want to make it focused if no other widget can
-          // (otherwise we'll end up focusing a child widget with an empty parent stack)
-          self.set_focused(w);
+        auto pid = tree.parent_of(w.id());
+        if (pid == w.id()) {
+          self.set_focused(w.id(), tree);
           return true;
         }
-        auto p = parents.back(); 
-        parents.pop_back();
+        auto p = *tree.get(pid); 
         return find_from(p, abs_pos - w.position());
        }
       }
     };
     
-    void set_focused(widget_ref w) {
-      set_focused(w, parents);
-    }
-    
     public : 
     
-    mouse_event_dispatcher(widget_ref root) {
-      set_focused(root, {});
-    }
+    mouse_event_dispatcher(widget_ref root) : focused{root.id()} {}
     
-    void set_focused(widget_ref w, const event_context_parent_stack& new_parents) {
-      if (w == focused)
+    void set_focused(widget_id id, const widget_tree& tree) {
+      if (id == focused)
         return;
       
-      // it will often be the case that &parents == &new_parents
-      if (&parents != &new_parents)
-        parents = new_parents;
+      focused = id;
       
       // Note : In a lot of cases we don't have to recompute the position entirely from the root
       // but it's good to recompute it once in a while
-      point absolute_pos = {0, 0};
-      for (auto p : parents)
-        absolute_pos += p.position();
-      absolute_pos += w.position();
-      
-      focused = w;
-      focused_absolute_pos = absolute_pos;
+      update_absolute_position(tree);
       
       top_parent_listener = {};
-      for (auto p : std::ranges::views::reverse(parents))
+      for (auto p : tree.parents_of(id)) {
         if (p.is_child_event_listener())
-          top_parent_listener = p;
-    }
-    
-    void reset_focus(widget_ref root) {
-      parents.clear();
-      set_focused(root, {});
+          top_parent_listener = p.id();
+      }
     }
     
     event_result on(mouse_event e, void* state, application_context& ctx);
@@ -124,59 +102,49 @@ namespace impl {
       return focused_absolute_pos;
     }
     
-    widget_ref current_focus() const { return focused; }
+    widget_id current_focus() const { return focused; }
     
-    void update_absolute_position() {
-      focused_absolute_pos = {0, 0};
-      for (auto& p : parents) 
-        focused_absolute_pos += p.position();
-      focused_absolute_pos += focused.position();
+    widget_ref current_focus(const widget_tree& tree, widget_id root_id) {
+      auto ref = tree.get(focused);
+      if (ref)
+        return *ref;
+      focused = root_id;
+      auto res = tree.get(focused);
+      focused_absolute_pos = res->position();
+      return *res;
     }
     
-    auto get_focused() const { return focused; }
+    void update_absolute_position_after_rebuild(const widget_tree& tree, widget_id root_id) {
+      auto ref = tree.get(focused);
+      if (!ref)
+        focused = root_id;
+      update_absolute_position(tree);
+    }
     
-    const auto& parents_stack() const { return parents; }
+    void update_absolute_position(const widget_tree& tree) {
+      optional<widget_ref> f = tree.get(focused);
+      assert( f && "focused not found in the tree?" );
+      focused_absolute_pos = f->absolute_position(tree);
+    }
     
     private : 
     
-    widget_ref focused;
+    widget_id focused;
     point focused_absolute_pos = {0, 0};
-    event_context_parent_stack parents;
-    optional<widget_ref> top_parent_listener = {};
+    optional<widget_id> top_parent_listener;
   };
   
   struct keyboard_event_dispatcher {
     
-    void set_focused(widget_ref r, const event_context_parent_stack& stack) {
-      if (focused == r)
-        return;
-      focused = r;
-      parents = stack;
+    void set_focused(widget_id id) {
+      focused = id;
     }
     
-    event_result reset_focus(application_context& ctx, void* state) {
-      if (focused) {
-        event_result res;
-        auto ec = event_context{ctx, res, parents, state};
-        focused->on(input_event{keyboard_focus_release{}}, ec);
-        focused.reset();
-        parents.clear();
-        return res;
-      }
-      return {};
-    }
+    event_result reset_focus(application_context& ctx, void* state);
     
-    event_result on(keyboard_event e, void* state, application_context& ctx) {
-      event_result res;
-      // FIXME : avoid the copy of the parents stack here?
-      auto ec = event_context{ctx, res, parents, state};
-      if (focused) 
-        focused->on(e, ec);
-      return res;
-    }
+    event_result on(keyboard_event e, void* state, application_context& ctx);
     
-    optional<widget_ref> focused;
-    event_context_parent_stack parents;
+    optional<widget_id> focused;
   };
   
   struct widget_animations {
@@ -293,6 +261,7 @@ struct application_context {
     root{Ctor()},
     mouse{root.borrow()}
   {
+    tree.insert(root.borrow(), root.id());
     backend.start_text_input(win);
     layout_root();
   }
@@ -310,54 +279,57 @@ struct application_context {
     animations.deanimate(r);
   }
   
-  void grab_mouse_focus(widget_ref new_focused, const event_context_parent_stack& parents) {
-    mouse.set_focused(new_focused, parents);
+  void grab_mouse_focus(widget_id new_focused) {
+    mouse.set_focused(new_focused, widget_tree());
   }
   
   widget_ref push_overlay(widget_box w) 
   {
     overlays.push_back(std::move(w));
-    mouse.set_focused(overlays.back().borrow(), {});
-    return overlays.back().borrow();
+    auto r = overlays.back().borrow();
+    widget_tree().insert(r, r.id());
+    mouse.set_focused(r.id(), widget_tree());
+    return r;
   }
   
-  void pop_overlay(widget_ref r)
+  void pop_overlay(widget_id id)
   {
-    auto it = std::find(overlays.begin(), overlays.end(), r);
+    // find the root widget
+    id = widget_tree().last_parent_of(id).id();
+    auto it = std::ranges::find_if(overlays, [id] (auto& e) { return e.id() == id; });
     if (it == overlays.end())
       return;
+    widget_tree().erase(id);
+    it->destroy(destroy_context{widget_tree()});
     overlays.erase(it);
-    if (mouse.get_focused() == r 
-        || mouse.parents_stack().size() && mouse.parents_stack()[0] == r)
-      mouse.set_focused(root.borrow(), {});
   }
   
-  void grab_keyboard_focus(widget_ref r, const event_context_parent_stack& stack) {
-    keyboard.set_focused(r, stack);
+  void grab_keyboard_focus(widget_id id) {
+    keyboard.set_focused(id);
   }
   
   event_result reset_keyboard_focus(void* state) {
     return keyboard.reset_focus(*this, state);
   }
   
-  widget_ref current_mouse_focus() const {
-    return mouse.current_focus();
+  widget_ref current_mouse_focus() {
+    return mouse.current_focus(widget_tree(), root.id()); 
   }
   
-  optional<widget_ref> current_keyboard_focus() const {
+  optional<widget_id> current_keyboard_focus() const {
     return keyboard.focused;
   }
   
   bool has_keyboard_focus(widget_ref r) const {
-    return keyboard.focused == r; 
+    return keyboard.focused == r.id(); 
   }
   
   bool has_mouse_focus(widget_ref r) const {
-    return mouse.current_focus() == r;
+    return mouse.current_focus() == r.id();
   }
   
   void reset_mouse_focus() {
-    mouse.reset_focus(root.borrow());
+    mouse.set_focused(root.id(), widget_tree());
   }
   
   bool is_held(key_modifier mod) const {
@@ -409,6 +381,12 @@ struct application_context {
     for (auto& o : overlays)
       fn(o.borrow(), {0, 0}, win.size());
     
+    /* 
+    auto f = current_mouse_focus();
+    auto r = rectangle(f.absolute_position(tree), f.size());
+    p.fill_style(rgba_f{colors::red}.with_alpha(0.3));
+    p.fill(r); */ 
+    
     p.end_frame();
     win.swap_buffer();
   }
@@ -417,6 +395,14 @@ struct application_context {
     debug_log("window resize");
     layout_root();
     paint();
+  }
+  
+  struct widget_tree& widget_tree() {
+    return tree;
+  }
+  
+  const struct widget_tree& widget_tree() const {
+    return tree;
   }
   
   std::atomic<bool> rebuild_requested = false;
@@ -435,6 +421,7 @@ struct application_context {
   struct window win;
   struct graphics_context gctx;
   
+  struct widget_tree tree;
   widget_box root;
   std::vector<widget_box> overlays;
   impl::mouse_event_dispatcher mouse;
@@ -444,21 +431,25 @@ struct application_context {
 
 namespace impl {
 
-event_result mouse_event_dispatcher::on(mouse_event e, void* state, application_context& ctx)
+event_result mouse_event_dispatcher::on(mouse_event e, void* state, 
+                                        application_context& ctx)
 {
   event_result res;
+  auto ec = event_context{ctx, res, state};
   
   if (e.is_move() && !e.is_drag())
   {
-    auto old_focus = focused;
-    auto old_pos = focused_absolute_pos;
-    auto old_ctx = event_context{ctx, res, parents, state};
-    find_new_focused{*this, e, parents}.find_from(focused, focused_absolute_pos);
-    if (old_focus != focused) 
+    auto old_focus = ctx.widget_tree().get(focused);
+    if (old_focus)
     {
-      old_focus.on(mouse_event{e.position - old_pos, mouse_exit{}}, old_ctx);
-      auto ec = event_context{ctx, res, parents, state};
-      focused.on(mouse_event{e.position - focused_absolute_pos, mouse_enter{}}, ec);
+      auto old_pos = focused_absolute_pos;
+      find_new_focused{*this, e, ctx.widget_tree()}.find_from(*old_focus, focused_absolute_pos);
+      if (old_focus->id() != focused)
+      {
+        old_focus->on(mouse_event{e.position - old_pos, mouse_exit{}}, ec);
+        auto focused_ref = *ctx.widget_tree().get(focused);
+        focused_ref.on(mouse_event{e.position - focused_absolute_pos, mouse_enter{}}, ec);
+      }
     }
   }
   
@@ -466,32 +457,65 @@ event_result mouse_event_dispatcher::on(mouse_event e, void* state, application_
   if (e.is_down() && focused != ctx.current_keyboard_focus())
     res = res || ctx.reset_keyboard_focus(state);
   
-  // FIXME : avoid the copy of the parents stack here?
-  auto ec = event_context{ctx, res, parents, state};
+  // focused::on might change the mouse focus, copy them here to safeguard against mutations
+  const auto focused_id = focused;
+  const auto top_parent_listener_id = top_parent_listener;
+  
   e.position -= focused_absolute_pos;
-  focused.on(e, ec);
-
-  if (top_parent_listener) {
-    e.position += focused.position();
-    auto parents_tmp = parents; // copy the vector to avoid the potential mutation in old_child_event. this is dirty and temporary code until the ID system is implemented
-    auto focused_tmp = focused;
-    auto top_parent_listener_tmp = top_parent_listener;
-    auto it = --parents_tmp.end();
-    for (auto p : std::ranges::views::reverse(parents_tmp)) 
+  auto focused_ref = ctx.widget_tree().get(focused_id);
+  assert( focused_ref && "focused not found in the tree" );
+  focused_ref->on(e, ec);
+  
+  // focused::on might have relocated or deleted focused, look it up again
+  focused_ref = ctx.widget_tree().get(focused_id);
+  if (!focused_ref) {
+    set_focused(ctx.root_widget().id(), ctx.widget_tree());
+    return res;
+  }
+  
+  if (top_parent_listener_id) {
+    e.position += focused_ref->position();
+    for (auto p : ctx.widget_tree().parents_of(*focused_ref))
     {
-      event_context parent_ec{ec};
-      parent_ec.parents = std::vector<widget_ref>{parents_tmp.begin(), it};
-      p.on_child_event(e, parent_ec, focused_tmp);
+      p.on_child_event(e, ec, *focused_ref);
       e.position += p.position();
-      if (top_parent_listener_tmp == p)
+      if (top_parent_listener_id == p.id())
         break;
     }
   }
   
   return res;
 }
-    
+
+event_result keyboard_event_dispatcher::reset_focus(application_context& ctx, void* state) {
+  if (!focused)
+    return {};
+  auto wr = ctx.widget_tree().get(*focused);
+  event_result res;
+  if (wr) {
+    auto ec = event_context{ctx, res, state};
+    wr->on(input_event{keyboard_focus_release{}}, ec);
+  }
+  focused.reset();
+  return res;
 }
+
+event_result keyboard_event_dispatcher::on(keyboard_event e, void* state, 
+                                           application_context& ctx) {
+  event_result res;
+  if (focused) { 
+    auto wb = ctx.widget_tree().get(*focused);
+    auto ec = event_context{ctx, res, state};
+    // Reset the focus if focused was deleted
+    if (!wb)
+      focused.reset();
+    else
+      wb->on(e, ec);
+  }
+  return res;
+}
+    
+} // impl
 
 auto event_context::lift_rebuild_request() {
   return [p = &context()] {
@@ -504,28 +528,17 @@ void event_context::push_overlay(widget_box widget) {
   request_repaint();
 }
 
-void event_context::pop_overlay(widget_ref r) {
-  ctx.pop_overlay(r);
+void event_context::pop_overlay(widget_id id) {
+  ctx.pop_overlay(id);
   request_repaint();
 }
 
-void event_context::pop_this_overlay() {
-  assert( parents.size() >= 1 && "pop_this_overlay called without at least 1 parent?" );
-  ctx.pop_overlay( parents[0] );
-  request_repaint();
+void event_context::grab_mouse_focus(widget_id focused) {
+  ctx.grab_mouse_focus(focused);
 }
 
-void event_context::grab_mouse_focus(widget_ref focused) {
-  // Truncate the parents stack if this is a parent
-  auto it = std::find(parents.begin(), parents.end(), focused);
-  if (it != parents.end())
-    ctx.grab_mouse_focus(focused, event_context_parent_stack{parents.begin(), it});
-  else
-    ctx.grab_mouse_focus(focused, parents);
-}
-
-void event_context::grab_keyboard_focus(widget_ref focused) {
-  ctx.grab_keyboard_focus(focused, parents);
+void event_context::grab_keyboard_focus(widget_id focused) {
+  ctx.grab_keyboard_focus(focused);
 }
 
 void event_context::release_keyboard_focus() {
@@ -550,7 +563,7 @@ void event_context::reset_mouse_focus() {
 }
 
 void event_context::push_overlay_relative(widget_box widget) {
-  auto abs_pos = absolute_position() + widget.position();
+  auto abs_pos = widget.absolute_position(tree());
   auto winsz = ctx.window().size();
   auto new_pos = abs_pos;
   new_pos -= max(new_pos + widget.size() - winsz, point{0, 0});
@@ -566,8 +579,20 @@ bool event_context::is_held(key_modifier mod) const {
   return ctx.is_held(mod);
 }
 
+widget_ref event_context::parent_of(widget_base& b) const {
+  return tree().parent_ref(b.id());
+}
+
+widget_tree& event_context::tree() const {
+  return ctx.widget_tree();
+}
+
 graphics_context& build_context::graphics_context() const { 
   return ctx.graphics_context(); 
+}
+
+widget_tree& build_context::widget_tree() const {
+  return ctx.widget_tree();
 }
 
 template <class ViewCtor, class View, class State>
@@ -593,7 +618,8 @@ struct application
     app_view.emplace( view_ctor(state) );
     auto bctx = build_context{app_ctx};
     app_view->rebuild(old_view, app_ctx.root_widget(), bctx, state);
-    app_ctx.mouse.update_absolute_position();
+    app_ctx.mouse.update_absolute_position_after_rebuild(app_ctx.widget_tree(), 
+                                                        app_ctx.root_widget().id());
     app_ctx.rebuild_requested = false;
     // FIXME : it would be nice to not have to do this on every rebuild ? 
     auto size_info = app_ctx.root_widget().size_info();

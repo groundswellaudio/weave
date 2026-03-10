@@ -63,7 +63,7 @@ struct table : widget_base, scrollable_base {
   
   public : 
   
-  table(point sz) : widget_base{sz} {}
+  table(widget_id id, point size) : widget_base{id, size} {}
   
   auto size_info() const {
     widget_size_info res;
@@ -217,7 +217,7 @@ struct table : widget_base, scrollable_base {
     scroll_offset += delta;
     scroll_offset = std::max(scroll_offset, 0.f);
     if (edited_field)
-      edited_field->set_position(edited_field->position() - vec2f{0, delta});
+      edited_field->set_position(edited_field->position() - point{0, delta});
     //assert( scroll_offset >= 0 );
   }
   
@@ -226,7 +226,7 @@ struct table : widget_base, scrollable_base {
   void handle_mouse_down_body(mouse_event e, event_context& Ec) {
     if (e.is_right_click() && popup) {
       auto w = popup(Ec, selection);
-      w.set_position(e.position + position() + Ec.absolute_position());
+      w.set_position(e.position + absolute_position(Ec.tree()));
       enter_popup_menu(Ec, std::move(w));
       return;
     }
@@ -264,7 +264,7 @@ struct table : widget_base, scrollable_base {
       ? size().x - get<1>(properties[col])
       : get<1>(properties[col + 1]) - get<1>(properties[col]);
     point field_size {field_width, row_height};
-    edited_field.emplace( text_field{} );
+    edited_field.emplace(Ec.tree().new_id());
     edited_field->set_size(field_size);
     edited_field->set_position( {get<1>(properties[col]), first_row + row * row_height - scroll_offset} );
     edited_field->enter_editing(Ec);
@@ -275,11 +275,12 @@ struct table : widget_base, scrollable_base {
         on_field_edit(Ec, {col, row}, str);
       edited_field.reset(); 
     };
-    Ec.with_parent(this).grab_mouse_focus(&*edited_field);
-    Ec.with_parent(this).grab_keyboard_focus(&*edited_field);
+    Ec.tree().insert(*edited_field, id());
+    Ec.grab_mouse_focus(edited_field->id());
+    Ec.grab_keyboard_focus(edited_field->id());
   }
   
-  void handle_mouse_down_header(vec2f p) {
+  void handle_mouse_down_header(point p) {
     auto sort_by = [this] (int prop_index) {
       bool increasing = true;
         // Swap the order if we're clicking on the same property
@@ -387,8 +388,8 @@ struct table : view<table<T>>, view_modifiers {
   using widget_t = widgets::table;
   using model_t = table_model<std::decay_t<T>>;
   
-  auto build(auto&& builder, auto& state) {
-    widget_t res {{400, 400}};
+  auto build(build_context ctx, auto& state) {
+    widget_t res {ctx.new_id(), {400, 400}};
     res.set_properties(model_t{}.properties(data.get()));
     res.set_cells(data.get());
     res.cell_double_click = cell_double_click;
@@ -397,9 +398,9 @@ struct table : view<table<T>>, view_modifiers {
     return res;
   }
   
-  rebuild_result rebuild(auto& old, widget_ref w, ignore, auto& state) {
+  rebuild_result rebuild(const table<T>& old, widget_ref w, ignore, auto& state) {
     version = old.version;
-    if (version != data.version()) {
+    if (&data != &old.data || version != data.version()) {
       version = data.version();
       auto& wb = w.as<widget_t>();
       wb.set_properties(model_t{}.properties(data.get()));
@@ -430,6 +431,7 @@ struct table : view<table<T>>, view_modifiers {
   }
   
   const observed_value<T>& data;
+  // FIXME : replace this by strongly typed closures
   widget_action<int> cell_double_click;
   widget_action<widgets::popup_menu(widgets::table::selection_t)> popup_opener;
   unsigned version; 

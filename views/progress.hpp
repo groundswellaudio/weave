@@ -37,8 +37,8 @@ struct progress_bar : view<progress_bar> {
   
   progress_bar(float ratio) : ratio{ratio} {}
   
-  auto build(auto&& b, ignore) {
-    return widget_t{{200, 15}, ratio};
+  auto build(build_context ctx, ignore) {
+    return widget_t{ctx.new_id(), {200, 15}, ratio};
   }
   
   rebuild_result rebuild(progress_bar Old, widget_ref w, ignore, ignore) {

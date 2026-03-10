@@ -5,6 +5,7 @@
 #include "../core/widget.hpp"
 
 #include <functional>
+#include <concepts>
 
 namespace weave {
 
@@ -35,15 +36,18 @@ template <class T>
 using write_fn = widget_action<void(T)>;
 
 template <class State, class Fn, class... Args>
+  requires (std::invocable<Fn, State&, Args&&...> 
+            || std::invocable<Fn, event_context&, Args&&...>
+            || std::invocable<Fn, Args&&...>)
 decltype(auto) context_invoke(Fn fn, event_context& ec, Args&&... args) {
   ec.request_rebuild();
   ec.request_repaint();
-  if constexpr ( requires { std::invoke(fn, ec.template state<State>(), (Args&&)args...); } )
+  if constexpr ( std::invocable<Fn, State&, Args&&...> )
     return (std::invoke(fn, ec.template state<State>(), (Args&&)args...));
-  else if constexpr ( requires { std::invoke(fn, ec, (Args&&)args...); } )
-    return (std::invoke(fn, ec, (Args&&)args...)); 
+  else if constexpr ( std::invocable<Fn, event_context&, Args&&...> )
+    return (std::invoke(fn, ec, WEAVE_FWD(args)...));
   else
-    return (std::invoke(fn, (Args&&)args...));
+    return (std::invoke(fn, WEAVE_FWD(args)...));
 }
 
 /// A simple helper for the observation of mutations of large data structure (images/array/ect)

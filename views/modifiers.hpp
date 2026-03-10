@@ -132,11 +132,7 @@ struct event_listener : V {
     return V::rebuild(old, widget_ref{&r.as<widget_t>().base()}, ctx, state);
   }
   
-  // a widget with a on_click action might trigger a rebuild that delete itself, 
-  // thus we have to potentially reset the mouse focus
   void destroy(widget_ref r, application_context& ctx) {
-    if (ctx.has_mouse_focus(r))
-      ctx.reset_mouse_focus();
     V::destroy(widget_ref(&r.as<widget_t>().base()), ctx);
   }
   

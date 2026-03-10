@@ -5,9 +5,11 @@
 #include "modifiers.hpp"
 #include "../util/tuple.hpp"
 #include "../util/util.hpp"
+
 #include <span>
 #include <algorithm>
 #include <concepts>
+#include <vector>
 
 namespace weave {
 
@@ -306,15 +308,14 @@ namespace impl {
     std::vector<widget_box>& vec;
     std::vector<int> to_erase;
     int& index;
+    widget_id this_id;
     bool mutated = false;
     
     [[no_unique_address]] non_copyable _;
     
     void consume(auto&& W) { 
-      vec.insert( 
-        vec.begin() + index++, 
-        widget_box{(decltype(W)&&)(W)}
-      );
+      auto it = vec.insert(vec.begin() + index++, widget_box{WEAVE_FWD(W)});
+      b.widget_tree().insert(it->borrow(), this_id);
       mutated = true;
     }
     
@@ -332,7 +333,7 @@ namespace impl {
 
   template <class T, class V, class S>
   auto build_stack(V& view, const build_context& ctx, S& state, auto&&... ctor_args) {
-    T Res { ctor_args... };
+    T Res { {ctx.new_id()}, ctor_args... };
     auto consumer = [&] (auto&&... args) { 
       Res.children_vec.push_back( widget_box{(decltype(args)&&)(args)...} );
     };
@@ -340,20 +341,24 @@ namespace impl {
     tuple_for_each([&] (auto& elem) {
       elem.seq_build(consumer, ctx, state);
     }, view.children);
+    
+    ctx.widget_tree().insert_children(Res);
+    
     return Res;
   }
   
   template <class T, class V, class S>
   rebuild_result rebuild_stack(V& New, auto& Old, widget_ref wb, const build_context& ctx, S& state) {
     auto& w = wb.as<T>();
-    int index = 0;
     
+    int index = 0;
     stack_updater seq_updater {
       {}, 
       ctx, 
       w.children_vec,
       {}, 
-      index
+      index, 
+      wb.id()
     };
     
     rebuild_result res; 
@@ -363,21 +368,22 @@ namespace impl {
       res |= elem.seq_rebuild(get<elem_index.value>(Old.children), seq_updater, ctx, state);
     }, New.children);
     
-    // FIXME : we're not calling .destroy on the views! (implementing this is actually a bit tricky)
-    
     // Remove every elements at the (sorted) indexes in to_erase
     if (seq_updater.to_erase.size())
     {
-      auto it = std::remove_if( w.children_vec.begin(), w.children_vec.end(), 
+      auto it = std::stable_partition( w.children_vec.begin(), w.children_vec.end(), 
                                 [ida = 0, idb = 0, &seq_updater] (ignore) mutable {
                                   if (idb == seq_updater.to_erase.size())
-                                    return false;
+                                    return true;
                                   if (ida++ == seq_updater.to_erase[idb]) {
                                     idb++;
-                                    return true;
+                                    return false;
                                   }
-                                  return false;
-                                } );
+                                  return true;
+                                });
+      std::for_each(it, w.children_vec.end(), 
+                    [ctx] (auto& e) { ctx.widget_tree().erase(e.id()); });
+      
       w.children_vec.erase(it, w.children_vec.end());
     }
     
@@ -407,7 +413,7 @@ struct stack : widget_base, scrollable_base
   // if scrollable
   optional<float> min_scroll_axis;
   
-  stack(stack_data d) : data{d} {}
+  stack(widget_id id, stack_data d) : widget_base{id}, data{d} {}
   
   rectangle scroll_zone() const {
     return {{0, 0}, size()};
@@ -465,7 +471,7 @@ struct stack : widget_base, scrollable_base
       res.flex_factor += i.flex_factor;
       
       res.nominal[1 - Axis] = std::max(res.nominal[1 - Axis], 
-                                            i.nominal[1 - Axis]);
+                                       i.nominal[1 - Axis]);
     }
     
     res.min[Axis] += (children_vec.size() - 1) * data.interspace;
@@ -516,12 +522,14 @@ using vstack = stack<1>;
 
 struct flow : widget_base, scrollable_base {
   
+  flow(widget_id id) : widget_base{id} {}
+  
   rectangle scroll_zone() const {
     return {{0, 0}, size()};
   }
   
   float scroll_size() const {
-    return total_height; 
+    return total_height;
   }
   
   void displace_scroll(float delta) {
@@ -625,7 +633,7 @@ struct stack_base : view<stack_base<T, Ts...>>, stack<Ts...> {
   optional<float> min_scroll_sz;
   
   template <class... Vs>
-  constexpr stack_base(Vs&&... ts) : stack<Ts...>{ {(Vs&&)(ts)...} } {} 
+  constexpr stack_base(Vs&&... ts) : stack<Ts...>{{WEAVE_FWD(ts)...}} {} 
   
   stack_base(stack_base&& o) = default;
   stack_base(const stack_base&) = default;
@@ -647,12 +655,15 @@ struct stack_base : view<stack_base<T, Ts...>>, stack<Ts...> {
   
   void destroy(widget_ref w, application_context& ctx) {
     auto& wb = w.as<T>();
+    
     auto lift_destroy = [it = wb.children_vec.begin()] mutable {
       return (it++)->borrow();
     };
     tuple_for_each( [&] (auto& elem) {
       elem.seq_destroy(lift_destroy, ctx);
     }, this->children );
+    
+    ctx.widget_tree().erase_children(wb);
   }
   
   auto&& scrollable(this auto&& self, float min_scroll_size = 300) {
@@ -701,10 +712,10 @@ struct flow : view<flow<Ts...>> {
   template <class... Vs>
     requires (std::constructible_from<Ts, Vs&&> && ...)
   flow(float width, Vs&&... ts) 
-  : width{width}, children{(Vs&&)ts...} {}
+  : width{width}, children{WEAVE_FWD(ts)...} {}
   
   auto build(auto&& ctx, auto& state) {
-    auto res = impl::build_stack<widgets::flow>(*this, ctx, state, vec2f{width, 0});
+    auto res = impl::build_stack<widgets::flow>(*this, ctx, state);
     res.rounded_radius = rounded_radius;
     return res;
   }
@@ -717,12 +728,16 @@ struct flow : view<flow<Ts...>> {
   
   void destroy(widget_ref r, application_context& ctx) {
     auto& wb = r.as<widgets::flow>();
+    
     auto lift_destroy = [it = wb.children_vec.begin()] mutable {
       return (it++)->borrow();
     };
+    
     tuple_for_each( [&] (auto& elem) {
       elem.seq_destroy(lift_destroy, ctx);
     }, children );
+    
+    ctx.widget_tree().erase_children(wb);
   }
   
   auto& rounded(float val) {

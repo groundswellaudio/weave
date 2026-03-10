@@ -90,7 +90,7 @@ struct scrollable : widget_base, scrollable_base {
   }
   
   void displace_scroll(float delta) {
-    child.set_position(child.position() - vec2f{0, delta});
+    child.set_position(child.position() - point{0, delta});
   }
   
   T child; 
@@ -109,7 +109,7 @@ struct scrollable : view<scrollable<View>> {
   
   template <class State>
   auto build(build_context b, State& state) {
-    return widget_t{ {size}, {}, child.build(b, state) };
+    return widget_t{ {b.new_id(), size}, {}, child.build(b, state) };
   }
   
   template <class State>

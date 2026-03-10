@@ -33,6 +33,8 @@ struct popup_menu : widget_base {
   
   public : 
   
+  popup_menu(widget_id id) : widget_base{id} {}
+  
   template <class Str, class Fn>
   void add_element(Str&& str, Fn fn, graphics_context& gctx);
   
@@ -60,7 +62,7 @@ struct popup_menu : widget_base {
     if (e.is_down())
     {
       if (!rectangle(size()).contains(e.position)) {
-        ec.pop_overlay(this);
+        ec.pop_overlay(id());
       }
       else if (hovered != -1 && !elements[hovered].is_submenu_opener)
         elements[hovered].action(ec, this);
@@ -119,8 +121,31 @@ struct popup_menu_stack : widget_base {
     return res;
   }
   
-  void push(popup_menu&& m) {
-    menus.push_back(std::move(m));
+  void close_children_of(popup_menu* m, event_context& ec) {
+    ec.request_repaint();
+    auto idx = m - menus.data();
+    assert( menus.size() > 1 && "popup menu stack contains only one element" );
+    std::for_each(menus.begin() + idx + 1, menus.end(), [&ec] (auto& m) {
+      ec.tree().erase(m);
+    });
+    menus.erase(menus.begin() + idx + 1, menus.end());
+  }
+  
+  void open_child(popup_menu m, event_context& ec) {
+    if (menus.capacity() < menus.size() + 1) {
+      menus.push_back(WEAVE_FWD(m));
+      std::for_each(menus.begin(), menus.end() - 1, [&ec] (auto& m) {
+        ec.tree().relocate(m);
+      });
+    }
+    else {
+      menus.push_back(WEAVE_FWD(m));
+    }
+    ec.tree().insert(widget_ref(&menus.back()), id());
+  }
+  
+  void destroy(destroy_context ctx) {
+    ctx.tree().erase_children(*this);
   }
   
   auto traverse_children(auto&& fn) {
@@ -129,7 +154,7 @@ struct popup_menu_stack : widget_base {
   
   void on(mouse_event e, event_context& ec) {
     if (e.is_down())
-      ec.pop_overlay(this);
+      ec.pop_overlay(id());
   }
   
   void paint(painter& p) {}
@@ -138,9 +163,8 @@ struct popup_menu_stack : widget_base {
 };
 
 void popup_menu::close(event_context& ec) {
-  auto overlay_ptr = ec.has_parent() && ec.parent().is<popup_menu_stack>() 
-                      ? ec.parent() : widget_ref(this);
-  ec.pop_overlay(overlay_ptr);
+  // parent_of return this if we are at the root overlay
+  ec.pop_overlay(ec.parent_of(*this).id());
 }
 
 template <class Str, class Fn>
@@ -166,31 +190,23 @@ void popup_menu::add_element(Str&& str, Fn fn, graphics_context& gctx) {
 }
 
 void popup_menu::close_children(event_context& ec) {
-  auto& p = ec.parent().as<popup_menu_stack>();
-  auto idx = this - p.menus.data();
-  assert( p.menus.size() > 1 && "popup menu stack contains only one element" );
-  ec.request_repaint();
   has_child = false;
-  // careful here : we change the address of this
-  p.menus.erase(p.menus.begin() + idx + 1, p.menus.end());
+  auto& p = ec.parent_of(*this).as<popup_menu_stack>();
+  p.close_children_of(this, ec);
 }
 
 void popup_menu::open_child(event_context& ec, int idx) {
   assert( elements[idx].is_submenu_opener );
-  auto& p = ec.parent().as<popup_menu_stack>();
   auto w = *elements[idx].action(ec, this);
   w.set_position({position().x + size().x, position().y + idx * row_size});
-  ec.request_repaint();
   has_child = true;
-  // careful here : we change the address of this 
-  p.push( std::move(w) );
-  // We most likely have the mouse focus, reset it to not cause a memory referencing error
-  ec.grab_mouse_focus(&p);
+  auto& p = ec.parent_of(*this).as<popup_menu_stack>();
+  p.open_child(WEAVE_MOVE(w), ec);
 }
 
 inline void enter_popup_menu(event_context& ec, popup_menu m) {
   if (m.can_open_submenu()) {
-    ec.push_overlay( popup_menu_stack{{ec.context().window().size()}, {m}} );
+    ec.push_overlay( popup_menu_stack{{ec.tree().new_id(), ec.context().window().size()}, {m}} );
   }
   else {
     ec.push_overlay( std::move(m) );
@@ -198,7 +214,7 @@ inline void enter_popup_menu(event_context& ec, popup_menu m) {
 }
 
 inline void enter_popup_menu_relative(event_context& ec, popup_menu m, widget_ref parent) {
-  auto pos = ec.absolute_position() + parent.position();
+  auto pos = parent.absolute_position(ec.tree());
   m.set_position(m.position() + pos);
   enter_popup_menu(ec, std::move(m));
 }

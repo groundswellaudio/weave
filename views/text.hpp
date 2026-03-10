@@ -26,6 +26,8 @@ struct text : widget_base
   
   public : 
   
+  text(widget_id id) : widget_base{id} {}
+  
   void set_alignment(text_align::x val) {
     align = val;
   }
@@ -79,7 +81,7 @@ struct with_label : widget_base {
   static constexpr float margin = 3; 
   
   template <class... Args>
-  with_label(Args&&... args) : child{WEAVE_FWD(args)...} {}
+  with_label(widget_id id, Args&&... args) : widget_base{id}, child{WEAVE_FWD(args)...} {}
   
   auto size_info() const {
     auto base = child.size_info();
@@ -104,7 +106,7 @@ struct with_label : widget_base {
     p.text({margin, child.size().y / 2}, text);
   }
   
-  auto traverse_children(auto fn) {
+  auto traverse_children(auto&& fn) {
     return fn(child);
   }
   
@@ -156,12 +158,12 @@ struct text : view<text<Args...>>, view_modifiers {
     return string;
   }
   
-  auto build(const build_context& b, ignore) {
-    auto& gctx = b.graphics_context();
-    auto res = widget_t{};
+  auto build(const build_context& ctx, ignore) {
+    auto& gctx = ctx.graphics_context();
+    auto res = widget_t{{ctx.new_id()}};
     res.set_string(make_string(), gctx);
     res.set_alignment(align_x);
-    res.set_font_size(prop.font_size, b.graphics_context());
+    res.set_font_size(prop.font_size, ctx.graphics_context());
     return res;
   }
   
@@ -211,7 +213,7 @@ struct with_label : view<with_label<V>>, view_modifiers {
   
   auto build(const build_context& ctx, auto& state) {
     using underlying = decltype(view.build(ctx, state));
-    auto res = widgets::with_label<underlying>{view.build(ctx, state)};
+    auto res = widgets::with_label<underlying>{ctx.widget_tree().new_id(), view.build(ctx, state)};
     res.set_label(str, ctx.graphics_context());
     return res;
   }

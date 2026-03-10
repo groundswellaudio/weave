@@ -79,7 +79,7 @@ struct toggle_button : widget_base
 
 struct trigger_button : widget_base {
 
-  widget_action<void()> on_click;
+  widget_action<void(widget_id self)> on_click;
   bool disabled = false;
   
   static constexpr point margin = {10, 4};
@@ -92,6 +92,8 @@ struct trigger_button : widget_base {
   float text_width = 0;
   
   public : 
+  
+  trigger_button(widget_id id) : widget_base{id} {}
   
   const auto& string() const { return str; }
   
@@ -126,7 +128,7 @@ struct trigger_button : widget_base {
       (hovered = false, ec.request_repaint());
     if (!e.is_down())
       return;
-    on_click(ec);
+    on_click(ec, id());
   }
   
   void set_disabled(bool new_disabled) {
@@ -168,17 +170,12 @@ struct toggle_button : view<toggle_button<Lens>>, view_modifiers {
   template <class S>
   auto build(build_context b, S& s) {
     auto value = lens.read(s);
-    return widget_t{{50, 20}, properties, lens_write_for_widget(lens), value};
+    return widget_t{{b.new_id()}, properties, lens_write_for_widget(lens), value};
   }
   
   rebuild_result rebuild(toggle_button<Lens>& Old, widget_ref w, ignore, ignore) {
     return {};
   }
-  
-  void destroy(widget_ref r, application_context& ctx) {
-      if (ctx.has_mouse_focus(r))
-        ctx.reset_mouse_focus();
-    }
   
   Lens lens;
   button_properties properties;
@@ -195,24 +192,19 @@ struct button : view<button<Fn>>, view_modifiers {
   
   button(const button&) = default;
   
-  auto text_bounds(application_context& ctx) {
-    return ctx.graphics_context().text_bounds(str, font_size);
-  }
-  
   template <class State>
   auto build(const build_context& b, State& s) {
-    decltype(widget_t::on_click) action = [f = fn] (auto& ec) { context_invoke<State>(f, ec); };
-    auto res = widget_t{};
+    auto res = widget_t{b.new_id()};
     auto& gctx = b.graphics_context();
     res.set_font_size(font_size, gctx);
     res.set_string(std::string(str), gctx);
-    res.on_click = std::move(action);
+    res.on_click = make_action<State>();
     res.disabled = disabled;
     return res;
   }
   
   template <class State>
-  rebuild_result rebuild(button<Fn>& Old, widget_ref w, auto&& ctx, State& s) {
+  rebuild_result rebuild(button<Fn>& Old, widget_ref w, const build_context& ctx, State& s) {
     auto& b = w.as<widget_t>();
     rebuild_result res;
     b.set_disabled(disabled);
@@ -227,7 +219,7 @@ struct button : view<button<Fn>>, view_modifiers {
     }
     if (update_bounds) 
       res |= rebuild_result::size_change;
-    b.on_click = [f = fn] (auto& ec) { context_invoke<State>(f, ec); };
+    b.on_click = make_action<State>();
     return {};
   }
   
@@ -236,12 +228,21 @@ struct button : view<button<Fn>>, view_modifiers {
     return *this;
   }
   
-  void destroy(widget_ref r, application_context& ctx) {
-      if (ctx.has_mouse_focus(r))
-        ctx.reset_mouse_focus();
-    }
-  
   private : 
+  
+  auto text_bounds(application_context& ctx) {
+    return ctx.graphics_context().text_bounds(str, font_size);
+  }
+  
+  template <class State>
+  auto make_action() {
+    return [f = fn] (event_context& ec, widget_id self) {
+      if constexpr (std::invocable<Fn, event_context&, widget_id>)
+        context_invoke<State>(f, ec, self);
+      else
+        context_invoke<State>(f, ec);
+    };
+  }
   
   std::string_view str;
   Fn fn;
@@ -342,7 +343,7 @@ namespace weave::views
     
     template <class S>
     auto build(const build_context& b, S& state) {
-      widget_t res {{}, paint_fn, {}, val};
+      widget_t res {{b.new_id()}, paint_fn, {}, val};
       res.write = [w = write_fn] (event_context& ec, bool v) -> bool {
         return context_invoke<S>(w, ec, v);
       };
@@ -361,11 +362,6 @@ namespace weave::views
       return {};
     }
     
-    void destroy(widget_ref r, application_context& ctx) {
-      if (ctx.has_mouse_focus(r))
-        ctx.reset_mouse_focus();
-    }
-    
     bool val;
     PaintFn paint_fn;
     WriteFn write_fn;
@@ -380,8 +376,8 @@ namespace weave::views
     using widget_t = widgets::graphic_trigger_button<PaintFn>;
     
     template <class S>
-    auto build(const build_context& b, S& state) {
-      widget_t res {{}, paint_fn, {}};
+    auto build(const build_context& ctx, S& state) {
+      widget_t res {{ctx.widget_tree().new_id()}, paint_fn, {}};
       res.on_click = action<S>();
       return res;
     }
@@ -391,11 +387,6 @@ namespace weave::views
       auto& b = w.as<widget_t>();
       b.on_click = action<S>();
       return {};
-    }
-    
-    void destroy(widget_ref r, application_context& ctx) {
-      if (ctx.has_mouse_focus(r))
-        ctx.reset_mouse_focus();
     }
     
     private : 

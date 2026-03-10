@@ -77,7 +77,7 @@ struct image : view<image<ImgT, Proj>>, view_modifiers {
     return *this;
   }
   
-  vec2f get_display_size() const {
+  point get_display_size() const {
     if (img->empty())
       return {0, 0};
     // CAREFUL here : by convention the dimensions of images are stored as (y, x), but the size of widget is (x, y)!
@@ -94,7 +94,7 @@ struct image : view<image<ImgT, Proj>>, view_modifiers {
   }
   
   /// Make an image view fit within a given box while preserving the aspect ratio.
-  auto& fit(vec2f box) {
+  auto& fit(point box) {
     max_bounds = box;
     return *this;
   }
@@ -105,19 +105,19 @@ struct image : view<image<ImgT, Proj>>, view_modifiers {
       texture = make_texture(ctx.graphics_context());
     auto wsize = get_display_size();
     version = img.version();
-    return widget_t{{wsize}, texture, wsize, corner_offset};
+    return widget_t{{ctx.new_id(), wsize}, texture, wsize, corner_offset};
   }
   
-  rebuild_result rebuild(const image& old, widget_ref elem, const build_context& up, ignore) {
+  rebuild_result rebuild(const image& old, widget_ref elem, const build_context& ctx, ignore) {
     auto& w = elem.as<widget_t>();
     version = old.version;
     if (!w.texture) {
       if (!img->empty())
-        w.texture = make_texture(up.graphics_context());
+        w.texture = make_texture(ctx.graphics_context());
     }
     else if (img.get().data() != old.img.get().data() || version != img.version()) {
       debug_log("refreshing image");
-      auto& gctx = up.graphics_context();
+      auto& gctx = ctx.graphics_context();
       gctx.delete_texture(*w.texture);
       
       if (img->empty()) {
@@ -126,7 +126,7 @@ struct image : view<image<ImgT, Proj>>, view_modifiers {
         return rebuild_result::size_change;
       }
       
-      w.texture = make_texture(up.graphics_context());
+      w.texture = make_texture(ctx.graphics_context());
     }
     auto new_size = get_display_size();
     if (w.size() == new_size)

@@ -180,9 +180,9 @@ struct slider : view<slider<Lens>> {
   }
   
   template <class S>
-  auto build(const build_context& b, S& state) {
+  auto build(const build_context& ctx, S& state) {
     auto val = lens.read(state);
-    auto res = widget_t{{}, properties};
+    auto res = widget_t{{ctx.new_id()}, properties};
     res.write = [l = lens] (event_context& c, float val) { l.write(c.state<S>(), val); };
     set_widget_value(res, val);
     res.write_scaled = write_scaled_v;
@@ -191,7 +191,7 @@ struct slider : view<slider<Lens>> {
   }
   
   template <class S>
-  rebuild_result rebuild(slider<Lens>& Old, widget_ref wb, build_context up, S& state) {
+  rebuild_result rebuild(slider<Lens>& Old, widget_ref wb, build_context ctx, S& state) {
     auto& w = wb.as<widget_t>();
     auto val = lens.read(state);
     if (properties != Old.properties) {

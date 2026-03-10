@@ -32,8 +32,8 @@ struct combo_box : widget_base {
   
   public : 
   
-  combo_box(point size, std::vector<std::string> choices)
-  : widget_base{size}, choices{std::move(choices)} {}
+  combo_box(widget_id id, std::vector<std::string> choices)
+  : widget_base{id}, choices{std::move(choices)} {}
   
   widget_size_info size_info() const {
     widget_size_info res;
@@ -53,12 +53,12 @@ struct combo_box : widget_base {
     hovered = e.is_enter() ? true : e.is_exit() ? false : hovered;
     if (!e.is_down())
       return;
-    popup_menu m;
+    popup_menu m {ec.tree().new_id()};
     int k = 0;
     for (auto& c : choices) 
       m.add_element(c, [this, p = k++] (event_context& ec) { this->select(ec, p); }, 
                     ec.graphics_context());
-    m.set_position(vec2f{0, size().y});
+    m.set_position(point{0, size().y});
     enter_popup_menu_relative(ec, std::move(m), this);
     hovered = false;
   }
@@ -118,8 +118,9 @@ struct combo_box : view<combo_box<Lens, Range>> {
     auto size = point{50, 20};
     auto&& vec = make_string_vec();
     auto w = max_text_width(vec, ctx.graphics_context(), 11);
-    auto res = widget_t{{w + 2 * widget_t::margin, 20}, std::forward<StringVec>(vec)};
-    res.max_width = w + 20; 
+    auto res = widget_t{ctx.new_id(), WEAVE_FWD(vec)};
+    res.max_width = w + 20;
+    res.set_size({w + 2 * widget_t::margin, 20});
     return res;
   }
   
