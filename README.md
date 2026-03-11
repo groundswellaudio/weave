@@ -5,13 +5,15 @@ weave is a declarative UI library for C++, inspired by the likes of ImGUI, Swift
 Its goal is to provide a terse, declarative API (like ImGUI) for designing user interfaces, 
 while offering the extensibility of traditional UI libraries.
 
-![A screenshot of the music player](./screenshot.png)
+![](./examples/screenshot_1.png)
+![](./examples/screenshot_2.png)
+
+*Screenshots of the music player*
 
 ## Hello world
 
 ```cpp
 #include <weave/weave.hpp>
-#include <format>
 
 struct State {
   int value = 0;
@@ -20,7 +22,7 @@ struct State {
 auto make_view(State& state) {
   using namespace weave::views;
   return vstack{
-    text{std::format("counter value : {}", state.value)},
+    text{"counter value : {}", state.value},
     button{"Increment", [] (auto& s) { ++s.value; }}
   };
 }
@@ -31,9 +33,9 @@ int main() {
 }
 ```
 
-The views are the high level description of the user interface. Roughly every time an user 
+The `views` are the high level description of the user interface. Roughly every time an user 
 action is triggered, the view constructor (`make_view`) is run and compared against the old 
-version to provide updates.
+version to provide updates to the underlying widgets. 
 
 Note that the button above does not take a callback containing a reference : the user 
 state is passed down to views and widgets. One of the design goal of `weave` is to 
@@ -43,7 +45,7 @@ reduce as much as possible the need to store references.
 
 weave avoid cumbersome inheritance hierarchies to favor non-intrusive polymorphism 
 and templates. The `widget_ref` and `widget_box` types encapsulate any types deriving 
-from the `widget_base` class, which contains only its position and size. 
+from the `widget_base` class, which contains only its identifier, position and size. 
 
 ```cpp 
 struct button : widget_base {
@@ -70,62 +72,69 @@ struct button : widget_base {
 };
 ```
 
-### The widget tree
+## The widget tree
 
-Some widgets have children. The only thing that a widget needs to do in order 
-to make its children available to the tree traversal is to declare a function 
-named `traverse_children` :
+Widgets refer to each other using a `widget_id` (a simple integer). The widget tree associate 
+each `widget_id` to a reference (which can be relocated) and to the identifier of its parent. 
+The children of a widget, however, are not stored in the widget tree, but in the widget themselves.
+
+This architecture was chosen as it makes writing memory safe and efficient code easy : 
+since references are never stored outside of the tree and you can test whether 
+a `widget_id` is valid or not, this gives you total control over memory layout 
+(unlike traditional UI library where everything as to be allocated on the heap)
+and references are guaranteed to be valid as long as your code follow some simple rules.
+
+The only thing that a widget needs to do in order to make its children available to the tree 
+traversal is to declare a function named `traverse_children` :
 
 ```cpp
-struct MyWidget {
+struct MyWidget : widget_base {
   
-  vec2f layout() { ... place the children... }
-  
-  auto traverse_children(auto fn) {
+  auto traverse_children(auto&& fn) {
     return weave::traverse(fn, a, b, fields);
     // equiavelent to : 
     // return fn(a) && (s ? fn(s) : true) && std::all_of(fields.begin(), fields.end(), /*ect*/);
   }
   
-  button b; 
+  toggle_button b; 
   std::optional<slider> s;
-  std::vector<unique_ptr<numeric_field>> fields;
+  std::vector<text_field> fields;
 };
 ```
 
 If a parent wishes to hide a child and disable its interaction logic, it can simply 
 exclude the child from traversal, as is implicitly done above with the use of `optional`.
 
-For the moment, we requires that widgets who can be the subject of mouse or keyboard 
-focus have a stable memory address while they or their children 
-are under focused. This is why we're using `unique_ptr` in the example 
-above. It could turns out that a `rebuild` triggered by an interaction from a field 
-invalidate the reference held by weave for dispatching mouse events, or maybe we know 
-that a change from a field cannot change the quantity from which the fields are instantiated, 
-so that unique address might not be needed.
-
 ## State mutation 
 
-A lot of views (sliders, fields, knobs...) are both state displayer and mutator. 
-These views always need to be passed two things : a value to read, and an invokable 
-to write. In weave this pair is called a `read_write`. 
-In some cases, those two things can be passed at once, for example 
-by passing a pointer to member or any invokable returning a reference : 
+As said earlier, one of the design goal of `weave` is to not store pointers directly 
+anywhere in the library. Most traditional UI libraries force you to keep pointers to your 
+state within the widget callback. This is constraining, wasteful, and prevent value 
+semantics (you might want to clone some part of your UI and have it operate on a different part of the state).
+Therefore, in weave, state is always passed down to widgets, and widgets only have to store 
+relative references, preserving value semantics and allowing you to relocate your state as 
+needed.
+
+Example : 
 
 ```cpp
-auto make_app(State& s) {
-  auto s  = views::slider{ &State::x }; 
-  auto s2 = views::slider{ [] (State& s) -> auto& { return s.x; } };
-  auto s3 = views::slider{ read_write{&State::get_x, &State::set_x} };
-}
+auto s  = views::slider{ &State::x }; 
+auto s2 = views::slider{ [] (State& s) -> auto& { return s.x; } };
+auto s3 = views::slider{ &State::set_x, state.x };
 ```
 
-## Roadmap 
+The state is passed down to widgets by `event_context`. Widgets actions can either operate 
+on the concrete state or on `event_context` (should you, for example, want to close an overlay 
+on the click of a button).
 
-[ ] Code a fully fledged music player and library manager (30% there)
+## Roadmap (in terms of priorities)
 
-[ ] Audio plugins support 
+- [ ] Code a fully fledged music player and library manager (30% there)
 
-[ ] Accessibility support
+- [ ] Practical system (maybe CSS inspired) to hierarchically customise the look of widgets
 
-[ ] Richer rendering API (maybe transitioning from nanovg towards some Rust library)
+- [ ] Audio plugins support 
+
+- [ ] Richer rendering API (maybe transitioning from nanovg towards some Rust library)
+
+- [ ] Accessibility support
