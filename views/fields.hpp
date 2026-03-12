@@ -31,7 +31,7 @@ struct text_field : widget_base {
   bool show_caret : 1 = false;
   bool editing : 1 = false;
   
-  void update_glyph_pos(graphics_context& gc) {
+  void update_glyph_pos(const graphics_context& gc) {
     gc.get_glyph_positions(glyph_pos, value_str, {5, size().y / 2}, font_size);
   }
   
@@ -89,11 +89,12 @@ struct text_field : widget_base {
   void set_font_size(float new_size, const graphics_context& ctx) {
     font_size = new_size;
     height = ctx.text_height(font_size);
+    update_glyph_pos(ctx);
   }
   
   bool is_being_edited() const { return editing; }
   
-  void set_value(std::string new_value, graphics_context& gc) {
+  void set_value(std::string new_value, const graphics_context& gc) {
     value_str = WEAVE_MOVE(new_value); 
     cursor_index[1] = value_str.size();
     update_glyph_pos(gc);
@@ -155,6 +156,25 @@ struct text_field : widget_base {
     return res;
   }
   
+  void on_backspace(event_context& ec) {
+    if (caret() == 0)
+      return;
+    if (has_selection())
+    {
+      value_str.erase(value_str.begin() + cursor_index[0], value_str.begin() + cursor_index[1]);
+      cursor_index[1] = cursor_index[0];
+      cursor_index[0] = -1;
+    }
+    else
+    {
+      value_str.erase( value_str.begin() + caret() - 1 );
+      --caret();
+    }
+    update_glyph_pos(ec.graphics_context());
+    try_decrease_x_offset();
+    ec.request_repaint();
+  }
+  
   void on(keyboard_event e, event_context& Ec) {
     if (e.is_up())
       return;
@@ -163,7 +183,7 @@ struct text_field : widget_base {
       if (has_selection()) // replace selection with input
       {
         value_str.replace( value_str.begin() + cursor_index[0], value_str.begin() + cursor_index[1],
-                e.text_input().begin(), e.text_input().end() );
+                           e.text_input().begin(), e.text_input().end() );
         cursor_index[1] = cursor_index[0] + 1;
         cursor_index[0] = -1;
       }
@@ -173,31 +193,16 @@ struct text_field : widget_base {
         value_str.insert( value_str.begin() + caret(), input.begin(), input.end() );
         caret() += input.size();
       }
-      update_glyph_pos(Ec.graphics_context());
       try_increase_x_offset();
       Ec.request_repaint();
+      update_glyph_pos(Ec.graphics_context());
       return;
     }
     
     switch(e.key()) {
-      case keycode::backspace: {
-        if (caret() == 0)
-          return;
-        if (has_selection())
-        {
-          value_str.erase(value_str.begin() + cursor_index[0], value_str.begin() + cursor_index[1]);
-          cursor_index[1] = cursor_index[0];
-          cursor_index[0] = -1;
-        }
-        else
-        {
-          value_str.erase( value_str.begin() + caret() - 1 );
-          --caret();
-        }
-        try_decrease_x_offset();
-        Ec.request_repaint();
-        break;
-      }
+      case keycode::backspace: 
+        on_backspace(Ec);
+        return;
       case keycode::enter: 
         exit_editing(Ec);
         write(Ec, value_str);
@@ -311,10 +316,10 @@ struct text_field : view<text_field<Setter>>, view_modifiers {
     res.set_background_text(background_text);
     if (value)
       res.set_value(std::string{*value}, ctx.graphics_context());
+    res.set_font_size(font_size_v, ctx.graphics_context());
     res.write = [fn = setter] (event_context& ec, std::string_view str) {
       context_invoke<S>(fn, ec, str);
     };
-    res.set_font_size(font_size_v, ctx.graphics_context());
     return res;
   }
   
