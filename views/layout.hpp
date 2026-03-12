@@ -313,9 +313,10 @@ namespace impl {
     
     [[no_unique_address]] non_copyable _;
     
-    void consume(auto&& W) { 
-      auto it = vec.insert(vec.begin() + index++, widget_box{WEAVE_FWD(W)});
-      b.widget_tree().insert(it->borrow(), this_id);
+    void consume(auto&& W) {
+      auto box = widget_box{WEAVE_FWD(W)};
+      auto it = vec.insert(vec.begin() + index++, std::move(box));
+      it->mount(b.widget_tree(), this_id);
       mutated = true;
     }
     
@@ -333,16 +334,15 @@ namespace impl {
 
   template <class T, class V, class S>
   auto build_stack(V& view, const build_context& ctx, S& state, auto&&... ctor_args) {
-    T Res { {ctx.new_id()}, ctor_args... };
-    auto consumer = [&] (auto&&... args) { 
-      Res.children_vec.push_back( widget_box{(decltype(args)&&)(args)...} );
+    T Res { {ctx.new_id()}, WEAVE_FWD(ctor_args)... };
+    auto consumer = [&] (auto&& elem) {
+      Res.children_vec.push_back( widget_box{WEAVE_FWD(elem)} );
+      Res.children_vec.back().mount(ctx.widget_tree(), Res.id());
     };
     
     tuple_for_each([&] (auto& elem) {
       elem.seq_build(consumer, ctx, state);
     }, view.children);
-    
-    ctx.widget_tree().insert_children(Res);
     
     return Res;
   }
@@ -361,9 +361,9 @@ namespace impl {
       wb.id()
     };
     
-    rebuild_result res; 
+    rebuild_result res;
     
-    tuple_for_each_with_index( [&] (auto elem_index, auto& elem) -> void 
+    tuple_for_each_with_index( [&] (auto elem_index, auto& elem)
     { 
       res |= elem.seq_rebuild(get<elem_index.value>(Old.children), seq_updater, ctx, state);
     }, New.children);
@@ -382,7 +382,7 @@ namespace impl {
                                   return true;
                                 });
       std::for_each(it, w.children_vec.end(), 
-                    [ctx] (auto& e) { ctx.widget_tree().erase(e.id()); });
+                    [ctx] (auto& e) { e.unmount(ctx.widget_tree()); });
       
       w.children_vec.erase(it, w.children_vec.end());
     }
@@ -390,7 +390,7 @@ namespace impl {
     // If some underlying items were deleted or added, reset the scrollbar position
     if (seq_updater.mutated)
       w.reset_scrollbar();
-      
+    
     if (seq_updater.mutated || (res & rebuild_result::size_change)) {
       w.do_layout(w.size());
       return {};
@@ -662,8 +662,6 @@ struct stack_base : view<stack_base<T, Ts...>>, stack<Ts...> {
     tuple_for_each( [&] (auto& elem) {
       elem.seq_destroy(lift_destroy, ctx);
     }, this->children );
-    
-    ctx.widget_tree().erase_children(wb);
   }
   
   auto&& scrollable(this auto&& self, float min_scroll_size = 300) {
@@ -736,8 +734,6 @@ struct flow : view<flow<Ts...>> {
     tuple_for_each( [&] (auto& elem) {
       elem.seq_destroy(lift_destroy, ctx);
     }, children );
-    
-    ctx.widget_tree().erase_children(wb);
   }
   
   auto& rounded(float val) {

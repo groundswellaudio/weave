@@ -116,15 +116,13 @@ struct widget_base {
       type_str.remove_prefix(sizeof("weave::widgets::") - 1);
     std::cerr << type_str << " " << self.position() << " " << self.size();
     auto info = self.size_info();
-    std::cerr << "min " << info.min << " max " << info.max << " flex " << info.flex_factor
+    std::cerr << " min " << info.min << " max " << info.max << " flex " << info.flex_factor
     << " nominal_size " << info.nominal;
-    if constexpr ( widget_has_children<T> ) {
-      self.traverse_children( [indent] (auto& elem) {
-        std::cerr << '\n';
-        elem.debug_dump(indent + 1); 
-        return true;
-      });
-    }
+    self.traverse_children( [indent] (auto& elem) {
+      std::cerr << '\n';
+      elem.debug_dump(indent + 1); 
+      return true;
+    });
   }
   
   void set_position(float x, float y) {
@@ -156,6 +154,12 @@ struct widget_base {
   
   void destroy(this auto&& self, destroy_context ctx);
   
+  void mount(this auto& self, widget_tree& tree, widget_id parent);
+  
+  void unmount(this auto& self, widget_tree&);
+  
+  void traverse_children(auto&& fn) {}
+    
   widget_id id() const { return uuid; }
   
   widget_id uuid;
@@ -191,6 +195,8 @@ namespace impl
     ptr<void(widget_base*, widget_children_vec&)> children;
     ptr<void(widget_base*, int indent)> debug_dump;
     ptr<void(widget_base*, destroy_context ctx)> destroy;
+    ptr<void(widget_base*, widget_tree&, widget_id)> mount;
+    ptr<void(widget_base*, widget_tree&)> unmount;
   };
   
   template <class T>
@@ -257,6 +263,14 @@ class widget_ref {
     return vptr == &impl::widget_vtable_impl<std::remove_const_t<T>>::value;
   }
   
+  void mount(widget_tree& tree, widget_id parent) {
+    vptr->mount(data, tree, parent);
+  }
+  
+  void unmount(widget_tree& tree) {
+    vptr->unmount(data, tree);
+  }
+  
   void paint(painter& p) const {
     vptr->paint(data, p);
   }
@@ -275,6 +289,7 @@ class widget_ref {
   widget_size_info size_info() const { return vptr->size_info(data); }
   
   point size() const { return data->size(); }
+  
   rectangle area() const { return data->area(); }
   
   void set_size(point sz) { data->set_size(sz); }
@@ -293,9 +308,7 @@ class widget_ref {
     return vptr->find_child_at(data, pos);
   }
   
-  widget_id id() const {
-    return data->id();
-  }
+  widget_id id() const { return data->id(); }
   
   std::vector<widget_ref> children() const {
     std::vector<widget_ref> vec; 
@@ -317,7 +330,7 @@ struct widget_box : widget_ref {
   template <class W>
     requires (std::is_base_of_v<widget_base, std::remove_reference_t<W>>)
   widget_box(W&& widget) {
-    data = new std::decay_t<W> { (W&&)widget };
+    data = new std::decay_t<W> { WEAVE_FWD(widget) };
     vptr = &impl::widget_vtable_impl<std::decay_t<W>>::value;
   }
   
@@ -384,7 +397,9 @@ struct widget_tree {
   }
   
   void erase(widget_id id) {
-    tree.erase(id);
+    auto it = tree.find(id);
+    assert( it != tree.end() && "widget already erased from tree" );
+    tree.erase(it);
   }
   
   void erase(const widget_base& w) {
@@ -509,13 +524,11 @@ struct widget_tree {
 };
 
 void widget_base::destroy(this auto&& self, destroy_context ctx) {
-  if constexpr (widget_has_children<decltype(self)>) {
-    self.traverse_children([ctx] (auto&& c) {
-      ctx.tree().erase(c.id());
-      c.destroy(ctx);
-      return true;
-    });
-  }
+  self.traverse_children([ctx] (auto&& c) {
+    ctx.tree().erase(c.id());
+    c.destroy(ctx);
+    return true;
+  });
 }
 
 point widget_base::absolute_position(const widget_tree& tree) const {
@@ -523,6 +536,22 @@ point widget_base::absolute_position(const widget_tree& tree) const {
   for (auto parent : tree.parents_of(*this))
     p += parent.position();
   return p;
+}
+
+void widget_base::mount(this auto& self, widget_tree& tree, widget_id parent) {
+  tree.insert(widget_ref(&self), parent);
+  self.traverse_children( [&tree, pid = self.id()] (auto& child) {
+    child.mount(tree, pid);
+    return true;
+  });
+}
+
+void widget_base::unmount(this auto& self, widget_tree& tree) {
+  self.traverse_children( [&tree] (auto& child) {
+    child.unmount(tree);
+    return true;
+  });
+  tree.erase(self.id());
 }
 
 namespace impl {
@@ -540,16 +569,11 @@ namespace impl {
 } // impl
 
 optional<widget_ref> widget_base::find_child_at(this auto& self, point pos) {
-  if constexpr ( widget_has_children<decltype(self)> ) {
-    optional<widget_ref> res;
-    self.traverse_children( [&res, pos] (auto& elem) {
-      return !elem.contains(pos) || (res = impl::to_widget_ref(elem), false);
-    });
-    return res;
-  }
-  else {
-    return {};
-  }
+  optional<widget_ref> res;
+  self.traverse_children( [&res, pos] (auto& elem) {
+    return !elem.contains(pos) || (res = impl::to_widget_ref(elem), false);
+  });
+  return res;
 }
 
 struct event_result {
@@ -661,16 +685,15 @@ namespace impl {
           return Obj.on_keyboard_focus_release(ctx);
       },
       child_event_fn_ptr<W>(),
-      +[] (widget_base* self, vec2f pos) -> optional<widget_ref> {
+      +[] (widget_base* self, point pos) -> optional<widget_ref> {
         auto& obj = *static_cast<W*>(self);
         return obj.find_child_at(pos);
       },
       +[] (widget_base* self, widget_children_vec& vec) {
-        if constexpr ( widget_has_children<W> )
-          static_cast<W*>(self)->traverse_children( [&vec] (auto&& elem) {
-            vec.push_back(to_widget_ref(elem));
-            return true;
-          });
+        static_cast<W*>(self)->traverse_children( [&vec] (auto&& elem) {
+          vec.push_back(to_widget_ref(elem));
+          return true;
+        });
       },
       +[] (widget_base* self, int indent) {
         static_cast<W*>(self)->debug_dump(indent + 1);
@@ -678,6 +701,13 @@ namespace impl {
       +[] (widget_base* self, destroy_context ctx) {
         static_cast<W*>(self)->destroy(ctx);
         delete static_cast<W*>(self);
+      },
+      +[] (widget_base* self, widget_tree& tree, widget_id id) {
+        static_cast<W*>(self)->mount(tree, id);
+      },
+      +
+      +[] (widget_base* self, widget_tree& tree) {
+        static_cast<W*>(self)->unmount(tree);
       }
     };
   };

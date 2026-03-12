@@ -206,10 +206,11 @@ void popup_menu::open_child(event_context& ec, int idx) {
 
 inline void enter_popup_menu(event_context& ec, popup_menu m) {
   if (m.can_open_submenu()) {
-    ec.push_overlay( popup_menu_stack{{ec.tree().new_id(), ec.context().window().size()}, {m}} );
+    auto p = popup_menu_stack{{ec.tree().new_id(), ec.context().window().size()}, {m}};
+    ec.push_overlay(std::move(p));
   }
   else {
-    ec.push_overlay( std::move(m) );
+    ec.push_overlay(std::move(m));
   }
 }
 

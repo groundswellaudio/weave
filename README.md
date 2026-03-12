@@ -2,7 +2,7 @@
 
 weave is a declarative UI library for C++, inspired by the likes of ImGUI, SwiftUI, and xilem.
 
-Its goal is to provide a terse, declarative API (like ImGUI) for designing user interfaces, 
+Its goal is to provide a terse, declarative API for designing user interfaces, 
 while offering the extensibility of traditional UI libraries.
 
 ![](./examples/screenshot_1.png)
@@ -81,7 +81,7 @@ The children of a widget, however, are not stored in the widget tree, but in the
 This architecture was chosen as it makes writing memory safe and efficient code easy : 
 since references are never stored outside of the tree and you can test whether 
 a `widget_id` is valid or not, this gives you total control over memory layout 
-(unlike traditional UI library where everything as to be allocated on the heap)
+(unlike traditional UI library where everything has to be allocated on the heap)
 and references are guaranteed to be valid as long as your code follow some simple rules.
 
 The only thing that a widget needs to do in order to make its children available to the tree 

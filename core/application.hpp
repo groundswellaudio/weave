@@ -77,7 +77,7 @@ namespace impl {
     
     public : 
     
-    mouse_event_dispatcher(widget_ref root) : focused{root.id()} {}
+    mouse_event_dispatcher(widget_id root) : focused{root} {}
     
     void set_focused(widget_id id, const widget_tree& tree) {
       if (id == focused)
@@ -259,10 +259,10 @@ struct application_context {
   : backend{this},
     win{win_prop},
     root{Ctor()},
-    mouse{root.borrow()}
+    mouse{root.id()}
   {
-    tree.insert(root.borrow(), root.id());
     backend.start_text_input(win);
+    root.mount(tree, root.id());
     layout_root();
   }
   
@@ -286,10 +286,10 @@ struct application_context {
   widget_ref push_overlay(widget_box w) 
   {
     overlays.push_back(std::move(w));
-    auto r = overlays.back().borrow();
-    widget_tree().insert(r, r.id());
-    mouse.set_focused(r.id(), widget_tree());
-    return r;
+    auto& o = overlays.back();
+    o.mount(widget_tree(), o.id());
+    mouse.set_focused(o.id(), widget_tree());
+    return o.borrow();
   }
   
   void pop_overlay(widget_id id)
@@ -381,11 +381,11 @@ struct application_context {
     for (auto& o : overlays)
       fn(o.borrow(), {0, 0}, win.size());
     
-    /* 
+    /*
     auto f = current_mouse_focus();
     auto r = rectangle(f.absolute_position(tree), f.size());
     p.fill_style(rgba_f{colors::red}.with_alpha(0.3));
-    p.fill(r); */ 
+    p.fill(r);*/
     
     p.end_frame();
     win.swap_buffer();
@@ -457,7 +457,7 @@ event_result mouse_event_dispatcher::on(mouse_event e, void* state,
   if (e.is_down() && focused != ctx.current_keyboard_focus())
     res = res || ctx.reset_keyboard_focus(state);
   
-  // focused::on might change the mouse focus, copy them here to safeguard against mutations
+  // focused::on might mutate focused 
   const auto focused_id = focused;
   const auto top_parent_listener_id = top_parent_listener;
   
@@ -468,8 +468,10 @@ event_result mouse_event_dispatcher::on(mouse_event e, void* state,
   
   // focused::on might have relocated or deleted focused, look it up again
   focused_ref = ctx.widget_tree().get(focused_id);
+  // We might have a new focused_id
   if (!focused_ref) {
-    set_focused(ctx.root_widget().id(), ctx.widget_tree());
+    auto new_focus_id = focused_id != focused ? focused : ctx.root_widget().id();
+    set_focused(new_focus_id, ctx.widget_tree());
     return res;
   }
   
