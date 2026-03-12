@@ -218,7 +218,6 @@ struct table : widget_base, scrollable_base {
     scroll_offset = std::max(scroll_offset, 0.f);
     if (edited_field)
       edited_field->set_position(edited_field->position() - point{0, delta});
-    //assert( scroll_offset >= 0 );
   }
   
   private : 
@@ -418,7 +417,7 @@ struct table : view<table<T>>, view_modifiers {
   }
   
   template <class S, class M>
-  auto& on_cell_double_click(auto fn) {
+  auto& on_cell_double_click(auto&& fn) {
     cell_double_click = [fn] (event_context& ec, int cell) {
       context_invoke<S>(fn, ec, cell);
     };
@@ -431,10 +430,9 @@ struct table : view<table<T>>, view_modifiers {
   }
   
   const observed_value<T>& data;
-  // FIXME : replace this by strongly typed closures
   widget_action<int> cell_double_click;
   widget_action<widgets::popup_menu(widgets::table::selection_t)> popup_opener;
-  unsigned version; 
+  unsigned version;
 };
 
 template <class T>

@@ -20,25 +20,15 @@ struct TrackPlayer : weave::audio_renderer<TrackPlayer>
   void render_audio(weave::audio_output_stream& os) {
     if (head == -1)
       return;
-    if (head + os.sample_size() > buffer.size()) {
-      auto it = os.begin();
-      for (; head < buffer.size(); head += 2)
-      {
-        auto s = *it;
-        s[0] = buffer[head] * volume;
-        s[1] = buffer[head + 1] * volume;
-        ++it;
-      }
-      head = -1;
+    auto src_begin = buffer.begin() + head;
+    auto src_end = buffer.begin() + head + os.num_samples();
+    if (src_end > buffer.end()) {
+      src_end = buffer.end();
+      head = -1; 
       done_reading = true;
     }
-    else
-    for (auto s : os)
-    {
-      s[0] = buffer[head] * volume;
-      s[1] = buffer[head + 1] * volume;
-      head += 2;
-    }
+    std::copy(src_begin, src_end, os.begin());
+    head += os.num_samples();
   }
   
   std::atomic<float> volume = 1.f;

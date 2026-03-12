@@ -219,7 +219,6 @@ auto track_info_menu(State& state, track_selection selected) {
     return Field;
   };
   
-  
   auto TitleField = MakeField( 
     [selected] (auto& state, std::string_view str) { state.set_tracks_title(selected, str); }, 
     [] (auto& t) -> auto&& { return t.title(); } 

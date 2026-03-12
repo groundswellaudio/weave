@@ -3,9 +3,10 @@
 #include <miniaudio.h>
 #include <string>
 #include <string_view>
-#include <vector>
 #include <cassert>
+#include <vector>
 #include <util/optional.hpp>
+#include <span>
 
 namespace weave {
 
@@ -80,39 +81,17 @@ inline audio_devices_range audio_output_devices() {
   return {devicesInfos, count};
 }
 
-struct audio_output_stream
-{
-	struct sample
-	{
-		auto& operator[](int x) { return ptr[x]; }
-		float* ptr;
-	};
-	
-	struct sample_iterator_sentinel
-	{
-		float* end_ptr;
-	};
-	
-	struct sample_iterator
-	{
-		auto& operator++()        { ptr += n_channels; return *this; }
-		sample operator*() const  { return {ptr};                    }
-		
-		bool operator!=(sample_iterator_sentinel s) const {
-			return ptr != s.end_ptr;
-		}
-		
-		float* ptr;
-		const int n_channels;
-	};
-	
-	auto sample_size() const { return n_samples; }
-	auto begin() { return sample_iterator{ptr, n_channels};                            }
-	auto end()   { return sample_iterator_sentinel{ptr + n_channels * n_samples};      }
-	
-	float* ptr;
-	int n_channels;
-	int n_samples;
+struct audio_output_stream {
+  
+  auto num_samples() const { return n_frames * n_channels; }
+  auto buffer_size() const { return n_frames; }
+  
+  auto begin() { return std::span<float>(ptr, num_samples()).begin();  }
+  auto end()   { return std::span<float>(ptr, num_samples()).end();    }
+  
+  float* ptr;
+  int n_channels;
+  int n_frames;
 };
 
 template <class T>

@@ -705,7 +705,6 @@ namespace impl {
       +[] (widget_base* self, widget_tree& tree, widget_id id) {
         static_cast<W*>(self)->mount(tree, id);
       },
-      +
       +[] (widget_base* self, widget_tree& tree) {
         static_cast<W*>(self)->unmount(tree);
       }
