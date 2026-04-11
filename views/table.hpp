@@ -337,7 +337,7 @@ struct table : widget_base, scrollable_base {
     }
   }
   
-  void paint_body(painter& p, vec2f body_sz) {
+  void paint_body(painter& p, point body_sz) {
     p.fill_style(colors::white);
     int cells_begin = scroll_offset / row;
     int cells_end = (scroll_offset + scroll_zone().size.y) / row + 1;

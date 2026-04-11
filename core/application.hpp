@@ -410,8 +410,7 @@ struct application_context {
   private : 
   
   void layout_root() {
-    root.layout(win.size());
-    root.debug_dump();
+    root.set_size(win.size());
     auto size_info = root_widget().size_info();
     win.set_min_size(size_info.min);
     win.set_max_size(size_info.max);

@@ -156,10 +156,17 @@ struct Database {
     "Title", "Artist", "Album", "Date added"
   };
   
-  observed_value<std::vector<Track>> tracks;
+  std::size_t track_count = 0;
+  observed_value<std::unordered_map<std::size_t, Track>> tracks;
   std::set<Artist, std::less<>> artists; // We want artists ordered by default
   std::vector<Playlist> playlists_v;
   std::set<Album, std::less<>> albums;
+  
+  template <class T>
+  void delete_tracks(T&& range) {
+    for (auto i : range)
+      tracks->erase(i);
+  }
   
   bool add_track_from_file(const std::string& path) {
     TagLib::FileRef f{path.c_str()};
@@ -175,10 +182,10 @@ struct Database {
     auto DateAdded = std::format("{} {:%R}", 
       std::chrono::year_month_day(std::chrono::floor<std::chrono::days>(Now)), 
       Now);
-    tracks->push_back( {path, {Title, Artist, Album, DateAdded}} );
+    auto tid = track_count++;
+    auto [it, inserted] = tracks.mut().emplace(tid, Track{path, {Title, Artist, Album, DateAdded}});
     try_add_artist(Artist);
-    try_add_album(tracks->back(), tracks->size() - 1);
-    tracks.mut();
+    try_add_album(it->second, tid);
     return true;
   }
   
@@ -209,10 +216,10 @@ struct Database {
   bool empty() const { return tracks->empty(); }
   auto num_tracks() const { return tracks->size(); }
   
-  auto& track(this auto& self, int index) { return self.tracks.get()[index]; }
+  auto& track(this auto& self, std::size_t id) { return self.tracks->find(id)->second; }
   
   auto& playlists() const { 
-    return playlists_v; 
+    return playlists_v;
   }
   
   void add_playlist() {
@@ -268,7 +275,7 @@ struct Database {
       artists.insert(it, Artist{str});
   }
   
-  void try_add_album(Track& track, int track_id) {
+  void try_add_album(Track& track, std::size_t track_id) {
     auto key = weave::tuple{std::string_view{track.artist()}, std::string_view{track.album()}};
     auto it = albums.find(key);
     if (it == albums.end() || *it != key) {
@@ -294,9 +301,9 @@ struct Database {
 };
 
 template <>
-struct weave::table_model<std::vector<Database::Track>> {
+struct weave::table_model<std::unordered_map<std::size_t, Database::Track>> {
   auto&& properties(ignore) { return Database::properties_v; }
-  auto& cells(auto& self) { return self; }
+  auto cells(auto& self) { return std::ranges::views::transform(self, [] (auto& elem) { return elem.second; }); }
   auto& cell_properties(const Database::Track& t) { return t.properties; }
 };
 

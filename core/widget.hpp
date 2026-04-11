@@ -94,17 +94,25 @@ struct widget_base {
   
   point size() const { return sz; }
   
+  point nominal_size(this auto&& self) {
+    return self.size_info().nominal;  
+  }
+  
   point position() const { return pos; }
   
   point absolute_position(const widget_tree& tree) const;
   
   rectangle area() const { return {pos, sz}; }
   
-  void set_size(point v) {
+  void set_size(this auto& self, point v) {
     assert( std::abs(v.x) < 1e10 && std::abs(v.y) < 1e10 && "aberrant size value" );
     assert( v.x >= 0 && v.y >= 0 && "negative size value" );
     assert( !std::isnan(v.x) && !std::isnan(v.y) && "NaN in widget size?" );
-    sz = v;
+    if constexpr ( requires {self.layout(v);} ) {
+      if (self.size() != v)
+        self.layout(v);
+    }
+    self.sz = v;
   }
   
   void debug_dump(this auto& self, int indent = 0) {
@@ -139,13 +147,6 @@ struct widget_base {
     auto p = position();
     auto sz = size();
     return p.x <= pos.x && p.y <= pos.y && p.x + sz.x >= pos.x && p.y + sz.y >= pos.y;
-  }
-   
-  void do_layout(this auto& self, point sz) {
-    if constexpr (requires {self.layout(sz);}) {
-      self.layout(sz);
-    }
-    self.set_size(sz);
   }
   
   void on_keyboard_focus_release(event_context& ec) {}
@@ -187,7 +188,7 @@ namespace impl
     using ptr = T*;
     
     ptr<void(widget_base*, painter&)> paint;
-    ptr<void(widget_base*, point sz)> layout;
+    ptr<void(widget_base*, point sz)> set_size;
     ptr<widget_size_info(const widget_base*)> size_info;
     ptr<void(widget_base*, input_event, event_context&)> on;
     ptr<void(widget_base*, input_event, event_context&, widget_ref)> on_child_event;
@@ -240,10 +241,6 @@ class widget_ref {
   bool operator==(widget_ref o) const {
     return data == o.data;
   }
-  
-  auto layout(point sz) {
-    return vptr->layout(data, sz);
-  }
 
   template <class T>
   T& as() {
@@ -290,9 +287,11 @@ class widget_ref {
   
   point size() const { return data->size(); }
   
+  point nominal_size() const { return size_info().nominal; }
+  
   rectangle area() const { return data->area(); }
   
-  void set_size(point sz) { data->set_size(sz); }
+  void set_size(point sz) { vptr->set_size(data, sz); }
   
   point position() const { return data->position(); }
   
@@ -665,8 +664,7 @@ namespace impl {
         obj.paint(p);
       },
       +[] (widget_base* self, point sz) {
-        auto& obj = *static_cast<W*>(self);
-        obj.do_layout(sz);
+        static_cast<W*>(self)->set_size(sz);
       },
       +[] (const widget_base* self) -> widget_size_info {
         return static_cast<const W*>(self)->size_info();

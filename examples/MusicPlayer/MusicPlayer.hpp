@@ -149,7 +149,7 @@ void on_file_drop(event_context& ec, const std::string& path_str) {
   .margin({30, 30});
   
   auto w = dialog.build(build_context{ec.context()}, ec.state<State>());
-  w.do_layout({300, 100});
+  w.set_size(w.nominal_size());
   w.set_position(ec.context().window().size() / 2 - w.size() / 2);
   ec.push_overlay(std::move(w));
 }
@@ -246,11 +246,13 @@ auto track_info_menu(State& state, track_selection selected) {
 }
 
 auto song_selection_popup_menu(event_context& ec, track_selection selected) {
+  // Would be nice here to find a way to not duplicate selected across closure. maybe 
+  // this will be solved by widgets containing user defined state that's passed down to closures
   widgets::popup_menu menu {ec.tree().new_id()};
   auto info = [selected] (event_context& ec) {
     auto& s = ec.state<State>();
     auto w = track_info_menu(s, selected).build(build_context{ec.context()}, s);
-    w.do_layout(w.size_info().nominal);
+    w.set_size(w.nominal_size());
     w.set_position(ec.context().window().size() / 2 - w.size() / 2);
     ec.push_overlay(std::move(w));
   };
@@ -265,9 +267,21 @@ auto song_selection_popup_menu(event_context& ec, track_selection selected) {
     }
     return m;
   };
+  auto delete_fn = [selected] (event_context& ec) {
+    using namespace views;
+    
+    auto w = vstack{ 
+               text{"Delete {} tracks from library?", selected.size()},
+               hstack{
+                button{"Yes", [selected] (State& s) { s.database.delete_tracks(selected); }},
+                button{"Cancel", &event_context::pop_overlay}
+               }}.build(build_context{ec.context()}, ec.state<State>());
+    w.set_size(w.nominal_size());
+  };
   
   menu.add_element("Info", info, ec.graphics_context());
   menu.add_element("Add to playlist", add_to_playlist, ec.graphics_context());
+  menu.add_element("Delete", delete_fn, ec.graphics_context());
   return menu;
 }
 

@@ -68,13 +68,16 @@ struct stack
 namespace impl {
   
   // Called after the sizing has been done
-  void place_stack_layout_elements(std::span<widget_box> children, stack_data data, int axis, 
+  void place_stack_layout_elements(std::span<widget_box> children, 
+                                   std::vector<point>& sizes, stack_data data, int axis,
                                    point this_size)
   {
     float axis_pos = data.margin[axis];
+    auto it = sizes.begin();
     
     for (auto& c : children)
     {
+      c.set_size(*it++);
       point pos;
       pos[axis] = axis_pos;
       pos[!axis] = data.margin[!axis] + data.align_ratio * 
@@ -92,6 +95,7 @@ namespace impl {
   }
   
   void resolve_max_constraints(std::span<widget_box> children, 
+                               std::vector<point>& sizes,
                               const std::vector<widget_size_info> sz_infos, int axis, 
                               point this_size,
                               stack_data data)
@@ -105,7 +109,7 @@ namespace impl {
     
     for (int k = 0; k < 3; ++k)
     {
-      std::vector<widget_ref> unconstrained;
+      std::vector<int> unconstrained_idx;
       
       for (auto i : iota(children.size())) 
       {
@@ -136,27 +140,27 @@ namespace impl {
           remaining_space += old_sz_axis - sz[axis]; 
         }
         else if (!sz_infos[i].aspect_ratio)
-          unconstrained.push_back(children[i].borrow());
+          unconstrained_idx.push_back(i);
       }
       
-      if (std::abs(remaining_space) < 1e-3 || !unconstrained.size())
+      if (std::abs(remaining_space) < 1e-3 || !unconstrained_idx.size())
         return;
       
       float sum_unconstrained_flex = 0;
       
-      for (auto u : unconstrained)
-        sum_unconstrained_flex += u.size_info().flex_factor[axis];
-        
+      for (auto i : unconstrained_idx)
+        sum_unconstrained_flex += children[i].size_info().flex_factor[axis];
+      
       // None of the remaining widget are flexible, nothing to do
       if (sum_unconstrained_flex == 0)
         return;
       
-      for (auto u : unconstrained) {
-        auto sz = u.size();
-        auto szi = u.size_info();
+      for (auto i : unconstrained_idx) {
+        auto sz = children[i].size();
+        auto szi = children[i].size_info();
         sz[axis] += remaining_space * szi.flex_factor[axis] / sum_unconstrained_flex;
         sz[axis] = std::min(szi.max[axis], sz[axis]);
-        u.set_size(sz);
+        children[i].set_size(sz);
       }
       
       remaining_space = 0;
@@ -164,6 +168,7 @@ namespace impl {
   }
   
   void resolve_min_constraints(std::span<widget_box> children, 
+                               std::vector<point>& sizes,
                               const std::vector<widget_size_info>& sz_infos, int axis, 
                               point this_size)
   {
@@ -171,20 +176,18 @@ namespace impl {
     {
       float space_to_remove = 0;
       
-      std::vector<widget_ref> unconstrained;
+      std::vector<int> unconstrained_idx;
       
       for (auto i : iota(children.size())) 
       {
-        auto sz_axis = children[i].size()[axis];
+        auto sz_axis = sizes[i][axis];
         auto sz_min_axis = sz_infos[i].min[axis];
         if (sz_axis < sz_min_axis) {
           space_to_remove += (sz_min_axis - sz_axis);
-          auto sz = children[i].size();
-          sz[axis] = sz_min_axis; 
-          children[i].set_size(sz);
+          sizes[i][axis] = sz_min_axis;
         }
         else
-          unconstrained.push_back(children[i].borrow());
+          unconstrained_idx.push_back(i);
       }
       
       if (space_to_remove == 0)
@@ -192,30 +195,32 @@ namespace impl {
       
       float sum_unconstrained_inv_flex = 0;
       
-      for (auto u : unconstrained)
-        sum_unconstrained_inv_flex += 1.f / u.size_info().flex_factor[axis];
+      for (auto i : unconstrained_idx)
+        sum_unconstrained_inv_flex += 1.f / children[i].size_info().flex_factor[axis];
         
-      for (auto u : unconstrained) {
-        auto sz = u.size();
-        sz[axis] -= space_to_remove / (u.size_info().flex_factor[axis] * sum_unconstrained_inv_flex);
-        u.set_size(sz);
+      for (auto i : unconstrained_idx) {
+        auto sz = sizes[i];
+        sz[axis] -= space_to_remove / (children[i].size_info().flex_factor[axis] * sum_unconstrained_inv_flex);
+        sizes[i] = sz;
       }
     }
   }
   
   void stack_layout(std::span<widget_box> children, stack_data data, int axis, 
                     point this_size)
-  {
+  { 
+    // set_size potentially call layout, so first we compute the sizes in this vector before setting them
+    std::vector<point> sizes;
     std::vector<widget_size_info> sz_infos;
+    
     for (auto& c : children)
       sz_infos.push_back(c.size_info());
     
-    float sum_nominal = 0;
+    sizes.resize(children.size());
     
+    float sum_nominal = 0;
     for (auto szi : sz_infos)
-    {
       sum_nominal += szi.nominal[axis];
-    }
     
     sum_nominal += data.interspace * (children.size() - 1);
     sum_nominal += data.margin[axis] * 2;
@@ -259,7 +264,7 @@ namespace impl {
           auto axis_sz = sz_infos[i].nominal[axis] 
                             + remaining_space * sz_infos[i].flex_factor[axis] / sum_flex;
           point sz = size_from_axis(i, axis_sz);
-          children[i].set_size(sz);
+          sizes[i] = sz;
         }
       }
       else 
@@ -267,11 +272,11 @@ namespace impl {
         // None of the children are extensible, just set them to nominal size
         for (auto i : iota(children.size())) {
           point sz = size_from_axis(i, sz_infos[i].nominal[axis]);
-          children[i].set_size(sz);
+          sizes[i] = sz;
         }
       }
       
-      resolve_max_constraints(children, sz_infos, axis, this_size, data);
+      resolve_max_constraints(children, sizes, sz_infos, axis, this_size, data);
     }
     else 
     {
@@ -290,17 +295,17 @@ namespace impl {
           sz_infos[i].nominal[axis] 
             - space_to_remove * 1.f / (sz_infos[i].flex_factor[axis] * sum_inv_flex);
         axis_sz = std::max(sz_infos[i].min[axis], axis_sz);
-        point sz = size_from_axis(i, axis_sz);
-        children[i].set_size(sz);
+        sizes[i] = size_from_axis(i, axis_sz);
+        //children[i].set_size(sz);
       }
       
-      resolve_min_constraints(children, sz_infos, axis, this_size);
+      resolve_min_constraints(children, sizes, sz_infos, axis, this_size);
     }
     
-    place_stack_layout_elements(children, data, axis, this_size);
+    for (auto [c, sz] : std::ranges::views::zip(children, sizes))
+      c.set_size(sz);
     
-    for (auto& c : children)
-      c.layout(c.size());
+    place_stack_layout_elements(children, sizes, data, axis, this_size);
   }
   
   struct stack_updater : view_sequence_updater<stack_updater> {
@@ -392,7 +397,7 @@ namespace impl {
       w.reset_scrollbar();
     
     if (seq_updater.mutated || (res & rebuild_result::size_change)) {
-      w.do_layout(w.size());
+      w.layout(w.size());
       return {};
     }
     
