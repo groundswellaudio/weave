@@ -209,14 +209,12 @@ struct animated : V {
       if (flag)
         app_ctx.animate(w, fn, period_ms);
       else
-        app_ctx.deanimate(r);
+        app_ctx.deanimate(w.id());
     }
     return V::rebuild(Old, r, ctx, state);
   }
   
   void destroy(widget_ref r, application_context& ctx) {
-    if (flag)
-      ctx.deanimate(r);
     V::destroy(widget_ref((typename V::widget_t*)&r.as<widget_t>()), ctx);
   }
   

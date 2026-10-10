@@ -609,7 +609,7 @@ struct event_context {
   void animate(W& widget, Fn fn, int period_in_ms);
   
   /// Remove all animations for a widget
-  void deanimate(widget_ref w);
+  void deanimate(widget_id id);
   
   void grab_keyboard_focus(widget_id id);
   

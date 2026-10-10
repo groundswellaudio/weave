@@ -69,9 +69,9 @@ struct text_field : widget_base {
     editing = true;
     show_caret = true;
     ec.grab_keyboard_focus(id());
-    ec.animate(*this, [] (auto& s, ignore) { 
-      s.show_caret = !s.show_caret;
-      return s.editing; 
+    ec.animate(*this, [] (auto& self, ignore) { 
+      self.show_caret = !self.show_caret;
+      return self.editing; 
     }, 800);
     cursor_index[1] = value().size();
     cursor_index[0] = -1;
@@ -83,7 +83,7 @@ struct text_field : widget_base {
     edit_x_offset = 0;
     cursor_index[0] = -1;
     ec.request_repaint();
-    ec.deanimate(this);
+    ec.deanimate(id());
   }
   
   void set_font_size(float new_size, const graphics_context& ctx) {
@@ -238,7 +238,7 @@ struct text_field : widget_base {
   }
   
   void paint(painter& p) {
-    p.fill_style(editing ? rgba_f{colors::cyan}.with_alpha(0.3) : rgba_f{colors::black});
+    p.fill_style(editing ? rgb_f(colors::cyan) * 0.3 : rgb_f(colors::black));
     p.fill(rectangle(size()));
     p.fill_style(colors::white);
     p.stroke_style(colors::white);
@@ -338,9 +338,6 @@ struct text_field : view<text_field<Setter>>, view_modifiers {
   }
   
   void destroy(widget_ref wr, application_context& ctx) {
-    auto& w = wr.as<widget_t>();
-    if (w.is_being_edited())
-      ctx.deanimate(wr);
   }
   
   auto&& set_value(this auto&& self, std::string_view str) {

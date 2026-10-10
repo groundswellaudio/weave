@@ -152,12 +152,13 @@ namespace impl {
     struct animation {
       
       // Return false if the animation should stop
-      bool run(std::chrono::steady_clock::time_point now, void* state_ptr) {
+      bool run(std::chrono::steady_clock::time_point now, const widget_tree& tree, void* state_ptr) {
         last_call = now;
-        return call(widget, state_ptr);
+        auto wref = tree.get(wid);
+        return wref && call(*wref, state_ptr);
       }
       
-      widget_ref widget;
+      widget_id wid;
       std::function<bool(widget_ref, void*)> call;
       int period_in_ms;
       std::chrono::steady_clock::time_point last_call;
@@ -169,15 +170,14 @@ namespace impl {
     
     public :
     
-    template <class Widget, class Fn>
-    void animate(Widget& widget, Fn fn, int period_ms)
+    template <class Fn>
+    void animate(widget_id id, Fn fn, int period_ms)
     {
       animations.push_back(
           animation{
-            &widget,
-            [fn] (widget_ref w, void* state) -> bool { 
-              auto ctx = animation_context{state};
-              return fn(w.as<Widget>(), ctx); 
+            id,
+            [fn] (widget_ref w, void* state) -> bool {
+              return fn(w, state); 
             },
             period_ms,
             std::chrono::steady_clock::now()
@@ -185,12 +185,12 @@ namespace impl {
       );
     }
     
-    void deanimate(widget_ref w) {
-      erase_if(animations, [w] (auto& a) { return a.widget == w;} );
+    void deanimate(widget_id id) {
+      erase_if(animations, [id] (auto& a) { return a.wid == id; });
     }
   
     /// Return true if a repaint is needed 
-    bool run(void* state_ptr)
+    bool run(const widget_tree& tree, void* state_ptr)
     {
       if (animations.size() == 0)
         return false;
@@ -200,7 +200,7 @@ namespace impl {
       
       bool gotta_repaint = false;
       
-      erase_if( animations, [now, &gotta_repaint, state_ptr] (auto& a)
+      erase_if( animations, [now, &gotta_repaint, state_ptr, &tree] (auto& a)
       {
         const auto time_since_last = int(duration_cast<milliseconds>(now - a.last_call).count());
         
@@ -209,7 +209,7 @@ namespace impl {
         
         gotta_repaint = true;
         
-        return not a.run(now, state_ptr);
+        return not a.run(now, tree, state_ptr);
       });
       return gotta_repaint;
     }
@@ -272,11 +272,14 @@ struct application_context {
   
   template <class W, class Fn>
   void animate(W& widget, Fn fn, int period_in_ms) {
-    animations.animate(widget, fn, period_in_ms);
+    animations.animate(widget.id(), [fn] (widget_ref wref, void* state_ptr) { 
+      auto actx = animation_context{state_ptr}; 
+      return fn(wref.as<W>(), actx); 
+    }, period_in_ms);
   }
   
-  void deanimate(widget_ref r) {
-    animations.deanimate(r);
+  void deanimate(widget_id id) {
+    animations.deanimate(id);
   }
   
   void grab_mouse_focus(widget_id new_focused) {
@@ -555,8 +558,8 @@ void event_context::animate(W& widget, Fn fn, int period_in_ms) {
   ctx.animate(widget, fn, period_in_ms);
 }
   
-void event_context::deanimate(widget_ref w) {
-  ctx.deanimate(w);
+void event_context::deanimate(widget_id id) {
+  ctx.deanimate(id);
 }
 
 void event_context::reset_mouse_focus() {
@@ -645,7 +648,7 @@ struct application
         frame.repaint_requested = true;
       }
       
-      frame.repaint_requested = frame.repaint_requested || app_ctx.animations.run(&state);
+      frame.repaint_requested = frame.repaint_requested || app_ctx.animations.run(app_ctx.widget_tree(), &state);
       
       if (frame.repaint_requested)
         app_ctx.paint(); 
