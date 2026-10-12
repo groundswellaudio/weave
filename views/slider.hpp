@@ -140,20 +140,26 @@ struct slider : widget_base
     ec.request_repaint();
   }
   
-  void paint(painter& p) 
+  struct style {
+    rgba_u8 background_color = rgb_u8{30, 30, 30};
+    rgba_u8 active_color = rgba_f{colors::cyan}.with_alpha(0.3);
+    rgba_u8 text_color = colors::white;
+  };
+  
+  void paint(painter& p, const style& s)
   {
     auto sz = size();
-    p.fill_style(prop.background_color);
+    p.fill_style(s.background_color);
     p.fill(rounded_rectangle(sz));
     
-    p.fill_style(prop.active_color);
+    p.fill_style(s.active_color);
     p.fill(rounded_rectangle({ratio_value() * sz.x, sz.y}));
     
     static constexpr auto outline_col = rgba_f{colors::white}.with_alpha(0.5);
     p.stroke_style(outline_col);
     p.stroke(rounded_rectangle(sz));
     
-    p.fill_style(colors::white);
+    p.fill_style(s.text_color);
     p.text_align(text_align::x::center, text_align::y::center);
     p.font_size(11);
     p.text({sz.x / 2, sz.y / 2}, value_str);

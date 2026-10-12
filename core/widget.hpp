@@ -5,6 +5,7 @@
 #include <cassert>
 #include <type_traits>
 #include <functional>
+#include <any>
 
 #include "events/mouse_events.hpp"
 #include "events/keyboard.hpp"
@@ -179,6 +180,8 @@ concept keyboard_event_listener = requires (T obj, keyboard_event e, event_conte
   obj.on(e, ec);
 };
 
+struct style_stack; 
+
 namespace impl 
 {
   using widget_children_vec = std::vector<widget_ref>;
@@ -187,7 +190,7 @@ namespace impl
     template <class T>
     using ptr = T*;
     
-    ptr<void(widget_base*, painter&)> paint;
+    ptr<void(widget_base*, painter&, const style_stack&)> paint;
     ptr<void(widget_base*, point sz)> set_size;
     ptr<widget_size_info(const widget_base*)> size_info;
     ptr<void(widget_base*, input_event, event_context&)> on;
@@ -203,6 +206,17 @@ namespace impl
   template <class T>
   struct widget_vtable_impl;
 } // impl
+
+struct style_stack {  
+
+  std::unordered_map<const impl::widget_vtable*, std::any> map;
+  
+  template <class W>
+  const typename W::style& style_for();
+  
+  template <class W, class S>
+  auto push(S style);
+};
 
 class widget_ref {
   
@@ -268,8 +282,8 @@ class widget_ref {
     vptr->unmount(data, tree);
   }
   
-  void paint(painter& p) const {
-    vptr->paint(data, p);
+  void paint(painter& p, const style_stack& ss) const {
+    vptr->paint(data, p, ss);
   }
 
   void on(input_event e, event_context& ec) {
@@ -659,9 +673,10 @@ namespace impl {
   struct widget_vtable_impl 
   {
     static constexpr widget_vtable value = {
-      +[] (widget_base* self, painter& p) {
+      +[] (widget_base* self, painter& p, const style_stack& ss) {
+        auto s = ss.style_for<W>();
         auto& obj = *static_cast<W*>(self);
-        obj.paint(p);
+        obj.paint(p, s);
       },
       +[] (widget_base* self, point sz) {
         static_cast<W*>(self)->set_size(sz);
@@ -708,6 +723,31 @@ namespace impl {
       }
     };
   };
+}
+
+template <class W>
+const typename W::style& style_stack::style_for() 
+{
+  auto it = map.find(&impl::widget_vtable_impl<W>::value);
+  if (it == map.end())
+    return {};
+  else return *std::any_cast<typename W::style>(&*it);
+}
+
+template <class W, class S>
+auto style_stack::push(S style) {
+  auto it = map.find(&impl::widget_vtable_impl<W>::value);
+  optional<typename W::style> old_value;
+  if (it != map.end()) {
+    old_value = it->second;
+    it->second = style;
+  }
+  else 
+    map.emplace(&impl::widget_vtable_impl<W>::value, style);
+  return on_exit([this, it, &old_value] () {
+    if (old_value)
+      it->second = *old_value;
+  });
 }
 
 } // weave

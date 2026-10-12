@@ -356,8 +356,9 @@ struct application_context {
     painter p = graphics_context().painter();
     p.set_font("default");
     p.begin_frame(win.size(), 1);
+    style_stack ss;
     
-    auto fn = [this, &p] (this auto&& self, widget_ref w, point scissor_pos, point scissor_sz) -> void
+    auto fn = [this, &p, &ss] (this auto&& self, widget_ref w, point scissor_pos, point scissor_sz) -> void
     {
       auto pos = w.position();
       auto sz = w.size();
@@ -374,7 +375,7 @@ struct application_context {
       // p.stroke_rect(new_scissor_pos, new_scissor_sz);
       auto scissor_raii = p.scissor(new_scissor_pos, new_scissor_sz);
       auto traii = p.translate(pos);
-      w.paint(p);
+      w.paint(p, ss);
       for (auto& w : w.children())
         self(w, new_scissor_pos - pos, new_scissor_sz);
     };
@@ -430,6 +431,11 @@ struct application_context {
   impl::keyboard_event_dispatcher keyboard;
   impl::widget_animations animations;
 };
+
+template <class T>
+void view<T>::destroy(widget_ref w, application_context& ctx) {
+  w.unmount(ctx.widget_tree());
+}
 
 namespace impl {
 

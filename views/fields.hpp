@@ -236,11 +236,17 @@ struct text_field : widget_base {
         break;
     }
   }
+  struct style { 
+    rgba_u8 background_color = colors::black;
+    rgba_u8 edit_background_color = rgba_f(colors::cyan) * 0.3;
+    rgba_u8 selection_color = rgba_u8(colors::cyan).with_alpha(0.3 * 255);
+    rgba_u8 text_color = colors::white;
+  };
   
-  void paint(painter& p) {
-    p.fill_style(editing ? rgb_f(colors::cyan) * 0.3 : rgb_f(colors::black));
+  void paint(painter& p, const style& s) {
+    p.fill_style(editing ? s.edit_background_color : s.background_color);
     p.fill(rectangle(size()));
-    p.fill_style(colors::white);
+    p.fill_style(s.text_color);
     p.stroke_style(colors::white);
     p.stroke(rounded_rectangle(size(), 3));
     
@@ -264,7 +270,7 @@ struct text_field : widget_base {
       auto cursor_pos_l = glyph_pos.pos_from_index(cursor_index[0]);
       auto cursor_pos_r = glyph_pos.pos_from_index(cursor_index[1]);
       rectangle r { {cursor_pos_l, 0}, {cursor_pos_r - cursor_pos_l, size().y} };
-      p.fill_style( rgba_f{colors::cyan}.with_alpha(0.3) );
+      p.fill_style(s.selection_color);
       p.fill(r);
     }
     

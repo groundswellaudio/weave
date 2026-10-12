@@ -184,21 +184,27 @@ struct table : widget_base, scrollable_base {
   static constexpr auto row = 15.f;
   static constexpr float margin = 5;
   
-  void paint(painter& p) {
+  struct style {
+    rgba_u8 background_color = rgb_f(colors::gray) * 0.3;
+    rgba_u8 text_color = colors::white;
+    rgba_u8 selection_color = rgba_u8(colors::cyan).with_alpha(70);
+  };
+  
+  void paint(painter& p, const style& s) {
     // background
-    auto background_col = rgb_f(colors::gray) * 0.3;
+    auto background_col = s.background_color; // rgb_f(colors::gray) * 0.3;
     p.fill_style(rgba_f(colors::black) * 0.3);
-    p.fill(rectangle({size().x, first_row})); // header background
+    p.fill(rectangle(size())); // background
     // outline
-    p.stroke_style(rgba_f(colors::black) * 0.5);
+    p.stroke_style(rgba_f(colors::black).with_alpha(0.5));
     p.stroke(rectangle(size()));
     
-    paint_header(p);
+    paint_header(p, s);
     
     {
       auto _ = p.translate({0, first_row});
       auto _ = p.scissor({0, 0}, scroll_zone().size);
-      paint_body(p, size() - point{0, first_row});
+      paint_body(p, size() - point{0, first_row}, s);
     }
     
     scrollable_base::paint(p);
@@ -306,9 +312,9 @@ struct table : widget_base, scrollable_base {
     sort_by(properties.size() - 1);
   }
   
-  void paint_header(painter& p) {
+  void paint_header(painter& p, const style& s) {
     p.font_size(13);
-    p.fill_style(colors::white);
+    p.fill_style(s.text_color);
     float pos_x = 0;
     p.stroke_style(colors::black);
     
@@ -337,8 +343,8 @@ struct table : widget_base, scrollable_base {
     }
   }
   
-  void paint_body(painter& p, point body_sz) {
-    p.fill_style(colors::white);
+  void paint_body(painter& p, point body_sz, const style& s) {
+    p.fill_style(s.text_color);
     int cells_begin = scroll_offset / row;
     int cells_end = (scroll_offset + scroll_zone().size.y) / row + 1;
     cells_end = std::min(cells_end, (int) cells.size());
@@ -365,7 +371,7 @@ struct table : widget_base, scrollable_base {
     }
     
     if (selection.size()) {
-      p.fill_style(rgba{colors::cyan}.with_alpha(70));
+      p.fill_style(s.selection_color);
       for (auto i : selection) {
         auto pos_y = i * row - scroll_offset;
         p.fill( rectangle({0, pos_y}, {size().x, row}) );

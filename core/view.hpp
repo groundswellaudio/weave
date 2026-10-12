@@ -82,7 +82,7 @@ struct view : view_sequence_base, view_base {
     self.destroy( GetForDestroy(), ctx );
   }
   
-  void destroy(widget_ref w, application_context& ctx) {}
+  void destroy(widget_ref w, application_context& ctx);
 };
 
 template <class T>

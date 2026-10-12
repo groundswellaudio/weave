@@ -39,11 +39,16 @@ struct transport_bar_widget : widget_base {
     ratio_value = val;
   }
   
-  void paint(painter& p) const {
+  struct style {
+    rgb_u8 text_color = colors::white;
+    rgb_u8 bar_color = colors::cyan;
+  };
+  
+  void paint(painter& p, const style& s) const {
     unsigned elapsed = ratio_value * max_value;
     unsigned remaining = max_value - elapsed; 
     
-    p.fill_style(colors::white);
+    p.fill_style(s.text_color);
     p.font_size(11);
     
     p.text_align(text_align::x::left, text_align::y::center);
@@ -55,7 +60,7 @@ struct transport_bar_widget : widget_base {
     
     p.fill_style(colors::gray);
     p.fill(rounded_rectangle(rectangle({0, header}, {size().x, bar_thickness}), 5)); 
-    p.fill_style( rgba_f{colors::cyan} );
+    p.fill_style(s.bar_color);
     rectangle r { {0, header}, {ratio_value * size().x, bar_thickness} };
     p.fill(rounded_rectangle(r, 5));
   }

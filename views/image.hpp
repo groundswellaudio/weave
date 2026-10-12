@@ -8,8 +8,8 @@ namespace weave::widgets {
 struct image : widget_base {
   
   optional<texture_handle> texture;
-  vec2f max_size;
-  vec2f corner_offset;
+  point max_size;
+  point corner_offset;
   
   auto size_info() const {
     widget_size_info res;
@@ -44,13 +44,15 @@ struct image : widget_base {
   
   void on(ignore, ignore) {}
   
-  void paint(painter& p) {
+  struct style {
+    int corner_radius = 0;
+  };
+  
+  void paint(painter& p, const style& s) {
     if (!texture)
       return;
     p.fill_style(*texture, -corner_offset, size());
-    p.fill(rectangle(size()));
-    // p.stroke_style(colors::red);
-    // p.stroke_rect({0, 0}, size());
+    p.fill(rounded_rectangle(size(), s.corner_radius));
   }
 };
 
