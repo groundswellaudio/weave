@@ -65,8 +65,16 @@ namespace weave::widgets
 
 struct slider : widget_base
 {
-  slider_properties prop;
-  float ratio_val; 
+  struct style_t {
+    rgba_u8 background_color = rgb_u8{30, 30, 30};
+    rgba_u8 active_color = rgba_f{colors::cyan}.with_alpha(0.3);
+    rgba_u8 text_color = colors::white;
+    unsigned precision = 2;
+  };
+  
+  float min = 0, max = 1;
+  style_t style;
+  float ratio_val;
   float scaled_val; 
   std::string value_str;
   write_fn<float> write;
@@ -92,21 +100,21 @@ struct slider : widget_base
     ratio_val = new_ratio;
     
     auto scaled = scaled_value();
-    value_str = std::format("{:.{}f}", scaled, prop.precision);
+    value_str = std::format("{:.{}f}", scaled, style.precision);
     return scaled;
   }
   
   /// Set the scaled value.
   void set_scaled(float value) {
-    auto min_inv = space.inverse(prop.min);
-    auto new_ratio = (space.inverse(value) - min_inv) / (space.inverse(prop.max) - min_inv);
+    auto min_inv = space.inverse(min);
+    auto new_ratio = (space.inverse(value) - min_inv) / (space.inverse(max) - min_inv);
     set_ratio(new_ratio);
   }
   
   /// Minmax of the scaled value
-  void set_range(float min, float max) {
-    prop.min = min;
-    prop.max = max;
+  void set_range(float new_min, float new_max) {
+    min = new_min;
+    max = new_max;
   }
   
   /// Set the function used to compute the scaled value
@@ -116,8 +124,8 @@ struct slider : widget_base
   
   /// Return the value which is displayed as a string
   float scaled_value() const {
-    auto min_inv = space.inverse(prop.min);
-    return space(min_inv + (space.inverse(prop.max) - min_inv) * ratio_val);
+    auto min_inv = space.inverse(min);
+    return space(min_inv + (space.inverse(max) - min_inv) * ratio_val);
   }
   
   /// Return the ratio of the slider bar (between 0 and 1)
@@ -140,26 +148,20 @@ struct slider : widget_base
     ec.request_repaint();
   }
   
-  struct style {
-    rgba_u8 background_color = rgb_u8{30, 30, 30};
-    rgba_u8 active_color = rgba_f{colors::cyan}.with_alpha(0.3);
-    rgba_u8 text_color = colors::white;
-  };
-  
-  void paint(painter& p, const style& s)
+  void paint(painter& p)
   {
     auto sz = size();
-    p.fill_style(s.background_color);
+    p.fill_style(style.background_color);
     p.fill(rounded_rectangle(sz));
     
-    p.fill_style(s.active_color);
+    p.fill_style(style.active_color);
     p.fill(rounded_rectangle({ratio_value() * sz.x, sz.y}));
     
     static constexpr auto outline_col = rgba_f{colors::white}.with_alpha(0.5);
     p.stroke_style(outline_col);
     p.stroke(rounded_rectangle(sz));
     
-    p.fill_style(s.text_color);
+    p.fill_style(style.text_color);
     p.text_align(text_align::x::center, text_align::y::center);
     p.font_size(11);
     p.text({sz.x / 2, sz.y / 2}, value_str);
@@ -188,32 +190,40 @@ struct slider : view<slider<Lens>> {
   template <class S>
   auto build(const build_context& ctx, S& state) {
     auto val = lens.read(state);
-    auto res = widget_t{{ctx.new_id()}, properties};
+    auto res = widget_t{{ctx.new_id()}};
     res.write = [l = lens] (event_context& c, float val) { l.write(c.state<S>(), val); };
     set_widget_value(res, val);
     res.write_scaled = write_scaled_v;
     res.space = space_v;
+    res.style = ctx.style_for<widget_t>();
+    if (precision_v)
+      res.style.precision = *precision_v;
+    res.min = min;
+    res.max = max;
     return res;
   }
   
   template <class S>
-  rebuild_result rebuild(slider<Lens>& Old, widget_ref wb, build_context ctx, S& state) {
+  rebuild_result rebuild(slider<Lens>& Old, widget_ref wb, const build_context& ctx, S& state) {
     auto& w = wb.as<widget_t>();
     auto val = lens.read(state);
-    if (properties != Old.properties) {
-      w.prop = properties;
-    }
     w.write_scaled = write_scaled_v;
+    auto style = ctx.style_for<widget_t>();
+    if (precision_v)
+      style.precision = *precision_v;
+    w.style = style;
     w.space = space_v;
+    w.min = min;
+    w.max = max;
     if (val != write_scaled_v ? w.scaled_value() : w.ratio_value()) {
       set_widget_value(w, val);
     }
     return {};
   }
   
-  auto& range(float min, float max) {
-    properties.min = min;
-    properties.max = max;
+  auto& range(float min_v, float max_v) {
+    min = min_v;
+    max = max_v;
     return *this;
   }
   
@@ -239,15 +249,16 @@ struct slider : view<slider<Lens>> {
   
   /// Set the numbers of decimals to be displayed
   auto& precision(unsigned prec) {
-    properties.precision = prec;
+    precision_v = prec;
     return *this;
   }
   
   void destroy(widget_ref w) {}
   
-  slider_properties properties;
+  float min, max;
   Lens lens;
   scalar_space space_v;
+  optional<unsigned> precision_v = {};
   bool write_scaled_v = true;
 };
 

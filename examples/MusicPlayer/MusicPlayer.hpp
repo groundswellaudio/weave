@@ -14,6 +14,12 @@ struct transport_bar_widget : widget_base {
   static constexpr float header = 15;
   static constexpr float bar_thickness = 8;
   
+  struct style_t {
+    rgb_u8 text_color = colors::white;
+    rgb_u8 bar_color = colors::cyan;
+  };
+  
+  style_t style;
   float ratio_value = 0;
   unsigned max_value = 0;
   write_fn<float> write;
@@ -39,16 +45,11 @@ struct transport_bar_widget : widget_base {
     ratio_value = val;
   }
   
-  struct style {
-    rgb_u8 text_color = colors::white;
-    rgb_u8 bar_color = colors::cyan;
-  };
-  
-  void paint(painter& p, const style& s) const {
+  void paint(painter& p) const {
     unsigned elapsed = ratio_value * max_value;
     unsigned remaining = max_value - elapsed; 
     
-    p.fill_style(s.text_color);
+    p.fill_style(style.text_color);
     p.font_size(11);
     
     p.text_align(text_align::x::left, text_align::y::center);
@@ -60,7 +61,7 @@ struct transport_bar_widget : widget_base {
     
     p.fill_style(colors::gray);
     p.fill(rounded_rectangle(rectangle({0, header}, {size().x, bar_thickness}), 5)); 
-    p.fill_style(s.bar_color);
+    p.fill_style(style.bar_color);
     rectangle r { {0, header}, {ratio_value * size().x, bar_thickness} };
     p.fill(rounded_rectangle(r, 5));
   }
@@ -79,7 +80,8 @@ struct transport_bar_view : view<transport_bar_view<Fn>>, views::view_modifiers 
     res.write = [fn = write_fn] (event_context& ec, auto val) {
       context_invoke<S>(fn, ec, val);
     };
-    res.max_value = track_length; 
+    res.max_value = track_length;
+    res.style = ctx.style_for<widget_t>();
     return res;
   }
   

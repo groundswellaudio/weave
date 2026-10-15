@@ -19,6 +19,15 @@ struct text_field : widget_base {
   
   static constexpr float margin = 5;  
   
+  struct style_t { 
+    rgba_u8 background_color = colors::black;
+    rgba_u8 edit_background_color = rgba_f(colors::cyan) * 0.3;
+    rgba_u8 selection_color = rgba_u8(colors::cyan).with_alpha(0.3 * 255);
+    rgba_u8 text_color = colors::white;
+  };
+  
+  style_t style;
+  
   private : 
   
   std::string value_str;
@@ -236,17 +245,11 @@ struct text_field : widget_base {
         break;
     }
   }
-  struct style { 
-    rgba_u8 background_color = colors::black;
-    rgba_u8 edit_background_color = rgba_f(colors::cyan) * 0.3;
-    rgba_u8 selection_color = rgba_u8(colors::cyan).with_alpha(0.3 * 255);
-    rgba_u8 text_color = colors::white;
-  };
   
-  void paint(painter& p, const style& s) {
-    p.fill_style(editing ? s.edit_background_color : s.background_color);
+  void paint(painter& p) {
+    p.fill_style(editing ? style.edit_background_color : style.background_color);
     p.fill(rectangle(size()));
-    p.fill_style(s.text_color);
+    p.fill_style(style.text_color);
     p.stroke_style(colors::white);
     p.stroke(rounded_rectangle(size(), 3));
     
@@ -270,7 +273,7 @@ struct text_field : widget_base {
       auto cursor_pos_l = glyph_pos.pos_from_index(cursor_index[0]);
       auto cursor_pos_r = glyph_pos.pos_from_index(cursor_index[1]);
       rectangle r { {cursor_pos_l, 0}, {cursor_pos_r - cursor_pos_l, size().y} };
-      p.fill_style(s.selection_color);
+      p.fill_style(style.selection_color);
       p.fill(r);
     }
     
@@ -326,24 +329,23 @@ struct text_field : view<text_field<Setter>>, view_modifiers {
     res.write = [fn = setter] (event_context& ec, std::string_view str) {
       context_invoke<S>(fn, ec, str);
     };
+    res.style = ctx.style_for<widget_t>();
     return res;
   }
   
-  rebuild_result rebuild(text_field<Setter>& old, widget_ref elem, const build_context& up, auto& state) {
+  rebuild_result rebuild(text_field<Setter>& old, widget_ref elem, const build_context& ctx, auto& state) {
     auto& w = elem.as<widget_t>();
-    if (!up.application_context().has_keyboard_focus(elem) && value && w.value() != *value) {
-      w.set_value(std::string{*value}, up.graphics_context());
+    w.style = ctx.style_for<widget_t>();
+    if (!ctx.application_context().has_keyboard_focus(elem) && value && w.value() != *value) {
+      w.set_value(std::string{*value}, ctx.graphics_context());
     }
     if (w.background_text() != background_text)
       w.set_background_text(background_text);
     if (old.font_size_v != font_size_v) {
-      w.set_font_size(font_size_v, up.graphics_context());
+      w.set_font_size(font_size_v, ctx.graphics_context());
       return rebuild_result::size_change;
     }
     return {};
-  }
-  
-  void destroy(widget_ref wr, application_context& ctx) {
   }
   
   auto&& set_value(this auto&& self, std::string_view str) {

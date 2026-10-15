@@ -40,6 +40,14 @@ FetchContent_Declare(stb
   GIT_REPOSITORY https://github.com/nothings/stb.git)
 FetchContent_MakeAvailable(stb)
 
+FetchContent_Declare(
+  cpm
+  URL https://github.com/cpm-cmake/CPM.cmake/releases/latest/download/CPM.cmake
+  DOWNLOAD_NO_EXTRACT TRUE)
+
+FetchContent_MakeAvailable(cpm)
+include(${cpm_SOURCE_DIR}/CPM.cmake)
+
 FetchContent_Declare(kumi-tuple
   GIT_REPOSITORY https://github.com/jfalcou/kumi.git
   GIT_TAG "origin/main")

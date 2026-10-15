@@ -302,8 +302,7 @@ struct application_context {
     auto it = std::ranges::find_if(overlays, [id] (auto& e) { return e.id() == id; });
     if (it == overlays.end())
       return;
-    widget_tree().erase(id);
-    it->destroy(destroy_context{widget_tree()});
+    it->unmount(widget_tree());
     overlays.erase(it);
   }
   
@@ -375,7 +374,7 @@ struct application_context {
       // p.stroke_rect(new_scissor_pos, new_scissor_sz);
       auto scissor_raii = p.scissor(new_scissor_pos, new_scissor_sz);
       auto traii = p.translate(pos);
-      w.paint(p, ss);
+      w.paint(p);
       for (auto& w : w.children())
         self(w, new_scissor_pos - pos, new_scissor_sz);
     };
@@ -659,6 +658,9 @@ struct application
       if (frame.repaint_requested)
         app_ctx.paint(); 
     }
+    
+    app_ctx.root_widget().unmount(app_ctx.widget_tree());
+    app_ctx.widget_tree().assert_empty();
   }
 };
 

@@ -31,6 +31,10 @@ struct TrackPlayer : weave::audio_renderer<TrackPlayer>
     head += os.num_samples();
   }
   
+  ~TrackPlayer(){
+    head = -1;
+  }
+  
   std::atomic<float> volume = 1.f;
   weave::audio_buffer buffer;
   std::atomic<int> head = -1;

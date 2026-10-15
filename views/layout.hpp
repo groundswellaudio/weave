@@ -386,9 +386,6 @@ namespace impl {
                                   }
                                   return true;
                                 });
-      std::for_each(it, w.children_vec.end(), 
-                    [ctx] (auto& e) { e.unmount(ctx.widget_tree()); });
-      
       w.children_vec.erase(it, w.children_vec.end());
     }
     

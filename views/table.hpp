@@ -31,6 +31,12 @@ struct table : widget_base, scrollable_base {
   
   using selection_t = std::vector<unsigned>; 
   
+  struct style_t {
+    rgba_u8 background_color = rgb_f(colors::gray) * 0.3;
+    rgba_u8 text_color = colors::white;
+    rgba_u8 selection_color = rgba_u8(colors::cyan).with_alpha(70);
+  };
+  
   private : 
   
   static constexpr float first_row = 30;
@@ -42,6 +48,7 @@ struct table : widget_base, scrollable_base {
     bool selected = false;
   };
   
+  style_t style;
   selection_t selection;
   std::vector<tuple<std::string, float>> properties;
   std::vector<cell> cells;
@@ -128,6 +135,7 @@ struct table : widget_base, scrollable_base {
   void on(mouse_event e, event_context& Ec) 
   {
     if (e.is_down() && edited_field) {
+      edited_field->unmount(Ec.tree());
       edited_field.reset();
       Ec.request_repaint();
     }
@@ -184,27 +192,21 @@ struct table : widget_base, scrollable_base {
   static constexpr auto row = 15.f;
   static constexpr float margin = 5;
   
-  struct style {
-    rgba_u8 background_color = rgb_f(colors::gray) * 0.3;
-    rgba_u8 text_color = colors::white;
-    rgba_u8 selection_color = rgba_u8(colors::cyan).with_alpha(70);
-  };
-  
-  void paint(painter& p, const style& s) {
+  void paint(painter& p) {
     // background
-    auto background_col = s.background_color; // rgb_f(colors::gray) * 0.3;
-    p.fill_style(rgba_f(colors::black) * 0.3);
+    auto background_col = style.background_color; // rgb_f(colors::gray) * 0.3;
+    p.fill_style(background_col);
     p.fill(rectangle(size())); // background
     // outline
     p.stroke_style(rgba_f(colors::black).with_alpha(0.5));
     p.stroke(rectangle(size()));
     
-    paint_header(p, s);
+    paint_header(p);
     
     {
       auto _ = p.translate({0, first_row});
       auto _ = p.scissor({0, 0}, scroll_zone().size);
-      paint_body(p, size() - point{0, first_row}, s);
+      paint_body(p, size() - point{0, first_row});
     }
     
     scrollable_base::paint(p);
@@ -312,9 +314,9 @@ struct table : widget_base, scrollable_base {
     sort_by(properties.size() - 1);
   }
   
-  void paint_header(painter& p, const style& s) {
+  void paint_header(painter& p) {
     p.font_size(13);
-    p.fill_style(s.text_color);
+    p.fill_style(style.text_color);
     float pos_x = 0;
     p.stroke_style(colors::black);
     
@@ -343,8 +345,8 @@ struct table : widget_base, scrollable_base {
     }
   }
   
-  void paint_body(painter& p, point body_sz, const style& s) {
-    p.fill_style(s.text_color);
+  void paint_body(painter& p, point body_sz) {
+    p.fill_style(style.text_color);
     int cells_begin = scroll_offset / row;
     int cells_end = (scroll_offset + scroll_zone().size.y) / row + 1;
     cells_end = std::min(cells_end, (int) cells.size());
@@ -371,7 +373,7 @@ struct table : widget_base, scrollable_base {
     }
     
     if (selection.size()) {
-      p.fill_style(s.selection_color);
+      p.fill_style(style.selection_color);
       for (auto i : selection) {
         auto pos_y = i * row - scroll_offset;
         p.fill( rectangle({0, pos_y}, {size().x, row}) );
@@ -393,8 +395,9 @@ struct table : view<table<T>>, view_modifiers {
   using widget_t = widgets::table;
   using model_t = table_model<std::decay_t<T>>;
   
-  auto build(build_context ctx, auto& state) {
+  auto build(const build_context& ctx, auto& state) {
     widget_t res {ctx.new_id(), {400, 400}};
+    res.style = ctx.style_for<widget_t>();
     res.set_properties(model_t{}.properties(data.get()));
     res.set_cells(data.get());
     res.cell_double_click = cell_double_click;
@@ -403,11 +406,12 @@ struct table : view<table<T>>, view_modifiers {
     return res;
   }
   
-  rebuild_result rebuild(const table<T>& old, widget_ref w, ignore, auto& state) {
+  rebuild_result rebuild(const table<T>& old, widget_ref w, const build_context& ctx, auto& state) {
+    auto& wb = w.as<widget_t>();
+    wb.style = ctx.style_for<widget_t>();
     version = old.version;
     if (&data != &old.data || version != data.version()) {
       version = data.version();
-      auto& wb = w.as<widget_t>();
       wb.set_properties(model_t{}.properties(data.get()));
       wb.set_cells(data.get());
     }

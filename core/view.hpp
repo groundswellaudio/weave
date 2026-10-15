@@ -44,6 +44,44 @@ struct view_sequence_base {
 struct application_context; 
 struct graphics_context;
 
+
+struct style_stack {  
+
+  std::unordered_map<const impl::widget_vtable*, std::any> map;
+  
+  template <class W>
+  typename W::style_t style_for() const;
+  
+  template <class W, class S>
+  auto push(S style);
+};
+
+template <class W>
+typename W::style_t style_stack::style_for() const
+{
+  auto it = map.find(&impl::widget_vtable_impl<W>::value);
+  if (it == map.end())
+    return {};
+  else return std::any_cast<typename W::style_t>(it->second);
+}
+
+template <class W, class S>
+auto style_stack::push(S style) {
+  auto it = map.find(&impl::widget_vtable_impl<W>::value);
+  optional<typename W::style> old_value;
+  if (it != map.end()) {
+    old_value = it->second;
+    it->second = style;
+  }
+  else {
+    map.emplace(&impl::widget_vtable_impl<W>::value, style);
+    return on_exit([this, it, &old_value] () {
+      if (old_value)
+        it->second = *old_value; 
+      });
+  }
+}
+
 struct build_context 
 {
   graphics_context& graphics_context() const;
@@ -51,7 +89,13 @@ struct build_context
   struct widget_tree& widget_tree() const;
   widget_id new_id() const { return widget_tree().new_id(); }
   
+  template <class W>
+  typename W::style_t style_for() const {
+    return styles.style_for<W>();
+  }
+  
   struct application_context& ctx;
+  style_stack styles;
 };
 
 template <class T>

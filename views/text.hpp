@@ -152,7 +152,7 @@ struct text : view<text<Args...>>, view_modifiers {
   auto make_string() const {
     std::string string;
     if constexpr (sizeof...(Args) != 0)
-      apply([&string, this] (auto&&... elems) { string = std::vformat(str, std::make_format_args(elems...)); }, fmt_args);
+      weave::apply([&string, this] (auto&&... elems) { string = std::vformat(str, std::make_format_args(elems...)); }, fmt_args);
     else
       string = str;
     return string;

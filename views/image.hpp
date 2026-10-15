@@ -10,7 +10,7 @@ struct image : widget_base {
   optional<texture_handle> texture;
   point max_size;
   point corner_offset;
-  
+  int corner_radius = 0;
   auto size_info() const {
     widget_size_info res;
     if (!texture) {
@@ -48,11 +48,11 @@ struct image : widget_base {
     int corner_radius = 0;
   };
   
-  void paint(painter& p, const style& s) {
+  void paint(painter& p) {
     if (!texture)
       return;
     p.fill_style(*texture, -corner_offset, size());
-    p.fill(rounded_rectangle(size(), s.corner_radius));
+    p.fill(rounded_rectangle(size(), corner_radius));
   }
 };
 
