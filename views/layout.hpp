@@ -728,7 +728,7 @@ struct flow : view<flow<Ts...>> {
   
   void destroy(widget_ref r, application_context& ctx) {
     auto& wb = r.as<widgets::flow>();
-    
+    wb.unmount(ctx.widget_tree());
     auto lift_destroy = [it = wb.children_vec.begin()] mutable {
       return (it++)->borrow();
     };

@@ -169,7 +169,7 @@ struct Database {
   template <class T>
   void delete_tracks(T&& range) {
     for (auto i : range)
-      tracks->erase(i);
+      tracks.mut().erase(i);
   }
   
   bool add_track_from_file(const std::string& path) {

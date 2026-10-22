@@ -280,10 +280,12 @@ auto song_selection_popup_menu(event_context& ec, track_selection selected) {
     auto w = vstack{ 
                text{"Delete {} tracks from library?", selected.size()},
                hstack{
-                button{"Yes", [selected] (State& s) { s.database.delete_tracks(selected); }},
+                button{"Yes", [selected] (event_context& ec, widget_id id) { ec.state<State>().database.delete_tracks(selected); 
+                  ec.pop_overlay(id); }},
                 button{"Cancel", &event_context::pop_overlay}
                }}.build(build_context{ec.context()}, ec.state<State>());
     w.set_size(w.nominal_size());
+    ec.push_overlay(std::move(w));
   };
   
   menu.add_element("Info", info, ec.graphics_context());

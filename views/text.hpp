@@ -136,15 +136,13 @@ namespace weave::views {
 template <class... Args>
 struct text : view<text<Args...>>, view_modifiers {
   
-  text(std::string_view str, Args... args) : str{str}, fmt_args{args...} {}
-  
-  //text(std::string_view str) : str{str} {}
+  text(std::string_view str, Args... args) : fmt_str{str}, fmt_args{args...} {}
   
   text(text&&) = default;
   text(const text&) = default;
   
   point bounds(graphics_context& gctx) {
-    return str.size() == 0 ? point{0, prop.font_size} : gctx.text_bounds(str, prop.font_size);
+    return fmt_str.size() == 0 ? point{0, prop.font_size} : gctx.text_bounds(fmt_str, prop.font_size);
   }
   
   using widget_t = widgets::text;
@@ -152,9 +150,9 @@ struct text : view<text<Args...>>, view_modifiers {
   auto make_string() const {
     std::string string;
     if constexpr (sizeof...(Args) != 0)
-      weave::apply([&string, this] (auto&&... elems) { string = std::vformat(str, std::make_format_args(elems...)); }, fmt_args);
+      weave::apply([&string, this] (auto&&... elems) { string = std::vformat(fmt_str, std::make_format_args(elems...)); }, fmt_args);
     else
-      string = str;
+      string = fmt_str;
     return string;
   }
   
@@ -170,7 +168,7 @@ struct text : view<text<Args...>>, view_modifiers {
   rebuild_result rebuild(const text& Old, widget_ref w, const build_context& up, ignore) {
     auto& wb = w.as<widget_t>();
     rebuild_result res {};
-    if (str != Old.str || fmt_args != Old.fmt_args) {
+    if (fmt_str != Old.fmt_str || fmt_args != Old.fmt_args) {
       wb.set_string(make_string(), up.graphics_context());
       res |= rebuild_result::size_change;
     }
@@ -198,7 +196,7 @@ struct text : view<text<Args...>>, view_modifiers {
   }
   
   widget_t::properties prop;
-  std::string_view str;
+  std::string fmt_str;
   tuple<Args...> fmt_args;
   text_align::x align_x = text_align::x::left;
 };
@@ -228,7 +226,7 @@ struct with_label : view<with_label<V>>, view_modifiers {
     return {};
   }
   
-  std::string_view str;
+  std::string str;
   V view;
 };
 

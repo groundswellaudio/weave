@@ -288,6 +288,7 @@ struct application_context {
   
   widget_ref push_overlay(widget_box w) 
   {
+    w.set_position(win.size() / 2 - w.size() / 2);
     overlays.push_back(std::move(w));
     auto& o = overlays.back();
     o.mount(widget_tree(), o.id());
