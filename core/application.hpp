@@ -288,7 +288,6 @@ struct application_context {
   
   widget_ref push_overlay(widget_box w) 
   {
-    w.set_position(win.size() / 2 - w.size() / 2);
     overlays.push_back(std::move(w));
     auto& o = overlays.back();
     o.mount(widget_tree(), o.id());
@@ -420,6 +419,13 @@ struct application_context {
     win.set_max_size(size_info.max);
   }
   
+  void unmount_all() {
+    root.unmount(tree);
+    for (auto& o : overlays) {
+      o.unmount(tree);
+    }
+  }
+  
   impl::sdl_backend backend;
   struct window win;
   struct graphics_context gctx;
@@ -536,6 +542,11 @@ auto event_context::lift_rebuild_request() {
 void event_context::push_overlay(widget_box widget) {
   ctx.push_overlay(std::move(widget));
   request_repaint();
+}
+
+void event_context::push_overlay_centered(widget_box w) {
+  w.set_position(ctx.window().size() / 2 - w.size() / 2);
+  push_overlay(WEAVE_MOVE(w));
 }
 
 void event_context::pop_overlay(widget_id id) {
@@ -660,7 +671,7 @@ struct application
         app_ctx.paint(); 
     }
     
-    app_ctx.root_widget().unmount(app_ctx.widget_tree());
+    app_ctx.unmount_all();
     app_ctx.widget_tree().assert_empty();
   }
 };

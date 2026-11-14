@@ -285,7 +285,7 @@ auto song_selection_popup_menu(event_context& ec, track_selection selected) {
                 button{"Cancel", &event_context::pop_overlay}
                }}.build(build_context{ec.context()}, ec.state<State>());
     w.set_size(w.nominal_size());
-    ec.push_overlay(std::move(w));
+    ec.push_overlay_centered(std::move(w));
   };
   
   menu.add_element("Info", info, ec.graphics_context());

@@ -515,7 +515,16 @@ struct widget_tree {
   }
   
   void assert_empty() {
-    assert(tree.empty());
+    if (!tree.empty()) {
+      for (auto& [id, n] : tree)
+      {
+        std::fprintf(stderr, "leaked widget id=%llu parent=%llu\n",
+                   (unsigned long long)id.value,
+                   (unsigned long long)n.parent.value);
+                   n.ref.debug_dump(0);
+      }
+      assert(false && "widget tree not empty");
+    }
   }
   
   private : 
@@ -608,6 +617,8 @@ struct event_context {
   void push_overlay(widget_box widget);
   
   void push_overlay_relative(widget_box widget);
+  
+  void push_overlay_centered(widget_box w);
   
   void pop_overlay(widget_id id);
   

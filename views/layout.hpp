@@ -657,6 +657,9 @@ struct stack_base : view<stack_base<T, Ts...>>, stack<Ts...> {
   
   void destroy(widget_ref w, application_context& ctx) {
     auto& wb = w.as<T>();
+    // erase this widget from the tree, don't erase the children recursively : 
+    // they will be erased in the call to seq_destroy
+    ctx.widget_tree().erase(wb.id());
     
     auto lift_destroy = [it = wb.children_vec.begin()] mutable {
       return (it++)->borrow();
@@ -728,7 +731,7 @@ struct flow : view<flow<Ts...>> {
   
   void destroy(widget_ref r, application_context& ctx) {
     auto& wb = r.as<widgets::flow>();
-    wb.unmount(ctx.widget_tree());
+    ctx.widget_tree().erase(wb.id());
     auto lift_destroy = [it = wb.children_vec.begin()] mutable {
       return (it++)->borrow();
     };
