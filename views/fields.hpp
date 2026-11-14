@@ -21,7 +21,7 @@ struct text_field : widget_base {
   
   struct style_t { 
     rgba_u8 background_color = colors::black;
-    rgba_u8 edit_background_color = rgba_f(colors::cyan) * 0.3;
+    rgba_u8 edit_background_color = rgb_f(colors::cyan) * 0.3;
     rgba_u8 selection_color = rgba_u8(colors::cyan).with_alpha(0.3 * 255);
     rgba_u8 text_color = colors::white;
   };
@@ -34,7 +34,7 @@ struct text_field : widget_base {
   std::string background_text_str;
   glyph_positions glyph_pos;
   float font_size = 11;
-  float height = 11; 
+  float height = 0;
   float edit_x_offset = 0;
   int cursor_index[2] = {-1, 0}; // left-right, cursor_index[1] is the caret
   bool show_caret : 1 = false;
@@ -256,16 +256,17 @@ struct text_field : widget_base {
     p.font_size(font_size);
     p.text_align(text_align::x::left, text_align::y::center);
     
+    auto pos = point{margin, size().y / 2};
     if (value().size() == 0) {
-      p.text({margin, size().y / 2}, background_text());
+      p.text(pos, background_text());
     }
     else {
       if (!editing)
-        p.text({margin, size().y / 2}, value());
+        p.text(pos, value());
       else
       {
         auto str = std::string_view{value().begin() + edit_x_offset, value().end()};
-        p.text({margin, size().y / 2}, str);
+        p.text(pos, str);
       }
     }
     

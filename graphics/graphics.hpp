@@ -15,6 +15,7 @@
 #include <vector>
 #include <string>
 #include <string_view>
+#include <cmath>
 
 namespace weave {
 
@@ -34,6 +35,7 @@ namespace text_align
   
   enum class y : int
   {
+    baseline = NVG_ALIGN_BASELINE,
     top     = NVG_ALIGN_TOP,
     center  = NVG_ALIGN_MIDDLE,
     bottom  = NVG_ALIGN_BOTTOM
@@ -81,6 +83,13 @@ struct painter
   float text_vert_offset = 0;
   int current_alignment = 0;
   float current_font_size = 11;
+  
+  float text_height(int font_size) {
+    nvgFontSize(ctx, font_size);
+    float a, d, h;
+    nvgTextMetrics(ctx, &a, &d, &h);
+    return a + std::abs(d);
+  }
   
   void begin_frame(vec2f size, int ratio){
     glClearColor(0, 0, 0, 1);
@@ -261,7 +270,7 @@ struct painter
       // FIXME : Take into account top alignment
       auto ellipsis_y = (current_alignment | (int) text_align::y::center) 
         ? (pos.y + font_size() / 2 - ellipsis_width / 10)
-        : pos.y; 
+        : pos.y;
         
       auto c = circle(vec2f{positions[0].minx + width, ellipsis_y}, ellipsis_width / 10);
       c = c.translated({-c.radius * 2 - 3, 0});
@@ -296,7 +305,7 @@ struct painter
   
   void update_font_offset()
   {
-    // due to font format unconsistency,
+    // due to font format inconsistency,
     // sometimes the ascender actually means "height max"
     // so we have to apply an offset to correct that if it's the case
     // ideally this should be handled by the renderer!
@@ -351,14 +360,14 @@ struct graphics_context
     nvgFontSize(ctx, font_size);
     float bounds[4];
     nvgTextBounds(ctx, 0, 0, str.data(), str.end(), bounds);
-    return vec2f{ bounds[2] - bounds[0], bounds[3] - bounds[1] };
+    return point{ bounds[2] - bounds[0], bounds[3] - bounds[1] };
   }
   
   float text_height(int font_size) const {
     nvgFontSize(ctx, font_size);
     float a, d, h;
     nvgTextMetrics(ctx, &a, &d, &h);
-    return h;
+    return a + std::abs(d);
   }
   
   texture_handle create_texture(const image<rgba<unsigned char>>& data, vec2<int> size) {

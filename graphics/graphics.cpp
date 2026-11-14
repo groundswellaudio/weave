@@ -7,6 +7,7 @@
 #include <SDL3/SDL.h>
 
 #include "misc/default_font_embed"
+#include "misc/Futura-Book-embed"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image.h>
@@ -26,6 +27,7 @@ graphics_context::graphics_context()
   
   create_font_from_memory("default", default_font_data);
   
+  //create_font_from_memory("default", Futura_Book_ttf);
   glClearColor(0,0,0,1);
   glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
 }

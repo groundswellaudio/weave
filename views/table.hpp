@@ -282,6 +282,7 @@ struct table : widget_base, scrollable_base {
         on_field_edit(Ec, {col, row}, str);
       edited_field.reset(); 
     };
+    edited_field->style.background_color = style.background_color;
     Ec.tree().insert(*edited_field, id());
     Ec.grab_mouse_focus(edited_field->id());
     Ec.grab_keyboard_focus(edited_field->id());
