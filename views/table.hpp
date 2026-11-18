@@ -43,12 +43,13 @@ struct table : widget_base, scrollable_base {
   static constexpr float row_height = 15;
   
   struct cell {
-    int index;
+    std::size_t index;
     std::vector<std::string> prop;
     bool selected = false;
   };
   
   style_t style;
+  unsigned first_selected;
   selection_t selection;
   std::vector<tuple<std::string, float>> properties;
   std::vector<cell> cells;
@@ -60,7 +61,7 @@ struct table : widget_base, scrollable_base {
   widget_action<vec2i, std::string_view> on_field_edit;
   widget_action<int> cell_double_click;
   widget_action<popup_menu(selection_t)> popup;
-  
+  widget_action<const selection_t&> on_delete;
   // Which property we're currently using for sorting order, if any
   int property_sort_index : 31 = -1;
   // Whether the sorting order is increasing or decreasing
@@ -100,8 +101,8 @@ struct table : widget_base, scrollable_base {
   void set_cells(const T& data) {
     cells.clear();
     int k = 0;
-    for (auto&& e : table_model<T>{}.cells(data)) {
-      cells.push_back({k++});
+    for (auto&& [index, e] : table_model<T>{}.cells(data)) {
+      cells.push_back({static_cast<std::size_t>(index)});
       for (auto& p : table_model<T>{}.cell_properties(e))
         cells.back().prop.push_back(p);
     }
@@ -185,11 +186,16 @@ struct table : widget_base, scrollable_base {
       dragging = -1;
   }
   
+  void on(keyboard_event e, event_context& ec) {
+    if (e.is_down() && e.key() == keycode::backspace) {
+      on_delete(ec, selection);
+    }
+  }
+  
   bool traverse_children(auto&& fn) {
     return edited_field ? fn(*edited_field) : true;
   }
   
-  static constexpr auto row = 15.f;
   static constexpr float margin = 5;
   
   void paint(painter& p) {
@@ -240,6 +246,7 @@ struct table : widget_base, scrollable_base {
     auto cell = find_cell_at(e.position);
     if (!cell)
       return;
+    Ec.grab_keyboard_focus(id());
     auto [col, row] = *cell;
     if (e.is_double_click() && cell_double_click) {
       cell_double_click(Ec, cells[row].index);
@@ -248,10 +255,15 @@ struct table : widget_base, scrollable_base {
     bool select_range = Ec.is_held(key_modifier::shift);
     if (select_range && selection.size()) {
       auto i = selection.front();
+      for (auto& c : cells)
+        c.selected = false;
       selection.erase(selection.begin() + 1, selection.end());
-      auto di = row <= i ? 1 : -1;
-      for (int idx = row; idx != i; idx += di)
-        selection.push_back(idx);
+      auto di = row <= first_selected ? 1 : -1;
+      for (int idx = row; idx != first_selected; idx += di) {
+        selection.push_back(cells[idx].index);
+        cells[idx].selected = true;
+      }
+      cells[first_selected].selected = true;
     }
     else {
       if (focused_cell == cell) {
@@ -259,8 +271,12 @@ struct table : widget_base, scrollable_base {
         enter_edit_field(col, row, Ec);
       }
       else {
+        for (auto& c : cells)
+          c.selected = false;
         selection.clear();
-        selection.push_back(row);
+        selection.push_back(cells[row].index);
+        cells[row].selected = true;
+        first_selected = row;
       }
       focused_cell = *cell;
     }
@@ -348,15 +364,15 @@ struct table : widget_base, scrollable_base {
   
   void paint_body(painter& p, point body_sz) {
     p.fill_style(style.text_color);
-    int cells_begin = scroll_offset / row;
-    int cells_end = (scroll_offset + scroll_zone().size.y) / row + 1;
+    int cells_begin = scroll_offset / row_height;
+    int cells_end = (scroll_offset + scroll_zone().size.y) / row_height + 1;
     cells_end = std::min(cells_end, (int) cells.size());
     
-    float pos = (int) -scroll_offset % (int) row;
+    float pos = (int) -scroll_offset % (int) row_height;
     
     assert( cells_begin >= 0 );
     
-    for (int i = cells_begin; i < cells_end; ++i, pos += row) {
+    for (int i = cells_begin; i < cells_end; ++i, pos += row_height) {
       auto& c = cells[i];
       int k = 0;
       for (auto& prop : c.prop) {
@@ -366,18 +382,17 @@ struct table : widget_base, scrollable_base {
           ? (size().x - left_x) 
           : get<1>(properties[k+1]) - left_x;
         
-        p.text_bounded({margin + get<1>(properties[k++]), pos + row / 2}, width - margin * 2, prop);
+        p.fill_style(style.text_color);
+        p.text_bounded({margin + get<1>(properties[k++]), pos + row_height / 2}, width - margin * 2, prop);
+        
+        if (c.selected)
+        {
+          p.fill_style(style.selection_color);
+          p.fill(rectangle{point{0, pos}, point{size().x, row_height}});  
+        }
         
         if (left_x + width >= size().x)
           break;
-      }
-    }
-    
-    if (selection.size()) {
-      p.fill_style(style.selection_color);
-      for (auto i : selection) {
-        auto pos_y = i * row - scroll_offset;
-        p.fill( rectangle({0, pos_y}, {size().x, row}) );
       }
     }
   }
@@ -403,6 +418,8 @@ struct table : view<table<T>>, view_modifiers {
     res.set_cells(data.get());
     res.cell_double_click = cell_double_click;
     res.popup = popup_opener;
+    res.on_delete = delete_action;
+    
     version = data.version();
     return res;
   }
@@ -416,6 +433,9 @@ struct table : view<table<T>>, view_modifiers {
       wb.set_properties(model_t{}.properties(data.get()));
       wb.set_cells(data.get());
     }
+    wb.cell_double_click = cell_double_click;
+    wb.popup = popup_opener;
+    wb.on_delete = delete_action;
     return {};
   }
   
@@ -427,13 +447,21 @@ struct table : view<table<T>>, view_modifiers {
     return *this;
   }
   
-  template <class S, class M>
+  template <class S>
   auto& on_cell_double_click(auto&& fn) {
     cell_double_click = [fn] (event_context& ec, int cell) {
       context_invoke<S>(fn, ec, cell);
     };
     return *this;
   }
+  
+  template <class S>
+  auto& on_delete(auto&& fn) {
+    delete_action = [fn] (event_context& ec, widgets::table::selection_t selected) {
+      context_invoke<S>(fn, ec, selected);
+    };
+    return *this;
+  } 
   
   auto& popup_menu(auto fn) {
     popup_opener = fn;
@@ -442,6 +470,7 @@ struct table : view<table<T>>, view_modifiers {
   
   const observed_value<T>& data;
   widget_action<int> cell_double_click;
+  widget_action<widgets::table::selection_t> delete_action;
   widget_action<widgets::popup_menu(widgets::table::selection_t)> popup_opener;
   unsigned version;
 };

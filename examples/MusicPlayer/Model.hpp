@@ -168,8 +168,10 @@ struct Database {
   
   template <class T>
   void delete_tracks(T&& range) {
-    for (auto i : range)
-      tracks.mut().erase(i);
+    tracks.mut();
+    for (auto i : range) {
+      tracks->erase(i);
+    }
   }
   
   bool add_track_from_file(const std::string& path) {
@@ -307,7 +309,7 @@ struct Database {
 template <>
 struct weave::table_model<std::unordered_map<std::size_t, Database::Track>> {
   auto&& properties(ignore) { return Database::properties_v; }
-  auto cells(auto& self) { return std::ranges::views::transform(self, [] (auto& elem) { return elem.second; }); }
+  auto& cells(auto& self) { return self; }
   auto& cell_properties(const Database::Track& t) { return t.properties; }
 };
 
@@ -460,6 +462,18 @@ struct State : weave::app_state {
   
   void add_to_playlist(int playlist_id, int track_id) {
     database.add_to_playlist(playlist_id, track_id);
+  }
+  
+  template <class T> 
+  void delete_tracks(T&& tracks) {
+    if (!current_track_id)
+      database.delete_tracks(tracks);
+    else
+      for (auto i : tracks)
+        if (*current_track_id == i) {
+          pause();
+          current_track_id.reset();
+        }
   }
   
   TrackPlayer player;

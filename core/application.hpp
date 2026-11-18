@@ -234,6 +234,21 @@ std::optional<std::basic_string<nfdchar_t>> open_file_dialog()
   return {};
 }
 
+std::optional<std::basic_string<nfdchar_t>> pick_folder_dialog() 
+{
+  NFD_Init();
+  nfdchar_t* outPath;
+  nfdresult_t result = NFD_PickFolder(&outPath, nullptr);
+  if (result == NFD_OKAY) {
+    std::string res{outPath};
+    NFD_FreePath(outPath);
+    NFD_Quit();
+    return res;
+  }
+  NFD_Quit();
+  return {};
+}
+
 std::optional<std::basic_string<nfdchar_t>> save_file_dialog()
 {
   NFD_Init();

@@ -182,7 +182,14 @@ auto top_panel(State& state)
   auto device_val = readwrite( state.player.current_device_index(), 
                                [] (State& s, int id) { s.player.set_audio_device(id); });
   
-  return hstack {
+  auto on_open = [] (event_context& ec) {
+    auto path = pick_folder_dialog();
+    if (!path)
+      return;
+    on_file_drop(ec, *path);
+  };
+  
+  return hstack { button{"Open", on_open}, 
     combo_box(device_val, audio_output_devices()), 
     transport_buttons,
     vstack{ either{ state.current_track(), 
@@ -251,6 +258,23 @@ auto track_info_menu(State& state, track_selection selected) {
   .margin({40, 40})
   .interspace(10);
 }
+auto on_delete_overlay(event_context& ec, const track_selection& selected) {
+  using namespace views;
+  auto w = vstack{ 
+               text{"Delete {} tracks from library?", selected.size()},
+               hstack{
+                button{"Yes", [selected] (event_context& ec, widget_id id) { ec.state<State>().delete_tracks(selected); 
+                  ec.pop_overlay(id); }},
+                button{"Cancel", &event_context::pop_overlay}
+               }}.build(build_context{ec.context()}, ec.state<State>());
+  w.set_size(w.nominal_size());
+  return w;
+}
+
+void on_delete_table_elements(event_context& ec, const track_selection& selected) {
+  auto w = on_delete_overlay(ec, selected);
+  ec.push_overlay_centered(std::move(w));
+}
 
 auto song_selection_popup_menu(event_context& ec, track_selection selected) {
   // Would be nice here to find a way to not duplicate selected across closure. maybe 
@@ -275,16 +299,7 @@ auto song_selection_popup_menu(event_context& ec, track_selection selected) {
     return m;
   };
   auto delete_fn = [selected] (event_context& ec) {
-    using namespace views;
-    
-    auto w = vstack{ 
-               text{"Delete {} tracks from library?", selected.size()},
-               hstack{
-                button{"Yes", [selected] (event_context& ec, widget_id id) { ec.state<State>().database.delete_tracks(selected); 
-                  ec.pop_overlay(id); }},
-                button{"Cancel", &event_context::pop_overlay}
-               }}.build(build_context{ec.context()}, ec.state<State>());
-    w.set_size(w.nominal_size());
+    auto w = on_delete_overlay(ec, selected);
     ec.push_overlay_centered(std::move(w));
   };
   
@@ -426,7 +441,8 @@ struct LibraryView {
         return table{state.database.tracks}
                     .on_cell_double_click(&State::play_track)
                     .popup_menu(&song_selection_popup_menu)
-                    .on_file_drop(&on_file_drop);
+                    .on_file_drop(&on_file_drop)
+                    .on_delete<State>(&on_delete_table_elements);
       },
       [&] (artists_t) {
         auto left = vstack {

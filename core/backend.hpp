@@ -129,7 +129,7 @@ class sdl_backend
       case SDL_EVENT_DROP_FILE: 
       {
         std::string file = e.drop.data;
-        vis( mouse_event{vec2f{0, 0}, file_drop(std::move(file))} );
+        vis( mouse_event{point{0, 0}, file_drop(std::move(file))} );
         break;
       }
       
@@ -145,9 +145,15 @@ class sdl_backend
       case SDL_EVENT_QUIT :
         want_quit = true;
         break;
-      
-      case SDL_EVENT_WINDOW_FOCUS_GAINED:
       case SDL_EVENT_WINDOW_FOCUS_LOST:
+      
+      {
+        //std::cout << "got focus lost" << std::endl;
+        break;
+      }
+      case SDL_EVENT_WINDOW_FOCUS_GAINED:
+        // std::cout << "got focus gained" << std::endl;
+        break;
       case SDL_EVENT_WINDOW_SHOWN:
       case SDL_EVENT_WINDOW_EXPOSED:
       case SDL_EVENT_WINDOW_OCCLUDED:
