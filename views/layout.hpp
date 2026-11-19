@@ -17,7 +17,7 @@ struct stack_data {
   float interspace = 8;
   point margin {0, 0};
   float align_ratio = 0;
-  rgba_u8 background_col {0, 0, 0, 0};
+  rgba_u8 background_color {0, 0, 0, 0};
   bool fill_cross_axis = false;
 };
 
@@ -52,7 +52,7 @@ struct stack
   }
   
   auto&& background_color(this auto&& self, rgba_u8 col) {
-    self.info.background_col = col;
+    self.info.background_color = col;
     return WEAVE_FWD(self);
   }
   
@@ -311,7 +311,7 @@ namespace impl {
   struct stack_updater : view_sequence_updater<stack_updater> {
     build_context b;
     std::vector<widget_box>& vec;
-    std::vector<int> to_erase;
+    std::vector<widget_box> graveyard;
     int& index;
     widget_id this_id;
     bool mutated = false;
@@ -330,10 +330,9 @@ namespace impl {
     }
     
     widget_ref destroy() {
-      widget_ref res = vec[index].borrow();
-      to_erase.push_back(index++);
+      graveyard.push_back(WEAVE_MOVE(vec[index++]));
       mutated = true;
-      return res;
+      return graveyard.back().borrow();
     }
   };
 
@@ -373,21 +372,7 @@ namespace impl {
       res |= elem.seq_rebuild(get<elem_index.value>(Old.children), seq_updater, ctx, state);
     }, New.children);
     
-    // Remove every elements at the (sorted) indexes in to_erase
-    if (seq_updater.to_erase.size())
-    {
-      auto it = std::stable_partition( w.children_vec.begin(), w.children_vec.end(), 
-                                [ida = 0, idb = 0, &seq_updater] (ignore) mutable {
-                                  if (idb == seq_updater.to_erase.size())
-                                    return true;
-                                  if (ida++ == seq_updater.to_erase[idb]) {
-                                    idb++;
-                                    return false;
-                                  }
-                                  return true;
-                                });
-      w.children_vec.erase(it, w.children_vec.end());
-    }
+    std::erase_if(w.children_vec, [] (const widget_box& b) { return !b; });
     
     // If some underlying items were deleted or added, reset the scrollbar position
     if (seq_updater.mutated)
@@ -445,7 +430,7 @@ struct stack : widget_base, scrollable_base
   }
   
   void paint(painter& p) {
-    p.fill_style(data.background_col);
+    p.fill_style(data.background_color);
     p.fill(rectangle(size()));
     if (min_scroll_axis)
       scrollable_base::paint(p);
@@ -633,6 +618,7 @@ template <class T, class... Ts>
 struct stack_base : view<stack_base<T, Ts...>>, stack<Ts...> {
   
   optional<float> min_scroll_sz;
+  optional<rgba_u8> background_col;
   
   template <class... Vs>
   constexpr stack_base(Vs&&... ts) : stack<Ts...>{{WEAVE_FWD(ts)...}} {} 
@@ -645,6 +631,9 @@ struct stack_base : view<stack_base<T, Ts...>>, stack<Ts...> {
   {
     auto Res = impl::build_stack<T>(*this, ctx, state, this->info);
     Res.min_scroll_axis = min_scroll_sz;
+    if (background_col) {
+      Res.data.background_color = *background_col;
+    }
     return Res;
   }
   
@@ -652,6 +641,9 @@ struct stack_base : view<stack_base<T, Ts...>>, stack<Ts...> {
   rebuild_result rebuild(auto& Old, widget_ref wb, const build_context& ctx, S& state) {
     auto& wl = wb.as<T>();
     wl.min_scroll_axis = min_scroll_sz;
+    if (background_col) {
+      wl.data.background_color = *background_col;
+    }
     return impl::rebuild_stack<T>(*this, Old, wb, ctx, state);
   }
   
@@ -671,6 +663,11 @@ struct stack_base : view<stack_base<T, Ts...>>, stack<Ts...> {
   
   auto&& scrollable(this auto&& self, float min_scroll_size = 300) {
     self.min_scroll_sz = min_scroll_size;
+    return self;
+  }
+  
+  auto&& background(this auto&& self, rgba_u8 col) {
+    self.background_col = col;
     return self;
   }
 };

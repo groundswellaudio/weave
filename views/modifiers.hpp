@@ -59,9 +59,10 @@ struct with_nominal_size : W {
 template <class T, class B>
 struct with_background : T {
   
-  void do_layout(point sz) {
-    background.do_layout(sz);
-    T::do_layout(sz);
+  void layout(point sz) {
+    background.set_size(sz);
+    if constexpr (requires (T& t) { t.layout(sz); })
+      T::layout(sz);
   }
   
   void paint(painter& p) {
@@ -182,18 +183,18 @@ struct with_nominal_size : V {
   
   rebuild_result rebuild(const with_nominal_size<V>& Old, widget_ref r, const build_context& ctx, auto& state) {
     auto& wb = r.as<widget_t>();
-    V::rebuild((V&)Old, widget_ref{&static_cast<typename V::widget_t&>(wb)}, ctx, state);
+    auto res = V::rebuild((V&)Old, widget_ref{&static_cast<typename V::widget_t&>(wb)}, ctx, state);
     if (nominal_size != Old.nominal_size) { 
       wb.nominal_size = nominal_size;
-      return rebuild_result::size_change;
+      return res | rebuild_result::size_change;
     }
-    return {};
+    return res;
   }
   
   void destroy(widget_ref w, application_context& ctx) {
     V::destroy(widget_ref(&(typename V::widget_t&)w.as<widget_t>()), ctx);
   }
-   
+
   point nominal_size;
 };
 
@@ -340,8 +341,8 @@ struct view_modifiers {
     return animated{WEAVE_FWD(self), flag, fn, period_ms};
   }
   
-  auto background(this auto&& self, auto&& background) {
-    return with_background{WEAVE_FWD(self), WEAVE_FWD(background)};
+  auto with_background(this auto&& self, auto&& background) {
+    return views::with_background{WEAVE_FWD(self), WEAVE_FWD(background)};
   }
   
   auto with_flex_factor(this auto&& self, point flex_factor) {
@@ -373,7 +374,7 @@ struct with_background : V {
   
   void destroy(widget_ref r, application_context& ctx) {
     V::destroy(widget_ref((typename V::widget_t*)&r.as<widget_t>()), ctx);
-    background.destroy(widget_ref(&r.as<widget_t>().background), ctx);
+    //background.destroy(widget_ref(&r.as<widget_t>().background), ctx);
   }
   
   B background;

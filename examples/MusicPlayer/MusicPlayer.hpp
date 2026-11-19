@@ -266,7 +266,8 @@ auto on_delete_overlay(event_context& ec, const track_selection& selected) {
                 button{"Yes", [selected] (event_context& ec, widget_id id) { ec.state<State>().delete_tracks(selected); 
                   ec.pop_overlay(id); }},
                 button{"Cancel", &event_context::pop_overlay}
-               }}.build(build_context{ec.context()}, ec.state<State>());
+               }}.background(rgb_f(colors::gray) * 0.3)
+                 .build(build_context{ec.context()}, ec.state<State>());
   w.set_size(w.nominal_size());
   return w;
 }
@@ -448,7 +449,7 @@ struct LibraryView {
         auto left = vstack {
           for_each{ state.artists(), [&self] (auto& a) mutable {
             auto t = text{a.name}.font_size(20)
-                      .background(views::rectangle{}.stroke(1).color(colors::white));
+                      .with_background(views::rectangle{}.stroke(1).color(colors::white));
             return selectable{t, &self.artist, artist_key{std::string_view{a.name}}};
           }}
         }.interspace(0).scrollable().with_nominal_size({200, 300});

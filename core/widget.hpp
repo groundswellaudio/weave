@@ -154,8 +154,6 @@ struct widget_base {
   
   std::optional<widget_ref> find_child_at(this auto& self, point pos);
   
-  void destroy(this auto&& self, destroy_context ctx);
-  
   void mount(this auto& self, widget_tree& tree, widget_id parent);
   
   void unmount(this auto& self, widget_tree&);
@@ -198,7 +196,7 @@ namespace impl
     ptr<optional<widget_ref>(widget_base*, point)> find_child_at;
     ptr<void(widget_base*, widget_children_vec&)> children;
     ptr<void(widget_base*, int indent)> debug_dump;
-    ptr<void(widget_base*, destroy_context ctx)> destroy;
+    ptr<void(widget_base*)> destroy;
     ptr<void(widget_base*, widget_tree&, widget_id)> mount;
     ptr<void(widget_base*, widget_tree&)> unmount;
   };
@@ -349,8 +347,12 @@ struct widget_box : widget_ref {
     return *this;
   }
   
-  operator bool () const {
+  operator bool() const {
     return data;
+  }
+  
+  ~widget_box() {
+    reset();
   }
   
   widget_ref borrow() { return widget_ref{data, vptr}; }
@@ -358,15 +360,11 @@ struct widget_box : widget_ref {
   // FIXME: would be good to have a const_widget_ref?
   widget_ref borrow() const { return widget_ref{data, vptr}; }
   
-  void reset(destroy_context ctx) {
+  void reset() {
     if (data) {
-      vptr->destroy(data, ctx);
+      vptr->destroy(data);
       data = nullptr;
     }
-  }
-  
-  void destroy(destroy_context ctx) {
-    reset(ctx);
   }
 };
 
@@ -538,14 +536,6 @@ struct widget_tree {
   unsigned id_count = 0;
 };
 
-void widget_base::destroy(this auto&& self, destroy_context ctx) {
-  self.traverse_children([ctx] (auto&& c) {
-    ctx.tree().erase(c.id());
-    c.destroy(ctx);
-    return true;
-  });
-}
-
 point widget_base::absolute_position(const widget_tree& tree) const {
   auto p = position();
   for (auto parent : tree.parents_of(*this))
@@ -714,8 +704,7 @@ namespace impl {
       +[] (widget_base* self, int indent) {
         static_cast<W*>(self)->debug_dump(indent + 1);
       },
-      +[] (widget_base* self, destroy_context ctx) {
-        static_cast<W*>(self)->destroy(ctx);
+      +[] (widget_base* self) {
         delete static_cast<W*>(self);
       },
       +[] (widget_base* self, widget_tree& tree, widget_id id) {

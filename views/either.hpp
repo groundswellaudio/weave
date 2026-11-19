@@ -145,9 +145,9 @@ struct either : view_sequence_base {
     }
   }
   
-  void seq_destroy(auto Destroy, application_context& ctx) {
+  void seq_destroy(auto&& Destroy, application_context& ctx) {
     visit( [&] (auto& elem) {
-      elem.seq_destroy(Destroy, ctx);
+      elem.seq_destroy(WEAVE_FWD(Destroy), ctx);
     }, body);
   }
   
