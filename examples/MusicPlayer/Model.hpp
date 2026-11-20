@@ -12,6 +12,7 @@
 #include <atomic>
 #include <set>
 #include <ranges>
+#include <functional>
 
 using namespace weave;
 
@@ -24,8 +25,9 @@ struct TrackPlayer : weave::audio_renderer<TrackPlayer>
     auto src_end = buffer.begin() + head + os.num_samples();
     if (src_end > buffer.end()) {
       src_end = buffer.end();
-      head = -1; 
+      head = -1;
       done_reading = true;
+      on_done_reading();
     }
     std::copy(src_begin, src_end, os.begin());
     head += os.num_samples();
@@ -39,6 +41,7 @@ struct TrackPlayer : weave::audio_renderer<TrackPlayer>
   weave::audio_buffer buffer;
   std::atomic<int> head = -1;
   std::atomic<bool> done_reading = false;
+  std::function<void()> on_done_reading;
 };
 
 static optional<weave::image<weave::rgba<unsigned char>>> read_file_cover(const std::string& path) {
@@ -437,15 +440,15 @@ struct State : weave::app_state {
     return "No track playing";
   }
   
-  // in seconds
-  int current_track_length() const {
-    return player.buffer.size() / (player.buffer.num_channels * player.samplerate());
-  }
-  
   void check_done_reading() {
     if (player.done_reading) {
       next_track();
     }
+  }
+  
+  // in seconds
+  int current_track_length() const {
+    return player.buffer.size() / (player.buffer.num_channels * player.samplerate());
   }
   
   auto& artists() { return database.artists; }

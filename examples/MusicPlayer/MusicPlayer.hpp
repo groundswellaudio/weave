@@ -172,7 +172,7 @@ auto top_panel(State& state)
     }.align_center();
   
   auto transport_bar = transport_bar_view{ [] (State& s, float val) { s.set_track_position(val); }, 
-                                          state.current_track_length() }
+                                          state.current_track() ? state.current_track_length() : 0 }
     .animate_when(state.is_playing(), 1000, 
     [] (auto& w, animation_context& ctx) { 
       w.set_value(ctx.state<State>().current_track_position());
@@ -504,10 +504,9 @@ using library_view = weave::views::composite_view<LibraryView, State>;
 
 auto make_view(State& state)
 {
-  using namespace views;
-  
   state.check_done_reading();
   
+  using namespace views;
   return vstack{ top_panel(state),
                   library_view{}, 
                }.align_center()
@@ -522,5 +521,10 @@ inline void run_app() {
   prop.name = "spinner";
   prop.size = point{600, 400};
   auto app = make_app(state, &make_view, prop);
+  state.player.on_done_reading = [&app] { app.app_ctx.request_rebuild(); };
   app.run(state);
+
+  // app is destroyed before state: stop the audio before notify can point at a dead app
+  state.pause();                  // ma_device_stop waits for a running callback to finish
+  state.player.on_done_reading = nullptr;
 }

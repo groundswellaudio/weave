@@ -84,8 +84,9 @@ struct scrollable : widget_base, scrollable_base {
     return fn(child);
   }
   
-  auto layout() {
-    child.layout();
+  auto layout(point sz) {
+    if constexpr (requires {child.layout(sz);})
+      child.layout(sz);
     return size();
   }
   
