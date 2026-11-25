@@ -37,8 +37,8 @@ struct combo_box : widget_base {
   
   widget_size_info size_info() const {
     widget_size_info res;
-    res.min = point{30, 15};
-    res.max.y = 30;
+    res.min = point{max_width + 2 * margin, 15};
+    res.max.y = 15;
     res.nominal = point{max_width + 2 * margin, 15.f};
     res.flex_factor = point{0.1, 0};
     return res;
@@ -115,7 +115,6 @@ struct combo_box : view<combo_box<Lens, Range>> {
   
   template <class S>
   auto build_impl(const build_context& ctx, S& state) {
-    auto size = point{50, 20};
     auto&& vec = make_string_vec();
     auto w = max_text_width(vec, ctx.graphics_context(), 11);
     auto res = widget_t{ctx.new_id(), WEAVE_FWD(vec)};

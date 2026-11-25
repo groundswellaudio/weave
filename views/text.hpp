@@ -112,12 +112,12 @@ struct with_label : widget_base {
   
   void set_label(std::string str, graphics_context& ctx) {
     text = WEAVE_MOVE(str);
-    text_size = ctx.text_bounds(str, 11).x;
+    text_size = ctx.text_bounds(text, 11).x;
   }
   
   void set_label(std::string_view str, graphics_context& ctx) {
     text = std::string{str};
-    text_size = ctx.text_bounds(str, 11).x;
+    text_size = ctx.text_bounds(text, 11).x;
   }
   
   void on(mouse_event e, event_context& ec) {}
@@ -207,8 +207,10 @@ text(T&& str, Ts&&... ts) -> text<Ts...>;
 template <class V>
 struct with_label : view<with_label<V>>, view_modifiers {
   
-  with_label(std::string_view str, V view) : str{str}, view{WEAVE_MOVE(view)} {}
+  using widget_t = widgets::with_label<typename V::widget_t>;
   
+  with_label(std::string_view str, V view) : str{str}, view{WEAVE_MOVE(view)} {}
+
   auto build(const build_context& ctx, auto& state) {
     using underlying = decltype(view.build(ctx, state));
     auto res = widgets::with_label<underlying>{ctx.widget_tree().new_id(), view.build(ctx, state)};
@@ -217,13 +219,12 @@ struct with_label : view<with_label<V>>, view_modifiers {
   }
   
   rebuild_result rebuild(const with_label<V>& old, widget_ref w, const build_context& ctx, auto& state) {
-    using underlying = decltype(view.build(ctx, state));
-    auto& wl = w.as<widgets::with_label<underlying>>();
+    auto& wl = w.as<widget_t>();
     if (str != old.str) {
       wl.set_label(str, ctx.graphics_context());
       return rebuild_result::size_change;
     }
-    return {};
+    return view.rebuild(old.view, widget_ref(&wl.child), ctx, state);
   }
   
   std::string str;

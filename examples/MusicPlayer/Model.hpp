@@ -19,19 +19,28 @@ using namespace weave;
 struct TrackPlayer : weave::audio_renderer<TrackPlayer>
 {
   void render_audio(weave::audio_output_stream& os) {
-    if (head == -1)
+    int h = head;
+    if (h < 0) {
+      std::ranges::fill(os, 0.f);
       return;
-    auto src_begin = buffer.begin() + head;
-    auto src_end = buffer.begin() + head + os.num_samples();
-    if (src_end > buffer.end()) {
-      src_end = buffer.end();
+    }
+    const float gain = volume.load(std::memory_order_relaxed);
+    auto n = std::min<std::ptrdiff_t>(os.num_samples(), (std::ptrdiff_t)buffer.size() - h);
+    auto src = buffer.begin() + h;
+
+    auto out = std::transform(src, src + n, os.begin(),
+                              [gain] (float s) { return s * gain; });
+    std::fill(out, os.end(), 0.f);
+
+    if (h + n >= (std::ptrdiff_t)buffer.size()) {
       head = -1;
       done_reading = true;
-      on_done_reading();
+      if (on_done_reading) 
+        on_done_reading();
     }
-    std::copy(src_begin, src_end, os.begin());
-    head += os.num_samples();
-  }
+    else
+      head = h + n;
+}
   
   ~TrackPlayer(){
     head = -1;
@@ -59,7 +68,7 @@ static optional<weave::image<weave::rgba<unsigned char>>> read_file_cover(const 
   return weave::decode_image({(unsigned char*)data_vec.data(), data_vec.size()});
 }
 
-struct Album { 
+struct Album {
     
   // Name and artist
   using Key = weave::tuple<std::string_view, std::string_view>;

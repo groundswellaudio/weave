@@ -208,7 +208,8 @@ auto top_panel(State& state)
 
 using track_selection = widgets::table::selection_t;
 
-auto track_info_menu(State& state, track_selection selected) {
+template <class R>
+auto track_info_menu(State& state, const R& selected) {
   
   using namespace weave::views;
   
@@ -258,7 +259,9 @@ auto track_info_menu(State& state, track_selection selected) {
   .margin({40, 40})
   .interspace(10);
 }
-auto on_delete_overlay(event_context& ec, const track_selection& selected) {
+
+template <class R>
+auto on_delete_overlay(event_context& ec, const R& selected) {
   using namespace views;
   auto w = vstack{ 
                text{"Delete {} tracks from library?", selected.size()},
@@ -277,7 +280,8 @@ void on_delete_table_elements(event_context& ec, const track_selection& selected
   ec.push_overlay_centered(std::move(w));
 }
 
-auto song_selection_popup_menu(event_context& ec, track_selection selected) {
+template <class R>
+auto song_selection_popup_menu(event_context& ec, const R& selected) {
   // Would be nice here to find a way to not duplicate selected across closure. maybe 
   // this will be solved by widgets containing user defined state that's passed down to closures
   widgets::popup_menu menu {ec.tree().new_id()};
@@ -285,8 +289,7 @@ auto song_selection_popup_menu(event_context& ec, track_selection selected) {
     auto& s = ec.state<State>();
     auto w = track_info_menu(s, selected).build(build_context{ec.context()}, s);
     w.set_size(w.nominal_size());
-    w.set_position(ec.context().window().size() / 2 - w.size() / 2);
-    ec.push_overlay(std::move(w));
+    ec.push_overlay_centered(std::move(w));
   };
   auto add_to_playlist = [selected] (event_context& ec) {
     widgets::popup_menu m {ec.tree().new_id()};
@@ -353,8 +356,8 @@ struct make_track_view {
   State& state;
   CenterViewState& view_state;
   TrackRange track_range;
+  int& track_counter;
   int p = 1;
-  
   auto operator()(tuple<const Database::Track&, int> TrackAndId) {
     using namespace weave::views;
     auto [t, tid] = TrackAndId;
@@ -365,37 +368,38 @@ struct make_track_view {
         state.set_play(false); 
       return Val;
     };
-    auto r = hstack{ text{"{} - ", (int)p}.with_flex_factor({0,0}), 
+    auto r = hstack{ text{"{} - ", (int)p++}.with_flex_factor({0,0}), 
                      graphic_toggle_button{&paint_play_button, 
                                            state.is_playing() && state.current_track_id == tid, 
                                            play_track}
                                           .with_fixed_size({11, 11}),
                      text{t.title()}.align_right() }.align_center();
-    return multi_selectable{r, &view_state.song_selection, p++}
+    return multi_selectable{r, &view_state.song_selection, track_counter++}
            .with_popup_menu([s = &view_state, track_range = track_range] (event_context& ec) {
               auto track_id_range = std::ranges::transform_view(track_range, [] (auto&& e) { return get<1>(e); });
               auto selected_tracks = filter_from_ascending_indices<std::vector<unsigned>>(track_id_range, s->song_selection);
               return song_selection_popup_menu(ec, selected_tracks);
-           });
-  }
-  
+          });
+    }
  };
 
 struct make_album_view {
   State& state;
   CenterViewState& view_state;
-  
+  int& track_counter;
   auto operator()(const Database::Album& a) {
     using namespace weave::views;
     auto album_tracks = state.database.album_tracks(a);
     return vstack {
       hstack{ views::image{a.cover}.fit({150, 150}), text{a.title()}.font_size(20) }.align_center(),
-      for_each(album_tracks, make_track_view{state, view_state, album_tracks})
+      for_each(album_tracks, make_track_view{state, view_state, album_tracks, track_counter})
     };
   }
 };
 
 struct LibraryView {
+  
+  int track_counter = 0;
   
   using view_state = CenterViewState;
   
@@ -436,12 +440,16 @@ struct LibraryView {
   auto body(State& state, view_state& self) {
     using namespace views;
     
+    auto popup_menu = [] (event_context& ec, const auto& selected) {
+      return song_selection_popup_menu(ec, selected);
+    };
+    
     auto center_view = either {
       self.selection, 
       [&] (songs_t) {
         return table{state.database.tracks}
                     .on_cell_double_click(&State::play_track)
-                    .popup_menu(&song_selection_popup_menu)
+                    .popup_menu(popup_menu)
                     .on_file_drop(&on_file_drop)
                     .on_delete<State>(&on_delete_table_elements);
       },
@@ -454,10 +462,11 @@ struct LibraryView {
           }}
         }.interspace(0).scrollable().with_nominal_size({200, 300});
         auto artist_view = [&] (artist_key current) {
+          track_counter = 0;
           return vstack{
             text{current.value}.font_size(30),
-            for_each( state.database.artist_albums(current.value),
-                      make_album_view{state, self} )
+            for_each(state.database.artist_albums(current.value),
+                      make_album_view{state, self, track_counter})
           }.with_nominal_size({300, 300}).scrollable();
         };
         
@@ -481,14 +490,16 @@ struct LibraryView {
       },
       [&] (playlist_id id) {
         auto&& tracks = state.database.playlist_tracks(id.value);
+        track_counter = 0;
         return vstack {
           text_field{ [id] (State& s, std::string_view str) { s.set_playlist_name(id.value, str); } }
           .set_value(state.database.playlist(id.value).name).font_size(30),
-          for_each( tracks, make_track_view{state, self, tracks} )
+          for_each( tracks, make_track_view<std::remove_reference_t<decltype(tracks)>>{state, self, tracks, track_counter} )
         }.scrollable();
       },
       [&] (album_id id) {
-        return make_album_view{state, self}(state.database.album(id.artist, id.title))
+        track_counter = 0;
+        return make_album_view{state, self, track_counter}(state.database.album(id.artist, id.title))
                .scrollable().with_nominal_size({300, 300});
       }
     };
