@@ -9,23 +9,23 @@ namespace weave::views {
 template <class Range, class ViewCtor>
 struct for_each : view_sequence_base {
   
-  for_each(auto&& range, ViewCtor ctor) : range{WEAVE_FWD(range)}, view_ctor{ctor} {}
+  for_each(auto&& r, ViewCtor ctor) : range{WEAVE_FWD(r)}, view_ctor{ctor} {
+    for (auto&& elem : range) {
+      elements.push_back(view_ctor(elem));
+    }
+  }
   
   using element = decltype( std::declval<ViewCtor>()(*std::declval<Range>().begin()) );
   
   void seq_build(auto Consumer, const build_context& b,  auto& state) {
-    for (auto&& elem : range) {
-      elements.push_back(view_ctor(elem));
-      Consumer( elements.back().build(b, state) );
+    for (auto&& elem : elements) {
+      Consumer( elem.build(b, state) );
     }
   }
   
   rebuild_result seq_rebuild(for_each& Old, auto&& seq_updater, const build_context& ctx, auto& state) 
   {
-    for (auto&& e : range) {
-      elements.push_back(view_ctor(e));
-    }
-    
+    // elements were already created by the constructor
     rebuild_result res = {};
     
     if (elements.size() >= Old.elements.size())

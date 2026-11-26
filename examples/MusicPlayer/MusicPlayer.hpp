@@ -5,6 +5,7 @@
 
 #include <ranges>
 #include <algorithm>
+#include <memory>
 
 using namespace weave;
 
@@ -351,19 +352,30 @@ auto filter_from_ascending_indices(A&& range, B&& indices) -> R {
   return res;
 }
 
-template <class TrackRange>
+using track_ids_ptr = std::shared_ptr<const std::vector<std::size_t>>;
+
+// Ids of a range of tuple<const Track&, int>
+template <class R>
+track_ids_ptr make_track_ids(R&& tracks) {
+  return std::make_shared<const std::vector<std::size_t>>(
+    tracks | std::views::transform([] (auto&& e) { return (std::size_t)get<1>(e); })
+           | std::ranges::to<std::vector<std::size_t>>());
+}
+
 struct make_track_view {
   State& state;
   CenterViewState& view_state;
-  TrackRange track_range;
-  int& track_counter;
+  track_ids_ptr track_ids;   // every track of the list, in display order
+  int& track_counter;        // index of the current row in *track_ids
   int p = 1;
   auto operator()(tuple<const Database::Track&, int> TrackAndId) {
     using namespace weave::views;
     auto [t, tid] = TrackAndId;
-    auto play_track = [id = tid] (State& state, bool Val) { 
-      if (Val)
+    auto play_track = [id = tid, ids = track_ids, index = track_counter] (State& state, bool Val) { 
+      if (Val) {
         state.play_track(id);
+        state.queue_tracks(*ids | std::views::drop(index + 1) | std::views::reverse);
+      }
       else
         state.set_play(false); 
       return Val;
@@ -375,9 +387,8 @@ struct make_track_view {
                                           .with_fixed_size({11, 11}),
                      text{t.title()}.align_right() }.align_center();
     return multi_selectable{r, &view_state.song_selection, track_counter++}
-           .with_popup_menu([s = &view_state, track_range = track_range] (event_context& ec) {
-              auto track_id_range = std::ranges::transform_view(track_range, [] (auto&& e) { return get<1>(e); });
-              auto selected_tracks = filter_from_ascending_indices<std::vector<unsigned>>(track_id_range, s->song_selection);
+           .with_popup_menu([s = &view_state, ids = track_ids] (event_context& ec) {
+              auto selected_tracks = filter_from_ascending_indices<std::vector<unsigned>>(*ids, s->song_selection);
               return song_selection_popup_menu(ec, selected_tracks);
           });
     }
@@ -386,13 +397,14 @@ struct make_track_view {
 struct make_album_view {
   State& state;
   CenterViewState& view_state;
+  track_ids_ptr track_ids;
   int& track_counter;
   auto operator()(const Database::Album& a) {
     using namespace weave::views;
     auto album_tracks = state.database.album_tracks(a);
     return vstack {
       hstack{ views::image{a.cover}.fit({150, 150}), text{a.title()}.font_size(20) }.align_center(),
-      for_each(album_tracks, make_track_view{state, view_state, album_tracks, track_counter})
+      for_each(album_tracks, make_track_view{state, view_state, track_ids, track_counter})
     };
   }
 };
@@ -463,10 +475,16 @@ struct LibraryView {
         }.interspace(0).scrollable().with_nominal_size({200, 300});
         auto artist_view = [&] (artist_key current) {
           track_counter = 0;
+          auto tracks_id = std::make_shared<const std::vector<std::size_t>>(
+                      state.database.artist_albums(current.value)
+                    | std::views::transform([] (auto& album) -> auto& { return album.tracks; })
+                    | std::views::join
+                    | std::ranges::to<std::vector<std::size_t>>());
+
           return vstack{
             text{current.value}.font_size(30),
             for_each(state.database.artist_albums(current.value),
-                      make_album_view{state, self, track_counter})
+                      make_album_view{state, self, tracks_id, track_counter})
           }.with_nominal_size({300, 300}).scrollable();
         };
         
@@ -494,12 +512,13 @@ struct LibraryView {
         return vstack {
           text_field{ [id] (State& s, std::string_view str) { s.set_playlist_name(id.value, str); } }
           .set_value(state.database.playlist(id.value).name).font_size(30),
-          for_each( tracks, make_track_view<std::remove_reference_t<decltype(tracks)>>{state, self, tracks, track_counter} )
+          for_each( tracks, make_track_view{state, self, make_track_ids(tracks), track_counter} )
         }.scrollable();
       },
       [&] (album_id id) {
+        auto&& album = state.database.album(id.artist, id.title);
         track_counter = 0;
-        return make_album_view{state, self, track_counter}(state.database.album(id.artist, id.title))
+        return make_album_view{state, self, make_track_ids(state.database.album_tracks(album)), track_counter}(album)
                .scrollable().with_nominal_size({300, 300});
       }
     };

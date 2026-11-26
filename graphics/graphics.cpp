@@ -7,7 +7,7 @@
 #include <SDL3/SDL.h>
 
 #include "misc/default_font_embed"
-#include "misc/Futura-Book-embed"
+//#include "misc/Futura-Book-embed"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image.h>

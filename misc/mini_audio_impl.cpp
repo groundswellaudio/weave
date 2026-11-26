@@ -1,5 +1,7 @@
 #include "audio.hpp"
 #include "util/util.hpp"
+#include <span>
+#include <cctype>
 #define MINIAUDIO_IMPLEMENTATION
 #include <miniaudio.h>
 
@@ -13,7 +15,12 @@
 
 std::optional<weave::audio_buffer> weave::read_audio_file(const std::string& path) 
 {
-  if (path.ends_with(".mp3"))
+  auto dot = path.find_last_of('.');
+  std::string ext = dot == std::string::npos ? std::string{} : path.substr(dot);
+  for (auto& c : ext)
+    c = (char)std::tolower((unsigned char)c);
+  
+  if (ext == ".mp3")
   {
     drmp3 mp3;
     if (!drmp3_init_file(&mp3, path.c_str(), nullptr))
@@ -28,14 +35,22 @@ std::optional<weave::audio_buffer> weave::read_audio_file(const std::string& pat
       auto framesJustRead = drmp3_read_pcm_frames_f32(&mp3, std::size(Temp) / mp3.channels, Temp);
       if (framesJustRead == 0)
         break;
-      vec.append_range(Temp);
+      vec.append_range(std::span{Temp, (std::size_t)(framesJustRead * mp3.channels)});
     }
 
     return audio_buffer{vec, (int)mp3.channels};
   }
-  else if (path.ends_with(".flac"))
+  else if (ext == ".flac")
   {
-    return {};
+    unsigned channels, sample_rate;
+    drflac_uint64 frame_count;
+    float* data = drflac_open_file_and_read_pcm_frames_f32(path.c_str(), &channels, &sample_rate, 
+                                                           &frame_count, nullptr);
+    if (!data)
+      return {};
+    auto dtor = on_exit( [&] () { drflac_free(data, nullptr); } );
+    std::vector<float> vec(data, data + frame_count * channels);
+    return audio_buffer{vec, (int)channels};
   }
   else // Default ot wav if all else fails 
   {

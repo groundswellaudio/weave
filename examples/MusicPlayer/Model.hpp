@@ -401,6 +401,12 @@ struct State : weave::app_state {
       }
       player.done_reading = false;
     }
+    else if (player.head < 0)
+    {
+      // same track as the one in the buffer, but it already played to the end: rewind it
+      player.head = 0;
+      player.done_reading = false;
+    }
     
     player.start_audio_render();
     is_playing_v = true;
@@ -411,12 +417,19 @@ struct State : weave::app_state {
     is_playing_v = false;
   }
   
+  template <class T> 
+  void queue_tracks(T&& range) {
+    tracks_queue = range | std::ranges::to<std::vector<std::size_t>>();
+  }
+  
   void next_track() {
-    current_track_id = *current_track_id + 1;
-    if (*current_track_id > database.num_tracks())
-      current_track_id = std::nullopt;
-    else
+    if (tracks_queue.size()) {
+      current_track_id = tracks_queue.back();
+      tracks_queue.pop_back();
       play();
+    }
+    else 
+      current_track_id = std::nullopt;
   }
   
   void previous_track() {
@@ -450,7 +463,7 @@ struct State : weave::app_state {
   }
   
   void check_done_reading() {
-    if (player.done_reading) {
+    if (player.done_reading.exchange(false)) {
       next_track();
     }
   }
@@ -487,7 +500,7 @@ struct State : weave::app_state {
           current_track_id.reset();
         }
   }
-  
+  std::vector<std::size_t> tracks_queue;
   TrackPlayer player;
   std::optional<int> current_track_id;
   int buffer_track_id = -1;
